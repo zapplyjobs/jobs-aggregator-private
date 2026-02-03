@@ -16,14 +16,13 @@ const fs = require('fs');
 const path = require('path');
 
 // Import fetchers
-const { fetchFromJSearch, getUsageStats } = require('../fetchers/jsearch-fetcher');
+const { fetchFromJSearch, getUsageStats } = require('./fetchers/jsearch-fetcher');
 
 // Import processors
-const { normalizeJobs } = require('../processors/normalizer');
-const { deduplicateJobs } = require('../processors/deduplicator');
+const { deduplicateJobs } = require('./processors/deduplicator');
 
 // Import utils
-const { writeJobsJSONL, writeMetadata } = require('../utils/file-writer');
+const { writeJobsJSONL, writeMetadata } = require('./utils/file-writer');
 
 // Paths
 const DATA_DIR = path.join(process.cwd(), '.github', 'data');
