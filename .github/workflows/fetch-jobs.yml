@@ -90,9 +90,9 @@ jobs:
     - name: 🔄 Pull latest changes (before push)
       if: always()
       run: |
-        echo "📥 Pulling latest changes with rebase..."
+        echo "📥 Pulling latest changes..."
         git fetch origin ${{ github.ref_name }}
-        git rebase origin/${{ github.ref_name }}
+        git reset --hard origin/${{ github.ref_name }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
