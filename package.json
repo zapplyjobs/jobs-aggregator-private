@@ -1,0 +1,16 @@
+{
+  "name": "jobs-data-2026",
+  "version": "1.0.0",
+  "description": "Central jobs fetcher - aggregates jobs from JSearch API for consumer repositories",
+  "main": ".github/scripts/index.js",
+  "scripts": {
+    "fetch": "node .github/scripts/index.js",
+    "test": "node .github/scripts/index.js --dry-run"
+  },
+  "keywords": ["jobs", "aggregator", "jsearch", "api"],
+  "author": "zapplyjobs",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}
