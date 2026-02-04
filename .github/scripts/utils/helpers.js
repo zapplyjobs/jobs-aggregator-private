@@ -77,10 +77,14 @@ function hashString(str) {
 function isInternship(job) {
   const title = (job.job_title || job.title || '').toLowerCase();
   const description = (job.job_description || '').toLowerCase();
-  const employmentTypes = job.job_employment_type || [];
+  // Normalize employment_types to always be an array (JSearch returns string or array)
+  const employmentTypesRaw = job.job_employment_type || [];
+  const employmentTypes = Array.isArray(employmentTypesRaw)
+    ? employmentTypesRaw
+    : (employmentTypesRaw ? String(employmentTypesRaw).split(',').map(t => t.trim().toUpperCase()) : []);
 
   // Check employment type field first
-  if (employmentTypes.some(t => t.includes('INTERN') || t.includes('INTERN'))) {
+  if (employmentTypes.some(t => t.includes('INTERN'))) {
     return true;
   }
 
@@ -108,7 +112,11 @@ function isInternship(job) {
 function isNewGrad(job) {
   const title = (job.job_title || job.title || '').toLowerCase();
   const description = (job.job_description || '').toLowerCase();
-  const employmentTypes = job.job_employment_type || [];
+  // Normalize employment_types to always be an array (JSearch returns string or array)
+  const employmentTypesRaw = job.job_employment_type || [];
+  const employmentTypes = Array.isArray(employmentTypesRaw)
+    ? employmentTypesRaw
+    : (employmentTypesRaw ? String(employmentTypesRaw).split(',').map(t => t.trim().toUpperCase()) : []);
 
   // Check employment type
   if (employmentTypes.some(t => t.includes('FULLTIME'))) {
