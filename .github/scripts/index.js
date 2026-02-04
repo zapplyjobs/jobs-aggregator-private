@@ -20,6 +20,8 @@ const { fetchFromJSearch, getUsageStats } = require('./fetchers/jsearch-fetcher'
 
 // Import processors
 const { deduplicateJobs } = require('./processors/deduplicator');
+const { tagJobs, generateTagStats } = require('./processors/tag-engine');
+const { printTagDistribution } = require('./processors/tag-monitor');
 
 // Import utils
 const { writeJobsJSONL, writeMetadata } = require('./utils/file-writer');
@@ -75,14 +77,32 @@ async function main() {
     console.log(`✅ Step 2 complete: ${normalizedJobs.length} jobs normalized`);
     console.log('');
 
+    // Step 2.5: Apply tags
+    console.log('🏷️  Step 2.5: Applying tags...');
+    console.log('━'.repeat(60));
+
+    const taggedJobs = tagJobs(normalizedJobs);
+
+    console.log(`✅ Step 2.5 complete: ${taggedJobs.length} jobs tagged`);
+    console.log('');
+
     // Step 3: Deduplicate
     console.log('🔍 Step 3: Deduplicating jobs...');
     console.log('━'.repeat(60));
 
-    const { unique: dedupedJobs, duplicates, stats: dedupeStats } = deduplicateJobs(normalizedJobs);
+    const { unique: dedupedJobs, duplicates, stats: dedupeStats } = deduplicateJobs(taggedJobs);
 
     console.log('');
     console.log(`✅ Step 3 complete: ${dedupedJobs.length} unique jobs (${duplicates} duplicates removed)`);
+    console.log('');
+
+    // Step 3.5: Generate tag statistics
+    console.log('📊 Step 3.5: Generating tag statistics...');
+    console.log('━'.repeat(60));
+
+    const tagStats = generateTagStats(dedupedJobs);
+
+    console.log(`✅ Step 3.5 complete: Tag statistics generated`);
     console.log('');
 
     // Step 4: Sort by date (newest first)
@@ -107,7 +127,7 @@ async function main() {
 
     // Write metadata
     const duration = Date.now() - startTime;
-    const metadata = generateMetadata(sortedJobs, dedupedJobs.length, duplicates, duration);
+    const metadata = generateMetadata(sortedJobs, dedupedJobs.length, duplicates, duration, tagStats);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
@@ -116,6 +136,9 @@ async function main() {
 
     // Step 6: Print summary
     printSummary(sortedJobs, dedupedJobs.length, duplicates, duration);
+
+    // Step 6.5: Print tag distribution
+    printTagDistribution(sortedJobs);
 
     // Step 7: Git commit (unless dry run)
     if (!isDryRun) {
@@ -154,9 +177,10 @@ async function main() {
  * @param {number} uniqueCount - Unique job count
  * @param {number} duplicateCount - Duplicate count
  * @param {number} duration - Duration in ms
+ * @param {Object} tagStats - Tag statistics from tag engine
  * @returns {Object} - Metadata object
  */
-function generateMetadata(jobs, uniqueCount, duplicateCount, duration) {
+function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, other: 0 };
@@ -202,7 +226,10 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration) {
     by_job_type: byInternship,
     by_location: byRemote,
 
-    jsearch_stats: getUsageStats()
+    jsearch_stats: getUsageStats(),
+
+    // Tag statistics (Phase 1)
+    tag_stats: tagStats
   };
 }
 

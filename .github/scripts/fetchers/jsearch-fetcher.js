@@ -21,25 +21,32 @@ const JSEARCH_BASE_URL = 'https://jsearch.p.rapidapi.com/search';
 const MAX_REQUESTS_PER_DAY = 6; // Free tier: 200/month ÷ 30 = ~6/day
 const USAGE_FILE = path.join(process.cwd(), '.github', 'data', 'jsearch-usage.json');
 
-// Query rotation - 5 queries for internships, new grad, remote
-const QUERIES = [
-  // Internship queries
-  'software engineer intern',
-  'software engineering internship',
-  'data science intern',
-  'machine learning intern',
-  'product manager intern',
-  // New grad queries
-  'new grad software engineer',
-  'entry level software engineer',
-  'junior software engineer',
-  'graduate software engineer',
-  'associate software engineer',
-  // Remote queries
-  'remote software engineer',
-  'remote developer',
-  'work from home software engineer'
+// Broad queries for Tagged Streams Aggregator (Phase 1)
+// These cover all domains: software, data science, hardware, nursing, product, etc.
+// Removed broken filters (employment_types, job_requirements) - they don't work per research
+// Client-side tagging in tag-engine.js handles filtering instead
+const BROAD_QUERIES = [
+  // Tech & Software (covers software, data science, product)
+  'software engineer developer data scientist product manager',
+
+  // Internships (covers all internship types)
+  'internship intern summer program co-op coop',
+
+  // Entry Level (covers new grad, junior, associate)
+  'entry level new grad junior associate',
+
+  // Healthcare (covers nursing, medical)
+  'nurse healthcare medical registered rn lpn',
+
+  // Hardware (covers embedded, electrical, firmware)
+  'hardware engineer embedded firmware electrical',
+
+  // Remote (covers all remote roles)
+  'remote work from home'
 ];
+
+// Keep query rotation - use current hour to select from broad queries
+const QUERIES = BROAD_QUERIES;
 
 /**
  * Load or initialize usage tracking
@@ -127,8 +134,9 @@ async function fetchFromJSearch() {
     url.searchParams.append('page', '1');
     url.searchParams.append('num_pages', '10');  // Up to 100 jobs per request
     url.searchParams.append('date_posted', 'month');
-    url.searchParams.append('employment_types', 'INTERN,FULLTIME');  // Both internships and entry level
-    url.searchParams.append('job_requirements', 'no_experience,under_3_years_experience');
+    // NOTE: Removed employment_types and job_requirements - they don't work per research
+    // Client-side tagging in tag-engine.js handles filtering instead
+    url.searchParams.append('country', 'us');  // IMPORTANT: Always specify country explicitly
 
     const response = await fetch(url.toString(), {
       method: 'GET',
