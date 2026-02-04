@@ -92,7 +92,10 @@ jobs:
       run: |
         echo "📥 Pulling latest changes..."
         git fetch origin ${{ github.ref_name }}
-        git reset --hard origin/${{ github.ref_name }}
+        # Use rebase instead of reset to preserve local commits
+        if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/${{ github.ref_name }})" ]; then
+          git pull origin ${{ github.ref_name }} --rebase || echo "No divergent commits to rebase"
+        fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
