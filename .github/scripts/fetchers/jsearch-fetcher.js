@@ -4,7 +4,7 @@
  * JSearch API Fetcher
  *
  * Fetches jobs from JSearch API (RapidAPI)
- * Free tier: 200 requests/month (~6 requests/day with safety margin)
+ * Paid tier: 10,000 requests/month (~333 requests/day with safety margin)
  *
  * Features:
  * - Query rotation (distributes queries across hourly runs)
@@ -18,7 +18,7 @@ const path = require('path');
 // Configuration
 const JSEARCH_API_KEY = process.env.JSEARCH_API_KEY;
 const JSEARCH_BASE_URL = 'https://jsearch.p.rapidapi.com/search';
-const MAX_REQUESTS_PER_DAY = 6; // Free tier: 200/month ÷ 30 = ~6/day
+const MAX_REQUESTS_PER_DAY = 300; // Paid tier: 10,000/month ÷ 30 = ~333/day (using 300 for safety)
 const USAGE_FILE = path.join(process.cwd(), '.github', 'data', 'jsearch-usage.json');
 
 // Broad queries for Tagged Streams Aggregator (Phase 1)
