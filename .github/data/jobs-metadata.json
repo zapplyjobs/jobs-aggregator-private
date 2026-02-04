@@ -1,52 +1,62 @@
 {
   "version": "1.0",
-  "generated": "2026-02-04T22:46:44.980Z",
-  "duration_ms": 9428,
-  "total_jobs": 3,
-  "unique_jobs": 3,
-  "duplicates_removed": 52,
+  "generated": "2026-02-04T23:11:53.809Z",
+  "duration_ms": 16324,
+  "total_jobs": 92,
+  "unique_jobs": 92,
+  "duplicates_removed": 1,
   "by_source": {
-    "jsearch": 3
+    "jsearch": 92
   },
   "by_employment_type": {
-    "FULL-TIME": 3
+    "FULL-TIME": 84,
+    "FULL-TIME AND PART-TIME": 1,
+    "FULL-TIME AND CONTRACTOR": 1,
+    "CONTRACTOR": 2,
+    "PART-TIME": 4
   },
   "by_job_type": {
     "internship": 0,
     "new-grad": 0,
-    "other": 3
+    "other": 92
   },
   "by_location": {
-    "remote": 0,
-    "onsite": 3
+    "remote": 92,
+    "onsite": 0
   },
   "jsearch_stats": {
     "date": "2026-02-04",
     "requests_today": 1,
     "remaining_today": 299,
-    "total_jobs_fetched": 55,
-    "avg_jobs_per_request": "55.0"
+    "total_jobs_fetched": 93,
+    "avg_jobs_per_request": "93.0"
   },
   "tag_stats": {
     "employment": {
-      "senior": 2,
-      "entry_level": 1
+      "entry_level": 81,
+      "mid_level": 1,
+      "senior": 10
     },
     "domains": {
-      "hardware": 3,
-      "product": 1
+      "general": 83,
+      "nursing": 4,
+      "product": 3,
+      "data_science": 2,
+      "software": 1
     },
     "locations": {
-      "us": 3,
-      "on_site": 3
+      "remote": 92,
+      "us": 80
     },
     "experience": {
-      "3_plus_years": 3
+      "3_plus_years": 63,
+      "no_experience": 26,
+      "under_3_years": 3
     },
     "special": {
-      "faang": 1,
-      "fortune500": 1
+      "fortune500": 1,
+      "unicorn": 1
     },
-    "total": 3
+    "total": 92
   }
 }
