@@ -1,10 +1,10 @@
 {
   "version": "1.0",
-  "generated": "2026-02-05T21:56:43.925Z",
-  "duration_ms": 72678,
+  "generated": "2026-02-05T22:13:12.528Z",
+  "duration_ms": 53583,
   "total_jobs": 1,
   "unique_jobs": 1,
-  "duplicates_removed": 133,
+  "duplicates_removed": 57,
   "by_source": {
     "jsearch": 1
   },
@@ -12,9 +12,9 @@
     "FULL-TIME": 1
   },
   "by_job_type": {
-    "internship": 1,
+    "internship": 0,
     "new-grad": 0,
-    "other": 0
+    "other": 1
   },
   "by_location": {
     "remote": 0,
@@ -24,15 +24,15 @@
     "date": "2026-02-05",
     "requests_today": 3,
     "remaining_today": 297,
-    "total_jobs_fetched": 134,
-    "avg_jobs_per_request": "44.7"
+    "total_jobs_fetched": 58,
+    "avg_jobs_per_request": "19.3"
   },
   "tag_stats": {
     "employment": {
-      "internship": 1
+      "entry_level": 1
     },
     "domains": {
-      "data_science": 1
+      "general": 1
     },
     "locations": {
       "us": 1,
