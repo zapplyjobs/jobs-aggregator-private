@@ -1,57 +1,47 @@
 {
   "version": "1.0",
-  "generated": "2026-02-05T23:12:11.338Z",
-  "duration_ms": 92708,
-  "total_jobs": 13,
-  "unique_jobs": 13,
-  "duplicates_removed": 279,
+  "generated": "2026-02-05T23:28:07.348Z",
+  "duration_ms": 67333,
+  "total_jobs": 1,
+  "unique_jobs": 1,
+  "duplicates_removed": 288,
   "by_source": {
-    "jsearch": 13
+    "jsearch": 1
   },
   "by_employment_type": {
-    "FULL-TIME": 11,
-    "FULL-TIME AND PART-TIME": 1,
-    "INTERNSHIP": 1
+    "FULL-TIME": 1
   },
   "by_job_type": {
-    "internship": 4,
+    "internship": 1,
     "new-grad": 0,
-    "other": 9
+    "other": 0
   },
   "by_location": {
     "remote": 0,
-    "onsite": 13
+    "onsite": 1
   },
   "jsearch_stats": {
     "date": "2026-02-05",
     "requests_today": 3,
     "remaining_today": 297,
-    "total_jobs_fetched": 292,
-    "avg_jobs_per_request": "97.3"
+    "total_jobs_fetched": 289,
+    "avg_jobs_per_request": "96.3"
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 6,
-      "senior": 3,
-      "internship": 4
+      "internship": 1
     },
     "domains": {
-      "software": 11,
-      "product": 1,
-      "general": 1
+      "software": 1
     },
     "locations": {
-      "us": 13,
-      "on_site": 13
+      "us": 1,
+      "on_site": 1
     },
     "experience": {
-      "3_plus_years": 5,
-      "no_experience": 8
+      "3_plus_years": 1
     },
-    "special": {
-      "faang": 1,
-      "fortune500": 2
-    },
-    "total": 13
+    "special": {},
+    "total": 1
   }
 }
