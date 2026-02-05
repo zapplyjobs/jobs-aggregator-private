@@ -7,9 +7,15 @@
  * Paid tier: 10,000 requests/month (~333 requests/day with safety margin)
  *
  * Features:
+ * - Multi-query per run (3 queries = 288/day < 333 quota)
  * - Query rotation (distributes queries across hourly runs)
  * - Rate limiting (respects daily quota)
  * - Usage tracking
+ *
+ * UPDATED 2026-02-05: Multiple queries per run for better coverage
+ * - Changed from 1 query/run to 3 queries/run
+ * - Added more internship-focused queries
+ * - Total: 96 runs × 3 queries = 288 requests/day (within 333 quota)
  */
 
 const fs = require('fs');
@@ -19,34 +25,71 @@ const path = require('path');
 const JSEARCH_API_KEY = process.env.JSEARCH_API_KEY;
 const JSEARCH_BASE_URL = 'https://jsearch.p.rapidapi.com/search';
 const MAX_REQUESTS_PER_DAY = 300; // Paid tier: 10,000/month ÷ 30 = ~333/day (using 300 for safety)
+const QUERIES_PER_RUN = 3; // Run 3 queries per workflow run
 const USAGE_FILE = path.join(process.cwd(), '.github', 'data', 'jsearch-usage.json');
 
-// Broad queries for Tagged Streams Aggregator (Phase 1)
-// These cover all domains: software, data science, hardware, nursing, product, etc.
-// Removed broken filters (employment_types, job_requirements) - they don't work per research
-// Client-side tagging in tag-engine.js handles filtering instead
-const BROAD_QUERIES = [
-  // Tech & Software (covers software, data science, product)
-  'software engineer developer data scientist product manager',
+// Query sets for Tagged Streams Aggregator
+// Organized by job type to ensure good coverage for all repos
+const QUERY_SETS = {
+  // Internship-focused queries (for Internships-2026)
+  internships: [
+    'software engineer intern internship co-op summer program',
+    'data science intern internship analytics',
+    'product manager intern internship summer',
+    'nursing intern internship healthcare medical',
+    'hardware engineer intern internship embedded electrical firmware',
+    'remote intern internship work from home'
+  ],
 
-  // Internships (covers all internship types)
-  'internship intern summer program co-op coop',
+  // Entry-level focused queries (for New-Grad-Jobs-2026)
+  entryLevel: [
+    'software engineer developer entry level new grad junior associate',
+    'data scientist analytics entry level new grad junior',
+    'product manager associate entry level new grad',
+    'nurse rn registered nurse entry level new grad',
+    'hardware engineer embedded firmware entry level junior',
+    'remote work from home entry level junior associate'
+  ],
 
-  // Entry Level (covers new grad, junior, associate)
-  'entry level new grad junior associate',
+  // Mixed queries (for all repos)
+  mixed: [
+    'software engineer developer intern internship entry level',
+    'data science analytics intern internship entry level',
+    'nurse rn healthcare medical intern internship',
+    'hardware engineer embedded firmware intern internship junior',
+    'product management intern internship associate',
+    'remote intern internship entry level work from home'
+  ]
+};
 
-  // Healthcare (covers nursing, medical)
-  'nurse healthcare medical registered rn lpn',
-
-  // Hardware (covers embedded, electrical, firmware)
-  'hardware engineer embedded firmware electrical',
-
-  // Remote (covers all remote roles)
-  'remote work from home'
+// Combine all queries for rotation
+const ALL_QUERIES = [
+  ...QUERY_SETS.internships,
+  ...QUERY_SETS.entryLevel,
+  ...QUERY_SETS.mixed
 ];
 
-// Keep query rotation - use current hour to select from broad queries
-const QUERIES = BROAD_QUERIES;
+/**
+ * Select which queries to run based on hour
+ * Rotates through query sets to ensure diverse coverage
+ * @param {number} hour - Current UTC hour
+ * @returns {Array} - Array of query strings to run
+ */
+function selectQueriesForHour(hour) {
+  // Each hour runs 3 different queries
+  // Rotate through ALL_QUERIES (18 total)
+  // Pattern: hour 0 = [0,6,12], hour 1 = [1,7,13], etc.
+
+  const startIndex = (hour * QUERIES_PER_RUN) % ALL_QUERIES.length;
+  const queries = [];
+
+  for (let i = 0; i < QUERIES_PER_RUN; i++) {
+    const index = (startIndex + i) % ALL_QUERIES.length;
+    queries.push(ALL_QUERIES[index]);
+  }
+
+  return queries;
+}
 
 /**
  * Load or initialize usage tracking
@@ -99,7 +142,45 @@ function saveUsageTracking(data) {
 }
 
 /**
- * Fetch jobs from JSearch API
+ * Make a single API request to JSearch
+ * @param {string} query - Search query
+ * @param {number} requestNum - Request number for logging
+ * @returns {Promise<Array>} - Array of job objects
+ */
+async function makeAPIRequest(query, requestNum) {
+  console.log(`📡 JSearch API - Query ${requestNum}/${QUERIES_PER_RUN}: "${query}"`);
+
+  // Build API request
+  const url = new URL(JSEARCH_BASE_URL);
+  url.searchParams.append('query', `${query} United States`);
+  url.searchParams.append('page', '1');
+  url.searchParams.append('num_pages', '10');  // Up to 100 jobs per request
+  url.searchParams.append('date_posted', 'month');
+  url.searchParams.append('country', 'us');
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      'X-RapidAPI-Key': JSEARCH_API_KEY,
+      'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
+    }
+  });
+
+  if (!response.ok) {
+    console.error(`❌ JSearch API request failed: ${response.status} ${response.statusText}`);
+    return [];
+  }
+
+  const data = await response.json();
+  const jobs = data.data || [];
+
+  console.log(`✅ Query ${requestNum} returned ${jobs.length} jobs`);
+
+  return jobs;
+}
+
+/**
+ * Fetch jobs from JSearch API (multiple queries)
  * @returns {Promise<Array>} - Array of normalized job objects
  */
 async function fetchFromJSearch() {
@@ -119,60 +200,47 @@ async function fetchFromJSearch() {
   }
 
   console.log(`📊 JSearch quota: ${usage.remaining}/${MAX_REQUESTS_PER_DAY} requests remaining`);
+  console.log(`📊 Running ${QUERIES_PER_RUN} queries this run`);
 
   try {
-    // Select query based on current hour (rotation)
+    // Select queries based on current hour
     const currentHour = new Date().getUTCHours();
-    const queryIndex = currentHour % QUERIES.length;
-    const query = QUERIES[queryIndex];
+    const queries = selectQueriesForHour(currentHour);
 
-    console.log(`📡 JSearch API - Query: "${query}" (${usage.requests + 1}/${MAX_REQUESTS_PER_DAY} today)`);
+    console.log(`🕐 Hour ${currentHour}: Running queries:`, queries.map((q, i) => `${i + 1}. "${q.substring(0, 40)}..."`));
 
-    // Build API request
-    const url = new URL(JSEARCH_BASE_URL);
-    url.searchParams.append('query', `${query} United States`);
-    url.searchParams.append('page', '1');
-    url.searchParams.append('num_pages', '10');  // Up to 100 jobs per request
-    url.searchParams.append('date_posted', 'month');
-    // NOTE: Removed employment_types and job_requirements - they don't work per research
-    // Client-side tagging in tag-engine.js handles filtering instead
-    url.searchParams.append('country', 'us');  // IMPORTANT: Always specify country explicitly
-
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'X-RapidAPI-Key': JSEARCH_API_KEY,
-        'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
+    // Execute all queries for this run
+    let allJobs = [];
+    for (let i = 0; i < queries.length; i++) {
+      // Check quota before each request
+      if (usage.requests >= MAX_REQUESTS_PER_DAY) {
+        console.log(`⏸️ Daily limit reached after ${i} queries, stopping`);
+        break;
       }
-    });
 
-    if (!response.ok) {
-      console.error(`❌ JSearch API request failed: ${response.status} ${response.statusText}`);
-      return [];
+      const jobs = await makeAPIRequest(queries[i], i + 1);
+      allJobs.push(...jobs);
+
+      // Update usage tracking
+      usage.requests++;
+      usage.remaining = MAX_REQUESTS_PER_DAY - usage.requests;
+      usage.queries_executed.push(queries[i]);
+
+      // Track metrics
+      if (!usage.metrics.jobs_per_query[queries[i]]) {
+        usage.metrics.jobs_per_query[queries[i]] = [];
+      }
+      usage.metrics.jobs_per_query[queries[i]].push(jobs.length);
+      usage.metrics.total_jobs += jobs.length;
     }
-
-    const data = await response.json();
-    const jobs = data.data || [];
-
-    // Update usage tracking
-    usage.requests++;
-    usage.remaining = MAX_REQUESTS_PER_DAY - usage.requests;
-    usage.queries_executed.push(query);
-
-    // Track metrics
-    if (!usage.metrics.jobs_per_query[query]) {
-      usage.metrics.jobs_per_query[query] = [];
-    }
-    usage.metrics.jobs_per_query[query].push(jobs.length);
-    usage.metrics.total_jobs += jobs.length;
 
     saveUsageTracking(usage);
 
     const avgJobsPerRequest = usage.metrics.total_jobs / usage.requests;
-    console.log(`✅ JSearch returned ${jobs.length} jobs (avg ${avgJobsPerRequest.toFixed(1)} jobs/request)`);
+    console.log(`📊 Total jobs fetched this run: ${allJobs.length} (avg ${avgJobsPerRequest.toFixed(1)} jobs/request)`);
     console.log(`📊 Total jobs fetched today: ${usage.metrics.total_jobs}`);
 
-    return normalizeJobs(jobs);
+    return normalizeJobs(allJobs);
 
   } catch (error) {
     console.error('❌ JSearch API error:', error.message);
@@ -319,5 +387,6 @@ module.exports = {
   fetchFromJSearch,
   getUsageStats,
   MAX_REQUESTS_PER_DAY,
-  QUERIES
+  QUERIES_PER_RUN,
+  ALL_QUERIES
 };
