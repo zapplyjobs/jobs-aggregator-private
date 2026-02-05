@@ -7,14 +7,13 @@
  * Paid tier: 10,000 requests/month (~333 requests/day with safety margin)
  *
  * Features:
- * - Multi-query per run (3 queries = 288/day < 333 quota)
+ * - Multi-query per run (3 queries = 72/day < 333 quota)
  * - Query rotation (distributes queries across hourly runs)
  * - Rate limiting (respects daily quota)
  * - Usage tracking
  *
- * UPDATED 2026-02-05: Multiple queries per run for better coverage
- * - Changed from 1 query/run to 3 queries/run
- * - Added more internship-focused queries
+ * UPDATED 2026-02-05: Added entry-level queries for New-Grad-Jobs
+ * - Mix of internship and entry-level queries (7 total, rotates 3 per run)
  * - Total: 96 runs × 3 queries = 288 requests/day (within 333 quota)
  */
 
@@ -31,21 +30,31 @@ const USAGE_FILE = path.join(process.cwd(), '.github', 'data', 'jsearch-usage.js
 // Query sets for Tagged Streams Aggregator
 // Organized by job type to ensure good coverage for all repos
 const QUERY_SETS = {
-  // Internship-focused queries (for Internships-2026) - PRIORITY
+  // Internship queries (for Internships-2026)
   internships: [
-    'intern',  // Simplest query - test if we get more results
     'software engineer intern internship co-op summer program',
     'data science intern internship analytics',
-    'product manager intern internship summer',
-    'nursing intern internship healthcare medical',
-    'hardware engineer intern internship embedded electrical firmware'
+    'nursing intern internship healthcare medical'
+  ],
+  // Entry-level queries (for New-Grad-Jobs-2026)
+  entryLevel: [
+    'entry level software engineer new graduate',
+    'associate software engineer',
+    'junior software engineer'
+  ],
+  // Mixed queries for broad coverage
+  mixed: [
+    'software engineer intern',  // Internship
+    'entry level software engineer'  // Entry-level
   ]
-  // NOTE: Removed entryLevel and mixed sets - focus on internships for now
-  // All repos (Internships, New-Grad, etc.) filter from the internship feed
 };
 
-// Use internship queries only (all repos filter what they need)
-const ALL_QUERIES = QUERY_SETS.internships;
+// Use all queries - rotates through internship, entry-level, and mixed
+const ALL_QUERIES = [
+  ...QUERY_SETS.internships,
+  ...QUERY_SETS.entryLevel,
+  ...QUERY_SETS.mixed
+];
 
 /**
  * Select which queries to run based on hour
@@ -55,8 +64,8 @@ const ALL_QUERIES = QUERY_SETS.internships;
  */
 function selectQueriesForHour(hour) {
   // Each hour runs 3 different queries
-  // Rotate through ALL_QUERIES (18 total)
-  // Pattern: hour 0 = [0,6,12], hour 1 = [1,7,13], etc.
+  // Rotate through ALL_QUERIES (7 total: 3 internships, 3 entryLevel, 1 mixed)
+  // Pattern: hour 0 = [0,2,4], hour 1 = [1,3,5], hour 2 = [2,4,6], etc.
 
   const startIndex = (hour * QUERIES_PER_RUN) % ALL_QUERIES.length;
   const queries = [];
