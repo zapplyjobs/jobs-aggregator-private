@@ -31,7 +31,7 @@ const USAGE_FILE = path.join(process.cwd(), '.github', 'data', 'jsearch-usage.js
 // Query sets for Tagged Streams Aggregator
 // Organized by job type to ensure good coverage for all repos
 const QUERY_SETS = {
-  // Internship-focused queries (for Internships-2026)
+  // Internship-focused queries (for Internships-2026) - PRIORITY
   internships: [
     'software engineer intern internship co-op summer program',
     'data science intern internship analytics',
@@ -39,35 +39,13 @@ const QUERY_SETS = {
     'nursing intern internship healthcare medical',
     'hardware engineer intern internship embedded electrical firmware',
     'remote intern internship work from home'
-  ],
-
-  // Entry-level focused queries (for New-Grad-Jobs-2026)
-  entryLevel: [
-    'software engineer developer entry level new grad junior associate',
-    'data scientist analytics entry level new grad junior',
-    'product manager associate entry level new grad',
-    'nurse rn registered nurse entry level new grad',
-    'hardware engineer embedded firmware entry level junior',
-    'remote work from home entry level junior associate'
-  ],
-
-  // Mixed queries (for all repos)
-  mixed: [
-    'software engineer developer intern internship entry level',
-    'data science analytics intern internship entry level',
-    'nurse rn healthcare medical intern internship',
-    'hardware engineer embedded firmware intern internship junior',
-    'product management intern internship associate',
-    'remote intern internship entry level work from home'
   ]
+  // NOTE: Removed entryLevel and mixed sets - focus on internships for now
+  // All repos (Internships, New-Grad, etc.) filter from the internship feed
 };
 
-// Combine all queries for rotation
-const ALL_QUERIES = [
-  ...QUERY_SETS.internships,
-  ...QUERY_SETS.entryLevel,
-  ...QUERY_SETS.mixed
-];
+// Use internship queries only (all repos filter what they need)
+const ALL_QUERIES = QUERY_SETS.internships;
 
 /**
  * Select which queries to run based on hour
@@ -154,7 +132,7 @@ async function makeAPIRequest(query, requestNum) {
   const url = new URL(JSEARCH_BASE_URL);
   url.searchParams.append('query', `${query} United States`);
   url.searchParams.append('page', '1');
-  url.searchParams.append('num_pages', '10');  // Up to 100 jobs per request
+  url.searchParams.append('num_pages', 20);  // Up to 200 jobs per request (was 10, trying more)
   url.searchParams.append('date_posted', 'month');
   url.searchParams.append('country', 'us');
 
