@@ -1,10 +1,10 @@
 {
   "version": "1.0",
-  "generated": "2026-02-05T23:44:28.999Z",
-  "duration_ms": 75545,
+  "generated": "2026-02-05T23:56:56.034Z",
+  "duration_ms": 46664,
   "total_jobs": 0,
   "unique_jobs": 0,
-  "duplicates_removed": 297,
+  "duplicates_removed": 296,
   "by_source": {},
   "by_employment_type": {},
   "by_job_type": {
@@ -20,8 +20,8 @@
     "date": "2026-02-05",
     "requests_today": 3,
     "remaining_today": 297,
-    "total_jobs_fetched": 297,
-    "avg_jobs_per_request": "99.0"
+    "total_jobs_fetched": 296,
+    "avg_jobs_per_request": "98.7"
   },
   "tag_stats": {
     "employment": {},
