@@ -33,12 +33,12 @@ const USAGE_FILE = path.join(process.cwd(), '.github', 'data', 'jsearch-usage.js
 const QUERY_SETS = {
   // Internship-focused queries (for Internships-2026) - PRIORITY
   internships: [
+    'intern',  // Simplest query - test if we get more results
     'software engineer intern internship co-op summer program',
     'data science intern internship analytics',
     'product manager intern internship summer',
     'nursing intern internship healthcare medical',
-    'hardware engineer intern internship embedded electrical firmware',
-    'remote intern internship work from home'
+    'hardware engineer intern internship embedded electrical firmware'
   ]
   // NOTE: Removed entryLevel and mixed sets - focus on internships for now
   // All repos (Internships, New-Grad, etc.) filter from the internship feed
@@ -152,7 +152,17 @@ async function makeAPIRequest(query, requestNum) {
   const data = await response.json();
   const jobs = data.data || [];
 
+  // Diagnostic logging
   console.log(`✅ Query ${requestNum} returned ${jobs.length} jobs`);
+  if (data.jobs_count !== undefined) {
+    console.log(`   API reports total available: ${data.jobs_count} jobs`);
+  }
+  if (data.pages !== undefined) {
+    console.log(`   Pages returned: ${data.pages}, Requested: 20`);
+  }
+  if (data.parameters) {
+    console.log(`   API parameters:`, JSON.stringify(data.parameters));
+  }
 
   return jobs;
 }
