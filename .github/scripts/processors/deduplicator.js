@@ -16,7 +16,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const DEDUPE_STORE_FILE = path.join(process.cwd(), '.github', 'data', 'dedupe-store.json');
-const DEDUPE_TTL_DAYS = 7; // Remove entries after 7 days
+const DEDUPE_TTL_DAYS = 14; // Remove entries after 14 days (matches ACTIVE_WINDOW_DAYS)
 const DEDUPE_TTL_MS = DEDUPE_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 /**
