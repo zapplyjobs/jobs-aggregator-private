@@ -1,10 +1,10 @@
 {
   "version": "1.0",
-  "generated": "2026-02-06T17:22:03.714Z",
-  "duration_ms": 58183,
+  "generated": "2026-02-06T17:50:12.594Z",
+  "duration_ms": 114083,
   "total_jobs": 1,
   "unique_jobs": 1,
-  "duplicates_removed": 19,
+  "duplicates_removed": 184,
   "by_source": {
     "jsearch": 1
   },
@@ -24,12 +24,12 @@
     "date": "2026-02-06",
     "requests_today": 3,
     "remaining_today": 297,
-    "total_jobs_fetched": 20,
-    "avg_jobs_per_request": "6.7"
+    "total_jobs_fetched": 185,
+    "avg_jobs_per_request": "61.7"
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 1
+      "senior": 1
     },
     "domains": {
       "general": 1
