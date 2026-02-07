@@ -16,6 +16,7 @@ const Router = require('./src/routing/router');
 const Location = require('./src/routing/location');
 const PostedJobsManager = require('./src/data/posted-jobs-manager-v2');
 const GlobalDedupeManager = require('./src/data/global-dedupe-manager');
+const { LOCATION_CHANNEL_CONFIG, INDUSTRY_CHANNEL_CONFIG } = require('./src/discord/config');
 
 // GitHub token for API requests
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -63,6 +64,29 @@ function fetchGitHubFile(owner, repo, filePath) {
 }
 
 /**
+ * Format job location for display
+ */
+function formatLocation(job) {
+  const city = job.job_city || '';
+  const state = job.job_state || '';
+  const isRemote = job.job_is_remote || false;
+
+  if (isRemote) {
+    return 'Remote';
+  }
+
+  if (city && state) {
+    return `${city}, ${state}`;
+  } else if (city) {
+    return city;
+  } else if (state) {
+    return state;
+  }
+
+  return 'Not specified';
+}
+
+/**
  * Generate minimal job fingerprint for deduplication
  */
 function generateMinimalJobFingerprint(job) {
@@ -88,7 +112,7 @@ async function postJobToDiscord(job, channelId, discordClient) {
   }
 
   // Format job for Discord
-  const location = Location.formatLocation(job);
+  const location = formatLocation(job);
   const salary = job.job_min_salary || job.job_max_salary
     ? `$${job.job_min_salary || 0} - $${job.job_max_salary || 0}`
     : 'Not specified';
@@ -241,32 +265,56 @@ async function main() {
         continue;
       }
 
-      // Route job to channels
-      const routing = Router.routeJob(job);
+      // Route job to channels (get both industry and location channels)
+      const industryRouting = Router.getJobChannelDetails(job, INDUSTRY_CHANNEL_CONFIG);
+      const locationChannelId = Location.getJobLocationChannel(job);
+
+      const channelsToPost = [];
+
+      // Add industry channel
+      if (industryRouting && industryRouting.channelId) {
+        channelsToPost.push({
+          channelId: industryRouting.channelId,
+          category: industryRouting.category,
+          type: 'industry'
+        });
+      }
+
+      // Add location channel (if applicable)
+      if (locationChannelId) {
+        channelsToPost.push({
+          channelId: locationChannelId,
+          category: industryRouting?.category || 'tech',
+          type: 'location'
+        });
+      }
 
       // Post to each channel
-      for (const channelId of routing.channels) {
-        if (!channels[channelId]) {
-          console.log(`  ⚠️  Channel not configured: ${channelId}`);
+      for (const channelInfo of channelsToPost) {
+        const envVarName = Object.keys(process.env).find(key => process.env[key] === channelInfo.channelId);
+
+        if (!envVarName) {
+          console.log(`  ⚠️  Channel ID ${channelInfo.channelId} not found in environment`);
           continue;
         }
 
-        const message = await postJobToDiscord(job, channels[channelId], discordClient);
+        const message = await postJobToDiscord(job, channelInfo.channelId, discordClient);
 
         // Track posting in local manager
         postedJobsManager.markAsPostedToChannel(
           job,
           message.id,
-          channels[channelId],
-          routing.category
+          channelInfo.channelId,
+          channelInfo.category
         );
 
         // Track posting in global dedupe store
+        const fingerprint = generateMinimalJobFingerprint(job);
         globalDedupeManager.markAsPosted(
           fingerprint,
           job.job_id || job.id,
           job._sourceRepo,
-          channels[channelId],
+          channelInfo.channelId,
           message.id
         );
       }
@@ -284,7 +332,7 @@ async function main() {
 
   // Save databases
   console.log('\n💾 Saving databases...');
-  postedJobsManager.save();
+  postedJobsManager.savePostedJobs();
   globalDedupeManager.saveStore();
   console.log('✅ Databases saved');
 
