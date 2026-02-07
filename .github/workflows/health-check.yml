@@ -13,12 +13,14 @@ jobs:
       - name: Check aggregator status
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           echo "=== Aggregator Health Check ==="
+          echo "Repository: ${{ github.repository }}"
           echo "Checking recent workflow runs..."
 
           # Check last 5 runs of post-to-discord workflow
-          RUNS=$(gh run list --workflow=post-to-discord.yml --limit 5 --json databaseId,conclusion,createdAt,displayTitle --jq '.[] | "\(.databaseId) | \(.conclusion) | \(.createdAt)"' || echo "No runs yet")
+          RUNS=$(gh run list --repo "$GITHUB_REPO" --workflow=post-to-discord.yml --limit 5 --json databaseId,conclusion,createdAt,displayTitle --jq '.[] | "\(.databaseId) | \(.conclusion) | \(.createdAt)"' || echo "No runs yet")
 
           if [ -z "$RUNS" ]; then
             echo "⚠️ No post-to-discord workflow runs found (workflow not created yet)"
@@ -30,7 +32,7 @@ jobs:
           echo ""
 
           # Check if last run failed
-          LAST_RUN=$(gh run list --workflow=post-to-discord.yml --limit 1 --json conclusion --jq '.[0].conclusion' 2>/dev/null || echo "none")
+          LAST_RUN=$(gh run list --repo "$GITHUB_REPO" --workflow=post-to-discord.yml --limit 1 --json conclusion --jq '.[0].conclusion' 2>/dev/null || echo "none")
 
           if [ "$LAST_RUN" = "failure" ]; then
             echo "❌ Last aggregator run FAILED!"
