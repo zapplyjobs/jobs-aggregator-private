@@ -1,30 +1,69 @@
 # jobs-data-2026
 
-⚠️ **DEPRECATED - 2026-02-06**
+**Status:** ✅ Aggregator - COMPLETE & VERIFIED (Phases 0-3) - **2026-02-07**
 
-This repository is no longer actively maintained. The aggregator approach has been abandoned in favor of individual JSearch integration per job board repository.
+## Purpose
 
-## Rationale
+Central Discord posting aggregator for all job board repositories. This repo reads `current_jobs.json` from individual repos and posts to Discord with global deduplication.
 
-The aggregator architecture introduced unnecessary complexity and single-point-of-failure risk. Each job board now independently fetches from its data sources (JSearch, ATS APIs, SimplifyJobs).
+## Architecture
 
-**Benefits of independence:**
-- Each repo can fail without affecting others
-- Custom queries, filters, schedules per repo
-- Simpler testing and debugging
-- No data freshness lag
-- No deployment coordination needed
+```
+Individual Repos (FETCHING LAYER)          Aggregator (POSTING LAYER)
+┌─────────────────────────────┐           ┌──────────────────────────────┐
+│ New-Grad-Jobs-2026          │──────────▶│                                  │
+│ Internships-2026            │──────────▶│  Read current_jobs.json        │
+│ (SEO repos - Phase 4)       │──────────▶│  Global deduplication (14d)    │
+└─────────────────────────────┘           │  Post to Discord               │
+                                          └──────────────────────────────┘
+```
 
-## Migration
+- **Individual repos** fetch jobs (JSearch, ATS, SimplifyJobs) → write `current_jobs.json`
+- **Aggregator** reads all → deduplicates globally → posts to Discord
+- This is the INTENDED design - separation of concerns
 
-All consuming repositories have been updated to set `USE_AGGREGATOR: 'false'` and now fetch data independently.
+## Workflows
 
-## Legacy Information
+| Workflow | Schedule | Purpose |
+|----------|----------|---------|
+| `post-to-discord.yml` | Every 5 min | Fetch & post jobs to Discord |
+| `verify-discord.yml` | Daily / manual | Verify posting correctness |
+| `health-check.yml` | Every hour | System health monitoring |
+| `collect-metrics.yml` | Daily | Operational metrics |
 
-This repository previously provided job data in a standardized format for consumption by other repositories.
+## Features
+
+- ✅ Global deduplication (14-day TTL)
+- ✅ Industry + location channel routing
+- ✅ Discord embed formatting (emojis, tags, counter)
+- ✅ Verification tool (privacy-encrypted reports)
+- ✅ Health monitoring
+
+## Phase Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 0 | Monitoring workflows | ✅ Complete |
+| Phase 1 | Removed Discord from individual repos | ✅ Complete |
+| Phase 2 | Aggregator Discord posting | ✅ Complete |
+| Phase 3 | Global deduplication | ✅ Complete |
+| Phase 4 | Enable SEO repos (5 repos) | ⏳ Ready |
+| Phase 5 | Verification & testing | ✅ Complete |
+
+## Files
+
+- `.github/scripts/discord-poster.js` - Main posting logic
+- `.github/scripts/verify-discord.js` - Discord verification tool
+- `.github/scripts/companies.json` - Company emoji/tier data
+- `global-dedupe-store.json` - Persistent dedupe database (auto-generated)
+
+## Configuration
+
+All secrets configured:
+- `DISCORD_TOKEN` - Bot authentication
+- 15x `DISCORD_*_CHANNEL_ID` - Industry + location channels
+- `JSEARCH_API_KEY` - JSearch API access
 
 ---
 
-## License
-
-MIT
+**Last Updated:** 2026-02-07
