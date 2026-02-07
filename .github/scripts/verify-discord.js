@@ -143,18 +143,29 @@ function verifyRouting(message, channelName, channelId) {
 
   // Tech channel - software/tech jobs + product/project management (consolidated per router.js)
   if (channelName === 'tech') {
+    // First, exclude healthcare/nursing jobs (data quality issue - shouldn't be in tech)
+    const healthcareKeywords = ['nurse', 'nursing', 'rn ', 'registered nurse', 'healthcare',
+                                 'medical', 'patient', 'clinical', 'hospital', 'pharmacist'];
+    const isHealthcare = healthcareKeywords.some(kw => title.includes(kw));
+
+    if (isHealthcare) {
+      issues.push(`Healthcare job in tech channel (data quality issue - should be filtered out)`);
+      return issues.length > 0 ? { issues, message: message.id, title, channel: channelName } : null;
+    }
+
     const techKeywords = [
       // Core tech roles
       'software', 'engineer', 'developer', 'programmer', 'coding',
-      'frontend', 'backend', 'full stack', 'devops', 'sre',
+      'frontend', 'backend', 'full stack', 'full-stack', 'devops', 'sre',
       // Product management (consolidated into tech per router.js)
-      'product manager', 'product owner', 'product lead', 'pm ',
+      'product manager', 'product owner', 'product lead', 'product ',
+      'pm ', 'product marketing', 'product intern',
       // Project management (consolidated into tech per router.js)
       'project manager', 'program manager', 'scrum master', 'agile',
       // Data/Analytics (often tech-related)
       'data', 'analytics', 'business intelligence', 'bi ',
       // Tech general
-      'technical', 'technology'
+      'technical', 'technology', 'engineering', 'engineer'
     ];
     const hasTechKeyword = techKeywords.some(kw => title.includes(kw));
 
