@@ -1,34 +1,53 @@
 {
   "version": "1.0",
-  "generated": "2026-02-06T23:58:43.744Z",
-  "duration_ms": 81988,
-  "total_jobs": 0,
-  "unique_jobs": 0,
-  "duplicates_removed": 174,
-  "by_source": {},
-  "by_employment_type": {},
+  "generated": "2026-02-07T00:46:53.231Z",
+  "duration_ms": 65266,
+  "total_jobs": 4,
+  "unique_jobs": 4,
+  "duplicates_removed": 77,
+  "by_source": {
+    "jsearch": 4
+  },
+  "by_employment_type": {
+    "FULL-TIME AND INTERNSHIP": 1,
+    "FULL-TIME": 2,
+    "INTERNSHIP": 1
+  },
   "by_job_type": {
-    "internship": 0,
+    "internship": 4,
     "new-grad": 0,
     "other": 0
   },
   "by_location": {
     "remote": 0,
-    "onsite": 0
+    "onsite": 4
   },
   "jsearch_stats": {
-    "date": "2026-02-06",
+    "date": "2026-02-07",
     "requests_today": 3,
     "remaining_today": 297,
-    "total_jobs_fetched": 174,
-    "avg_jobs_per_request": "58.0"
+    "total_jobs_fetched": 81,
+    "avg_jobs_per_request": "27.0"
   },
   "tag_stats": {
-    "employment": {},
-    "domains": {},
-    "locations": {},
-    "experience": {},
+    "employment": {
+      "internship": 4
+    },
+    "domains": {
+      "software": 1,
+      "general": 1,
+      "product": 1,
+      "nursing": 1
+    },
+    "locations": {
+      "us": 4,
+      "on_site": 4
+    },
+    "experience": {
+      "3_plus_years": 2,
+      "no_experience": 2
+    },
     "special": {},
-    "total": 0
+    "total": 4
   }
 }
