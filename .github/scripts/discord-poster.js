@@ -16,7 +16,7 @@ const Router = require('./src/routing/router');
 const Location = require('./src/routing/location');
 const PostedJobsManager = require('./src/data/posted-jobs-manager-v2');
 const GlobalDedupeManager = require('./src/data/global-dedupe-manager');
-const { LOCATION_CHANNEL_CONFIG, INDUSTRY_CHANNEL_CONFIG } = require('./src/discord/config');
+const { LOCATION_CHANNEL_CONFIG, CHANNEL_CONFIG } = require('./src/discord/config');
 
 // GitHub token for API requests
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -266,7 +266,7 @@ async function main() {
       }
 
       // Route job to channels (get both industry and location channels)
-      const industryRouting = Router.getJobChannelDetails(job, INDUSTRY_CHANNEL_CONFIG);
+      const industryRouting = Router.getJobChannelDetails(job, CHANNEL_CONFIG);
       const locationChannelId = Location.getJobLocationChannel(job);
 
       const channelsToPost = [];
