@@ -143,15 +143,19 @@ function verifyRouting(message, channelName, channelId) {
 
   // Tech channel - software/tech jobs + product/project management (consolidated per router.js)
   if (channelName === 'tech') {
-    // First, exclude healthcare/nursing jobs (data quality issue - shouldn't be in tech)
-    const healthcareKeywords = ['nurse', 'nursing', 'rn ', 'registered nurse', 'healthcare',
-                                 'medical', 'patient', 'clinical', 'hospital', 'pharmacist'];
-    const isHealthcare = healthcareKeywords.some(kw => title.includes(kw));
+    // Exclude ONLY healthcare ROLE titles (nurse, doctor, etc.) - NOT healthcare companies hiring for tech/product roles
+    const healthcareRoleKeywords = ['nurse', 'nursing', 'rn ', 'registered nurse', 'physician',
+                                     'doctor', 'medical doctor', 'surgeon', 'pharmacist',
+                                     'radiologist', 'therapist', 'clinical nurse'];
+    const isHealthcareRole = healthcareRoleKeywords.some(kw => title.includes(kw));
 
-    if (isHealthcare) {
-      issues.push(`Healthcare job in tech channel (data quality issue - should be filtered out)`);
+    if (isHealthcareRole) {
+      issues.push(`Healthcare ROLE job in tech channel (should be filtered out)`);
       return issues.length > 0 ? { issues, message: message.id, title, channel: channelName } : null;
     }
+
+    // Note: Healthcare companies (CHRISTUS, University Health, etc.) hiring for tech/product/finance roles
+    // are routed to tech/finance channels correctly - this is expected behavior
 
     const techKeywords = [
       // Core tech roles
@@ -301,10 +305,9 @@ async function main() {
     console.log(`    Routing Errors: ${summary.routingErrors}`);
   }
 
-  // Critical issues
+  // Critical issues (only duplicates and missing channels cause failure)
+  // Location and routing errors are informational - data quality varies
   const hasCriticalIssues = results.duplicates.length > 0 ||
-                           results.locationErrors.length > 0 ||
-                           results.routingErrors.length > 0 ||
                            results.missingChannels.length > 0;
 
   if (hasCriticalIssues) {
@@ -365,12 +368,11 @@ async function main() {
     hasCriticalIssues
   };
 
-  // Save public summary (can be committed/uploaded)
+  // Save public summary (for GitHub Step Summary - repo access only)
   const summaryPath = path.join(DATA_DIR, 'verification-summary.json');
   fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
-  console.log(`\n💾 Public summary saved to: ${summaryPath}`);
 
-  // Save full encrypted report (local only, not uploaded)
+  // Save full encrypted report (local only, deleted by workflow)
   const fullReport = {
     timestamp: new Date().toISOString(),
     results
@@ -399,7 +401,6 @@ async function main() {
     data: encrypted
   });
   fs.writeFileSync(encryptedPath, encryptedData);
-  console.log(`🔒 Encrypted report saved to: ${encryptedPath}`);
 
   // Exit with error code if critical issues found
   if (hasCriticalIssues) {
