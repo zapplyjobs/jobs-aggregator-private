@@ -53,21 +53,21 @@ jobs:
           DISCORD_SOCAL_INT_CHANNEL_ID: ${{ secrets.DISCORD_SOCAL_INT_CHANNEL_ID }}
         run: node .github/scripts/verify-discord.js
 
-      - name: Upload public summary (sanitized, no sensitive data)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: verification-summary
-          path: /tmp/verification-summary.json
-          retention-days: 30
-
-      - name: Post results to summary
+      - name: Post results to summary (private - repo access only)
         if: always()
         run: |
           if [ -f /tmp/verification-summary.json ]; then
             echo "# Discord Verification Report" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
             echo '```json' >> $GITHUB_STEP_SUMMARY
             cat /tmp/verification-summary.json >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
           fi
+
+      - name: Delete temporary files
+        if: always()
+        run: |
+          rm -f /tmp/verification-summary.json
+          rm -f /tmp/verification-report.enc
