@@ -1,29 +1,29 @@
 {
-  "timestamp": "2026-02-07T15:34:13.369Z",
+  "timestamp": "2026-02-07T18:10:07.478Z",
   "repos": {
     "New-Grad": {
       "name": "New-Grad",
       "type": "main",
-      "jobs": 0,
+      "jobs": 10,
       "lastUpdate": null,
       "workflowStatus": {
-        "id": 21782317150,
-        "status": "completed",
-        "conclusion": "success",
-        "lastRun": "2026-02-07T15:33:50Z"
+        "id": 21784526176,
+        "status": "in_progress",
+        "conclusion": null,
+        "lastRun": "2026-02-07T18:06:26Z"
       },
       "error": null
     },
     "Internships": {
       "name": "Internships",
       "type": "main",
-      "jobs": 73,
+      "jobs": 10,
       "lastUpdate": null,
       "workflowStatus": {
-        "id": 21782334781,
+        "id": 21784533330,
         "status": "completed",
         "conclusion": "skipped",
-        "lastRun": "2026-02-07T15:25:03Z"
+        "lastRun": "2026-02-07T18:06:58Z"
       },
       "error": null
     },
@@ -33,10 +33,10 @@
       "jobs": 0,
       "lastUpdate": null,
       "workflowStatus": {
-        "id": 21782451765,
-        "status": "queued",
+        "id": 21784575363,
+        "status": "in_progress",
         "conclusion": null,
-        "lastRun": "2026-02-07T15:34:12Z"
+        "lastRun": "2026-02-07T18:10:05Z"
       },
       "error": null
     },
@@ -107,8 +107,8 @@
     }
   },
   "summary": {
-    "totalJobs": 73,
-    "operationalRepos": 5,
+    "totalJobs": 20,
+    "operationalRepos": 4,
     "failedRepos": 1
   }
 }
