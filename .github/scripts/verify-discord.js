@@ -17,11 +17,12 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { Client, GatewayIntentBits } = require('discord.js');
 
 // Configuration
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-const DATA_DIR = path.join(process.cwd(), '.github', 'data');
+const DATA_DIR = process.env.GITHUB_ACTIONS ? '/tmp' : path.join(process.cwd(), '.github', 'data');
 
 // Channel configuration (industry channels)
 const CHANNELS = {
@@ -140,14 +141,25 @@ function verifyRouting(message, channelName, channelId) {
     }
   }
 
-  // Tech channel - software/tech jobs
+  // Tech channel - software/tech jobs + product/project management (consolidated per router.js)
   if (channelName === 'tech') {
-    const techKeywords = ['software', 'engineer', 'developer', 'programmer', 'coding',
-                         'frontend', 'backend', 'full stack', 'devops', 'sre'];
+    const techKeywords = [
+      // Core tech roles
+      'software', 'engineer', 'developer', 'programmer', 'coding',
+      'frontend', 'backend', 'full stack', 'devops', 'sre',
+      // Product management (consolidated into tech per router.js)
+      'product manager', 'product owner', 'product lead', 'pm ',
+      // Project management (consolidated into tech per router.js)
+      'project manager', 'program manager', 'scrum master', 'agile',
+      // Data/Analytics (often tech-related)
+      'data', 'analytics', 'business intelligence', 'bi ',
+      // Tech general
+      'technical', 'technology'
+    ];
     const hasTechKeyword = techKeywords.some(kw => title.includes(kw));
 
     if (!hasTechKeyword) {
-      issues.push(`Job in tech channel without obvious tech keywords in title`);
+      issues.push(`Job in tech channel without obvious tech/product/pm keywords in title`);
     }
   }
 
@@ -328,13 +340,55 @@ async function main() {
     console.log('\n✅ NO CRITICAL ISSUES FOUND - Verification passed!');
   }
 
-  // Save results to file
-  const reportPath = path.join(DATA_DIR, 'verification-report.json');
-  fs.writeFileSync(reportPath, JSON.stringify({
+  // Create public summary (no sensitive details)
+  const summary = {
+    timestamp: new Date().toISOString(),
+    totalMessages: results.totalMessages,
+    channelSummary: results.channelSummary,
+    criticalIssuesCount: {
+      duplicates: results.duplicates.length,
+      locationErrors: results.locationErrors.length,
+      routingErrors: results.routingErrors.length,
+      missingChannels: results.missingChannels.length
+    },
+    hasCriticalIssues
+  };
+
+  // Save public summary (can be committed/uploaded)
+  const summaryPath = path.join(DATA_DIR, 'verification-summary.json');
+  fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+  console.log(`\n💾 Public summary saved to: ${summaryPath}`);
+
+  // Save full encrypted report (local only, not uploaded)
+  const fullReport = {
     timestamp: new Date().toISOString(),
     results
-  }, null, 2));
-  console.log(`\n💾 Report saved to: ${reportPath}`);
+  };
+
+  const encryptedPath = path.join(DATA_DIR, 'verification-report.enc');
+  const reportJson = JSON.stringify(fullReport, null, 2);
+
+  // Generate encryption key from environment or derive from local secret
+  const encryptionKey = process.env.VERIFICATION_ENCRYPTION_KEY
+    || crypto.scryptSync('local-dev-key-only', 'salt', 32);
+
+  // Generate random IV
+  const iv = crypto.randomBytes(16);
+
+  // Encrypt
+  const cipher = crypto.createCipheriv('aes-256-gcm', encryptionKey, iv);
+  let encrypted = cipher.update(reportJson, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag();
+
+  // Save encrypted data with IV and auth tag
+  const encryptedData = JSON.stringify({
+    iv: iv.toString('hex'),
+    authTag: authTag.toString('hex'),
+    data: encrypted
+  });
+  fs.writeFileSync(encryptedPath, encryptedData);
+  console.log(`🔒 Encrypted report saved to: ${encryptedPath}`);
 
   // Exit with error code if critical issues found
   if (hasCriticalIssues) {
