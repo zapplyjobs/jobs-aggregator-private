@@ -15,6 +15,7 @@ const path = require('path');
 const Router = require('./src/routing/router');
 const Location = require('./src/routing/location');
 const PostedJobsManager = require('./src/data/posted-jobs-manager-v2');
+const GlobalDedupeManager = require('./src/data/global-dedupe-manager');
 
 // GitHub token for API requests
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -151,6 +152,7 @@ async function main() {
 
   // Initialize managers
   const postedJobsManager = new PostedJobsManager();
+  const globalDedupeManager = new GlobalDedupeManager();
 
   // Fetch jobs from all repos
   console.log('\n📡 Fetching jobs from repos...');
@@ -180,20 +182,20 @@ async function main() {
 
   console.log(`\n📊 Total jobs fetched: ${allJobs.length}`);
 
-  // Global deduplication
-  console.log('\n🔄 Deduplicating jobs...');
+  // Global deduplication (in-memory for current batch)
+  console.log('\n🔄 Deduplicating jobs within batch...');
   const seenFingerprints = new Set();
   const uniqueJobs = allJobs.filter(job => {
     const fingerprint = generateMinimalJobFingerprint(job);
     if (seenFingerprints.has(fingerprint)) {
-      console.log(`  ⏭️  Skipping duplicate: ${job.job_title} @ ${job.employer_name}`);
+      console.log(`  ⏭️  Skipping batch duplicate: ${job.job_title} @ ${job.employer_name}`);
       return false;
     }
     seenFingerprints.add(fingerprint);
     return true;
   });
 
-  console.log(`✅ After deduplication: ${uniqueJobs.length} jobs`);
+  console.log(`✅ After batch deduplication: ${uniqueJobs.length} jobs`);
 
   // Get channels from environment
   const channels = {
@@ -223,7 +225,17 @@ async function main() {
 
   for (const job of uniqueJobs) {
     try {
-      // Check if already posted
+      // Generate fingerprint for this job
+      const fingerprint = generateMinimalJobFingerprint(job);
+
+      // Check if already posted globally (across all runs, 14-day TTL)
+      if (globalDedupeManager.hasBeenPosted(fingerprint)) {
+        console.log(`  ⏭️  Skipping (already posted globally): ${job.job_title} @ ${job.employer_name}`);
+        skippedCount++;
+        continue;
+      }
+
+      // Check if already posted locally (this run's database)
       if (postedJobsManager.hasBeenPosted(job)) {
         skippedCount++;
         continue;
@@ -241,12 +253,21 @@ async function main() {
 
         const message = await postJobToDiscord(job, channels[channelId], discordClient);
 
-        // Track posting
+        // Track posting in local manager
         postedJobsManager.markAsPostedToChannel(
           job,
           message.id,
           channels[channelId],
           routing.category
+        );
+
+        // Track posting in global dedupe store
+        globalDedupeManager.markAsPosted(
+          fingerprint,
+          job.job_id || job.id,
+          job._sourceRepo,
+          channels[channelId],
+          message.id
         );
       }
 
@@ -261,10 +282,11 @@ async function main() {
   console.log(`  ✅ Posted: ${postedCount} jobs`);
   console.log(`  ⏭️  Skipped (already posted): ${skippedCount} jobs`);
 
-  // Save database
-  console.log('\n💾 Saving database...');
+  // Save databases
+  console.log('\n💾 Saving databases...');
   postedJobsManager.save();
-  console.log('✅ Database saved');
+  globalDedupeManager.saveStore();
+  console.log('✅ Databases saved');
 
   // Logout
   await discordClient.destroy();
