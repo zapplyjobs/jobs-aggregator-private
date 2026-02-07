@@ -7,6 +7,7 @@
     "fetch": "node .github/scripts/index.js",
     "post": "node .github/scripts/discord-poster.js",
     "metrics": "node .github/scripts/collect-metrics.js",
+    "verify": "node .github/scripts/verify-discord.js",
     "test": "node .github/scripts/index.js --dry-run"
   },
   "keywords": ["jobs", "aggregator", "jsearch", "api", "discord"],

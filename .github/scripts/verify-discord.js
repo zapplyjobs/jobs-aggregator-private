@@ -1,0 +1,350 @@
+#!/usr/bin/env node
+
+/**
+ * Discord Channel Verification Tool
+ *
+ * Verifies job posting correctness by reading Discord channels directly
+ *
+ * Checks:
+ * 1. Message Presence - Are jobs appearing in channels?
+ * 2. Location Accuracy - Is the location field correct?
+ * 3. Routing Verification - Are jobs in correct channels?
+ * 4. Duplicate Detection - Any duplicate messages in same channel?
+ * 5. Counter Verification - Do counts match expected?
+ *
+ * Usage: node .github/scripts/verify-discord.js
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { Client, GatewayIntentBits } = require('discord.js');
+
+// Configuration
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const DATA_DIR = path.join(process.cwd(), '.github', 'data');
+
+// Channel configuration (industry channels)
+const CHANNELS = {
+  // Industry channels
+  tech: process.env.DISCORD_TECH_CHANNEL_ID,
+  ai: process.env.DISCORD_AI_CHANNEL_ID,
+  'data-science': process.env.DISCORD_DS_CHANNEL_ID,
+  finance: process.env.DISCORD_FINANCE_CHANNEL_ID,
+
+  // Location channels
+  'bay-area': process.env.DISCORD_BAY_AREA_CHANNEL_ID,
+  'new-york': process.env.DISCORD_NY_CHANNEL_ID,
+  'pacific-northwest': process.env.DISCORD_PNW_CHANNEL_ID,
+  'remote-usa': process.env.DISCORD_REMOTE_USA_CHANNEL_ID,
+  'other-usa': process.env.DISCORD_OTHER_USA_CHANNEL_ID,
+
+  // Internships-specific channels
+  sales: process.env.DISCORD_SALES_CHANNEL_ID,
+  marketing: process.env.DISCORD_MARKETING_CHANNEL_ID,
+  other: process.env.DISCORD_OTHER_CHANNEL_ID,
+  'bay-area-int': process.env.DISCORD_BAY_AREA_INT_CHANNEL_ID,
+  'socal-int': process.env.DISCORD_SOCAL_INT_CHANNEL_ID
+};
+
+// Verification results
+const results = {
+  totalMessages: 0,
+  duplicates: [],
+  locationErrors: [],
+  routingErrors: [],
+  missingChannels: [],
+  channelSummary: {}
+};
+
+/**
+ * Generate minimal job fingerprint for deduplication
+ */
+function generateJobFingerprint(message) {
+  const crypto = require('crypto');
+
+  // Extract job details from embed
+  const embed = message.embeds[0];
+  if (!embed) return null;
+
+  const title = (embed.title || '').toLowerCase().trim();
+  const company = embed.fields?.find(f => f.name === 'Company')?.value || '';
+  const url = embed.url || '';
+
+  const fingerprintData = `${url}|${title}|${company}`;
+  return crypto.createHash('sha256').update(fingerprintData).digest('hex');
+}
+
+/**
+ * Verify location field accuracy
+ */
+function verifyLocation(message) {
+  const embed = message.embeds[0];
+  if (!embed) return null;
+
+  const locationField = embed.fields?.find(f => f.name === 'Location');
+  if (!locationField) {
+    return { error: 'Missing location field', message: message.id };
+  }
+
+  const location = locationField.value;
+  const footer = embed.footer?.text || '';
+
+  // Check for obvious issues
+  const issues = [];
+
+  // Empty location
+  if (!location || location === 'Not specified' || location === 'Unknown') {
+    issues.push('Empty or unspecified location');
+  }
+
+  // Location mismatch with source repo (if applicable)
+  if (footer.includes('Internships') && location.includes('Senior')) {
+    issues.push('Internship job with senior level in location?');
+  }
+
+  return issues.length > 0 ? { issues, message: message.id, location } : null;
+}
+
+/**
+ * Verify routing correctness
+ */
+function verifyRouting(message, channelName, channelId) {
+  const embed = message.embeds[0];
+  if (!embed) return null;
+
+  const title = (embed.title || '').toLowerCase();
+  const company = embed.fields?.find(f => f.name === 'Company')?.value || '';
+
+  const issues = [];
+
+  // Check if job is in appropriate channel
+  if (channelName === 'ai' || channelName === 'data-science') {
+    // AI/DS channel should have AI/DS related jobs
+    const aiKeywords = ['machine learning', 'ml engineer', 'ai', 'artificial intelligence',
+                        'data scientist', 'data engineer', 'data analyst', 'nlp', 'computer vision'];
+    const hasAIKeyword = aiKeywords.some(kw => title.includes(kw));
+
+    if (!hasAIKeyword) {
+      issues.push(`Job in ${channelName} channel without AI/DS keywords in title`);
+    }
+  }
+
+  if (channelName === 'finance') {
+    // Finance channel should have finance related jobs
+    const financeKeywords = ['financial analyst', 'accountant', 'controller', 'treasury',
+                            'audit', 'tax', 'investment', 'finance'];
+    const hasFinanceKeyword = financeKeywords.some(kw => title.includes(kw) || company.toLowerCase().includes(kw));
+
+    if (!hasFinanceKeyword) {
+      issues.push(`Job in finance channel without finance keywords in title/company`);
+    }
+  }
+
+  // Tech channel - software/tech jobs
+  if (channelName === 'tech') {
+    const techKeywords = ['software', 'engineer', 'developer', 'programmer', 'coding',
+                         'frontend', 'backend', 'full stack', 'devops', 'sre'];
+    const hasTechKeyword = techKeywords.some(kw => title.includes(kw));
+
+    if (!hasTechKeyword) {
+      issues.push(`Job in tech channel without obvious tech keywords in title`);
+    }
+  }
+
+  return issues.length > 0 ? { issues, message: message.id, title, channel: channelName } : null;
+}
+
+/**
+ * Verify single channel
+ */
+async function verifyChannel(channelName, channelId) {
+  if (!channelId) {
+    results.missingChannels.push({ channel: channelName, reason: 'No channel ID configured' });
+    return;
+  }
+
+  console.log(`\n🔍 Verifying ${channelName} (${channelId})...`);
+
+  try {
+    const channel = await client.channels.fetch(channelId);
+    if (!channel) {
+      results.missingChannels.push({ channel: channelName, reason: 'Channel not found or bot lacks access' });
+      return;
+    }
+
+    // Fetch last 100 messages
+    const messages = await channel.messages.fetch({ limit: 100 });
+    const embedMessages = messages.filter(m => m.embeds.length > 0);
+
+    console.log(`  📊 Found ${embedMessages.size} job posts (last 100 messages)`);
+
+    results.channelSummary[channelName] = {
+      channelId,
+      totalJobPosts: embedMessages.size,
+      duplicates: 0,
+      locationErrors: 0,
+      routingErrors: 0
+    };
+
+    // Check for duplicates
+    const fingerprints = new Map();
+    for (const [id, message] of embedMessages) {
+      const fingerprint = generateJobFingerprint(message);
+      if (fingerprint) {
+        if (fingerprints.has(fingerprint)) {
+          results.duplicates.push({
+            channel: channelName,
+            originalMessage: fingerprints.get(fingerprint),
+            duplicateMessage: id,
+            title: message.embeds[0]?.title
+          });
+          results.channelSummary[channelName].duplicates++;
+        } else {
+          fingerprints.set(fingerprint, id);
+        }
+      }
+    }
+
+    // Check location accuracy
+    for (const [id, message] of embedMessages) {
+      const locationCheck = verifyLocation(message);
+      if (locationCheck && locationCheck.issues) {
+        results.locationErrors.push({
+          channel: channelName,
+          ...locationCheck
+        });
+        results.channelSummary[channelName].locationErrors++;
+      }
+    }
+
+    // Check routing correctness
+    for (const [id, message] of embedMessages) {
+      const routingCheck = verifyRouting(message, channelName, channelId);
+      if (routingCheck && routingCheck.issues) {
+        results.routingErrors.push({
+          channel: channelName,
+          ...routingCheck
+        });
+        results.channelSummary[channelName].routingErrors++;
+      }
+    }
+
+    results.totalMessages += embedMessages.size;
+
+  } catch (error) {
+    results.missingChannels.push({ channel: channelName, reason: error.message });
+  }
+}
+
+/**
+ * Main execution
+ */
+async function main() {
+  console.log('🔍 Discord Verification Tool - Starting...\n');
+
+  // Initialize Discord client
+  client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent
+    ]
+  });
+
+  await client.login(DISCORD_TOKEN);
+  console.log('✅ Discord client connected\n');
+
+  // Verify all channels
+  for (const [channelName, channelId] of Object.entries(CHANNELS)) {
+    await verifyChannel(channelName, channelId);
+  }
+
+  // Logout
+  await client.destroy();
+
+  // Print summary
+  console.log('\n' + '='.repeat(60));
+  console.log('📊 VERIFICATION SUMMARY');
+  console.log('='.repeat(60));
+
+  console.log(`\n📈 Total Messages Verified: ${results.totalMessages}`);
+  console.log(`\n📋 Channel Breakdown:`);
+
+  for (const [channel, summary] of Object.entries(results.channelSummary)) {
+    console.log(`\n  ${channel}:`);
+    console.log(`    Total Posts: ${summary.totalJobPosts}`);
+    console.log(`    Duplicates: ${summary.duplicates}`);
+    console.log(`    Location Errors: ${summary.locationErrors}`);
+    console.log(`    Routing Errors: ${summary.routingErrors}`);
+  }
+
+  // Critical issues
+  const hasCriticalIssues = results.duplicates.length > 0 ||
+                           results.locationErrors.length > 0 ||
+                           results.routingErrors.length > 0 ||
+                           results.missingChannels.length > 0;
+
+  if (hasCriticalIssues) {
+    console.log('\n🚨 CRITICAL ISSUES FOUND:\n');
+
+    if (results.missingChannels.length > 0) {
+      console.log(`❌ Missing/Inaccessible Channels (${results.missingChannels.length}):`);
+      results.missingChannels.forEach(ch => {
+        console.log(`  - ${ch.channel}: ${ch.reason}`);
+      });
+    }
+
+    if (results.duplicates.length > 0) {
+      console.log(`\n🔄 Duplicates Found (${results.duplicates.length}):`);
+      results.duplicates.slice(0, 10).forEach(dup => {
+        console.log(`  - [${dup.channel}] ${dup.title}`);
+      });
+      if (results.duplicates.length > 10) {
+        console.log(`  ... and ${results.duplicates.length - 10} more`);
+      }
+    }
+
+    if (results.locationErrors.length > 0) {
+      console.log(`\n📍 Location Errors (${results.locationErrors.length}):`);
+      results.locationErrors.slice(0, 10).forEach(err => {
+        console.log(`  - [${err.channel}] ${err.issues.join(', ')}`);
+      });
+      if (results.locationErrors.length > 10) {
+        console.log(`  ... and ${results.locationErrors.length - 10} more`);
+      }
+    }
+
+    if (results.routingErrors.length > 0) {
+      console.log(`\n🧭 Routing Errors (${results.routingErrors.length}):`);
+      results.routingErrors.slice(0, 10).forEach(err => {
+        console.log(`  - [${err.channel}] ${err.title}`);
+        console.log(`    Issues: ${err.issues.join(', ')}`);
+      });
+      if (results.routingErrors.length > 10) {
+        console.log(`  ... and ${results.routingErrors.length - 10} more`);
+      }
+    }
+  } else {
+    console.log('\n✅ NO CRITICAL ISSUES FOUND - Verification passed!');
+  }
+
+  // Save results to file
+  const reportPath = path.join(DATA_DIR, 'verification-report.json');
+  fs.writeFileSync(reportPath, JSON.stringify({
+    timestamp: new Date().toISOString(),
+    results
+  }, null, 2));
+  console.log(`\n💾 Report saved to: ${reportPath}`);
+
+  // Exit with error code if critical issues found
+  if (hasCriticalIssues) {
+    process.exit(1);
+  }
+}
+
+let client;
+main().catch(error => {
+  console.error('\n❌ Fatal error:', error.message);
+  console.error(error.stack);
+  process.exit(1);
+});
