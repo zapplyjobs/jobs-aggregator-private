@@ -18,6 +18,9 @@ const PostedJobsManager = require('./src/data/posted-jobs-manager-v2');
 const GlobalDedupeManager = require('./src/data/global-dedupe-manager');
 const { LOCATION_CHANNEL_CONFIG, CHANNEL_CONFIG } = require('./src/discord/config');
 
+// Load company data for emoji and tier detection
+const companies = JSON.parse(fs.readFileSync(path.join(__dirname, 'companies.json'), 'utf8'));
+
 // GitHub token for API requests
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
@@ -86,6 +89,162 @@ function formatLocation(job) {
   return 'Not specified';
 }
 
+// State name to abbreviation mapping for consistent location formatting
+const STATE_ABBREVIATIONS = {
+  'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA',
+  'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE', 'florida': 'FL', 'georgia': 'GA',
+  'hawaii': 'HI', 'idaho': 'ID', 'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA',
+  'kansas': 'KS', 'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+  'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS', 'missouri': 'MO',
+  'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+  'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH',
+  'oklahoma': 'OK', 'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+  'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT', 'vermont': 'VT',
+  'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV', 'wisconsin': 'WI', 'wyoming': 'WY',
+  'district of columbia': 'DC'
+};
+
+/**
+ * Format location for consistent display (with state abbreviation)
+ */
+function formatLocationWithAbbr(job) {
+  const city = job.job_city || '';
+  const state = job.job_state || '';
+  const isRemote = job.job_is_remote || false;
+
+  if (isRemote || (city && city.toLowerCase() === 'remote')) {
+    return 'Remote';
+  }
+
+  // Convert state to abbreviation if it's a full state name
+  let stateAbbr = state;
+  if (state) {
+    const stateLower = state.toLowerCase().trim();
+    stateAbbr = STATE_ABBREVIATIONS[stateLower] || state;
+  }
+
+  // If no city but has state, just show state
+  if (!city || city.trim() === '' || city.toLowerCase() === 'not specified') {
+    return stateAbbr || 'Remote';
+  }
+
+  // If has city and state, show "City, ST"
+  if (stateAbbr) {
+    return `${city}, ${stateAbbr}`;
+  }
+
+  // If only city, show city
+  return city;
+}
+
+/**
+ * Generate tags for a job based on title, description, and company
+ */
+function generateTags(job) {
+  const tags = [];
+  const title = (job.job_title || '').toLowerCase();
+  const description = (job.job_description || '').toLowerCase();
+  const company = job.employer_name || '';
+
+  // Location tags - ONLY tag as Remote if location field explicitly says remote
+  if (job.job_city && job.job_city.toLowerCase().includes('remote')) {
+    tags.push('Remote');
+  }
+
+  // Add major city tags
+  const majorCities = {
+    'san francisco': 'SF', 'sf': 'SF', 'bay area': 'SF',
+    'new york': 'NYC', 'nyc': 'NYC', 'manhattan': 'NYC',
+    'seattle': 'Seattle', 'bellevue': 'Seattle', 'redmond': 'Seattle',
+    'austin': 'Austin', 'los angeles': 'LA', 'la': 'LA',
+    'boston': 'Boston', 'chicago': 'Chicago', 'denver': 'Denver'
+  };
+
+  const cityKey = (job.job_city || '').toLowerCase();
+  if (majorCities[cityKey]) {
+    tags.push(majorCities[cityKey]);
+  }
+
+  // Company tier tags
+  if (companies.faang_plus.some(c => c.name === company)) {
+    tags.push('FAANG');
+  } else if (companies.unicorn_startups.some(c => c.name === company)) {
+    tags.push('Unicorn');
+  } else if (companies.fintech.some(c => c.name === company)) {
+    tags.push('Fintech');
+  } else if (companies.gaming.some(c => c.name === company)) {
+    tags.push('Gaming');
+  }
+
+  // Technology/skill tags (limit to most relevant - check title first)
+  const techStack = {
+    'machine learning': 'ML', 'ai': 'AI', 'data science': 'DataScience',
+    'digital engineer': 'SWE', 'digital engineering': 'SWE',
+    'ios': 'iOS', 'android': 'Android', 'mobile': 'Mobile',
+    'frontend': 'Frontend', 'backend': 'Backend', 'fullstack': 'FullStack',
+    'devops': 'DevOps', 'security': 'Security', 'blockchain': 'Blockchain',
+    'aws': 'AWS', 'azure': 'Azure', 'gcp': 'GCP'
+  };
+
+  // Only match tags from title (more accurate than description)
+  for (const [keyword, tag] of Object.entries(techStack)) {
+    if (title.includes(keyword)) {
+      tags.push(tag);
+    }
+  }
+
+  // Limit to max 8 tags for consistency
+  if (tags.length > 8) {
+    tags.length = 8;
+  }
+
+  // Role category tags (only if not already added via tech stack)
+  if (!tags.includes('DataScience') && (title.includes('data scientist') || title.includes('analyst'))) {
+    tags.push('DataScience');
+  }
+  if (!tags.includes('ML') && (title.includes('machine learning') || title.includes('ml engineer'))) {
+    tags.push('ML');
+  }
+  if (title.includes('product manager') || title.includes('pm ')) {
+    tags.push('ProductManager');
+  }
+  if (title.includes('designer') || title.includes('ux') || title.includes('ui')) {
+    tags.push('Design');
+  }
+
+  return [...new Set(tags)]; // Remove duplicates
+}
+
+/**
+ * Format posted date for display
+ */
+function formatPostedDate(job) {
+  const now = new Date();
+  const companyDate = job.job_posted_at_datetime_utc ? new Date(job.job_posted_at_datetime_utc) : null;
+
+  if (companyDate) {
+    // Show both Discord and Company dates
+    const discordDateStr = now.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    const companyDateStr = companyDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    return `Discord: ${discordDateStr}\nCompany: ${companyDateStr}`;
+  }
+
+  // Fallback for jobs without company date
+  return now.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
 /**
  * Generate minimal job fingerprint for deduplication
  */
@@ -105,50 +264,52 @@ function generateMinimalJobFingerprint(job) {
 /**
  * Post single job to Discord channel
  */
-async function postJobToDiscord(job, channelId, discordClient) {
+async function postJobToDiscord(job, channelId, discordClient, channelName, channelJobNumber) {
   const channel = await discordClient.channels.fetch(channelId);
   if (!channel) {
     throw new Error(`Channel not found: ${channelId}`);
   }
 
-  // Format job for Discord
-  const location = formatLocation(job);
-  const salary = job.job_min_salary || job.job_max_salary
-    ? `$${job.job_min_salary || 0} - $${job.job_max_salary || 0}`
-    : 'Not specified';
+  // Generate tags and find company emoji
+  const tags = generateTags(job);
+  const company = companies.faang_plus.find(c => c.name === job.employer_name) ||
+                  companies.unicorn_startups.find(c => c.name === job.employer_name) ||
+                  companies.fintech.find(c => c.name === job.employer_name) ||
+                  companies.gaming.find(c => c.name === job.employer_name) ||
+                  companies.top_tech.find(c => c.name === job.employer_name) ||
+                  companies.enterprise_saas.find(c => c.name === job.employer_name);
 
-  const embed = {
-    title: job.job_title || 'Untitled Position',
-    url: job.job_apply_link || job.job_google_link || '#',
-    color: 0x00D26A, // Zapply green
-    fields: [
-      {
-        name: 'Company',
-        value: job.employer_name || 'Unknown',
-        inline: true
-      },
-      {
-        name: 'Location',
-        value: location,
-        inline: true
-      },
-      {
-        name: 'Type',
-        value: job.job_job_type || 'Not specified',
-        inline: true
-      }
-    ],
-    footer: {
-      text: `${job._sourceRepo || 'Unknown'} • Posted: ${new Date(job.job_posted_at_datetime_utc || Date.now()).toLocaleDateString()}`
-    }
-  };
+  // Build embed with proper format
+  const { EmbedBuilder } = require('discord.js');
 
-  // Add salary if available
-  if (salary !== 'Not specified') {
-    embed.fields.push({
-      name: 'Salary',
-      value: salary,
-      inline: true
+  const embed = new EmbedBuilder()
+    .setTitle(job.job_title || 'Untitled Position')
+    .setURL(job.job_apply_link || job.job_google_link || '#')
+    .setColor(0x00A8E8) // Match New-Grad color
+    .addFields(
+      { name: '🏢 Company', value: job.employer_name || 'Not specified', inline: true },
+      { name: '📍 Location', value: formatLocationWithAbbr(job), inline: true },
+      { name: '💰 Posted', value: formatPostedDate(job), inline: true }
+    );
+
+  // Add tags field with hashtag formatting
+  if (tags.length > 0) {
+    embed.addFields({
+      name: '🏷️ Tags',
+      value: tags.map(tag => `#${tag}`).join(' '),
+      inline: false
+    });
+  }
+
+  // Add footer with job number and channel name
+  if (channelName && channelJobNumber) {
+    embed.setFooter({
+      text: `Job #${channelJobNumber} in #${channelName}`
+    });
+  } else {
+    // Fallback footer if no channel info
+    embed.setFooter({
+      text: job._sourceRepo || 'Unknown'
     });
   }
 
@@ -298,14 +459,26 @@ async function main() {
           continue;
         }
 
-        const message = await postJobToDiscord(job, channelInfo.channelId, discordClient);
+        // Get channel name and job number for footer
+        let channelName = null;
+        try {
+          const channelObj = await discordClient.channels.fetch(channelInfo.channelId);
+          channelName = channelObj?.name || null;
+        } catch (e) {
+          // Channel name lookup failed, continue without it
+        }
+
+        const channelJobNumber = postedJobsManager.getChannelJobNumber(channelInfo.channelId);
+
+        const message = await postJobToDiscord(job, channelInfo.channelId, discordClient, channelName, channelJobNumber);
 
         // Track posting in local manager
         postedJobsManager.markAsPostedToChannel(
           job,
           message.id,
           channelInfo.channelId,
-          channelInfo.category
+          channelInfo.category,
+          channelJobNumber
         );
 
         // Track posting in global dedupe store
