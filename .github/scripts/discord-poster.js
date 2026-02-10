@@ -40,33 +40,35 @@ const REPOS = [
 const DATA_DIR = path.join(process.cwd(), '.github', 'data');
 
 /**
- * Fetch file content from GitHub API
+ * Fetch file content from GitHub (raw URL)
+ * Uses raw.githubusercontent.com instead of Contents API to avoid 1MB limit
  */
 function fetchGitHubFile(owner, repo, filePath) {
   return new Promise((resolve, reject) => {
-    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`;
+    // Use raw.githubusercontent.com instead of Contents API (no size limit)
+    const url = `https://raw.githubusercontent.com/${owner}/${repo}/main/${filePath}`;
 
     https.get(url, {
       headers: {
         'User-Agent': 'Zapply-Aggregator',
-        'Authorization': `Bearer ${GITHUB_TOKEN}`,
-        'Accept': 'application/vnd.github.v3+json'
+        'Authorization': `Bearer ${GITHUB_TOKEN}`, // Still needed for private repos
       }
     }, (res) => {
+      // Handle 404 gracefully
+      if (res.statusCode === 404) {
+        resolve(null);
+        return;
+      }
+
+      // Handle other errors
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode} for ${owner}/${repo}/${filePath}`));
+        return;
+      }
+
       let data = '';
       res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data);
-          if (json.content) {
-            resolve(Buffer.from(json.content, 'base64').toString('utf8'));
-          } else {
-            resolve(null);
-          }
-        } catch (error) {
-          reject(error);
-        }
-      });
+      res.on('end', () => resolve(data));
     }).on('error', reject);
   });
 }
