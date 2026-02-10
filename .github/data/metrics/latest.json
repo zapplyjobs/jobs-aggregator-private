@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-02-10T00:38:51.922Z",
+  "timestamp": "2026-02-10T06:29:57.473Z",
   "repos": {
     "New-Grad": {
       "name": "New-Grad",
@@ -7,10 +7,10 @@
       "jobs": 0,
       "lastUpdate": null,
       "workflowStatus": {
-        "id": 21845475459,
+        "id": 21854246831,
         "status": "completed",
         "conclusion": "success",
-        "lastRun": "2026-02-09T23:47:58Z"
+        "lastRun": "2026-02-10T06:28:36Z"
       },
       "error": null
     },
@@ -20,10 +20,10 @@
       "jobs": 0,
       "lastUpdate": null,
       "workflowStatus": {
-        "id": 21819581233,
+        "id": 21854147666,
         "status": "completed",
-        "conclusion": "skipped",
-        "lastRun": "2026-02-09T09:31:06Z"
+        "conclusion": "failure",
+        "lastRun": "2026-02-10T06:23:16Z"
       },
       "error": null
     },
@@ -33,10 +33,10 @@
       "jobs": 0,
       "lastUpdate": null,
       "workflowStatus": {
-        "id": 21846754359,
+        "id": 21854311678,
         "status": "in_progress",
         "conclusion": null,
-        "lastRun": "2026-02-10T00:38:49Z"
+        "lastRun": "2026-02-10T06:29:55Z"
       },
       "error": null
     },
@@ -98,17 +98,17 @@
       "jobs": 4,
       "lastUpdate": null,
       "workflowStatus": {
-        "id": 21819645702,
+        "id": 21854124985,
         "status": "completed",
-        "conclusion": "success",
-        "lastRun": "2026-02-09T09:33:47Z"
+        "conclusion": "failure",
+        "lastRun": "2026-02-10T06:22:37Z"
       },
       "error": null
     }
   },
   "summary": {
     "totalJobs": 4,
-    "operationalRepos": 6,
-    "failedRepos": 0
+    "operationalRepos": 5,
+    "failedRepos": 2
   }
 }
