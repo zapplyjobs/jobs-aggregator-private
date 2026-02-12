@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-12T12:29:13.304Z",
+  "lastUpdated": "2026-02-12T12:58:50.030Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8366,6 +8366,13 @@
       "channelId": "1462989324071997504",
       "messageId": "1471483280594436180",
       "postedAt": "2026-02-12T12:29:13.164Z"
+    },
+    "39ee0f7d60c280c1d2994db82d40cee06466408328484971f3d5e79b8fc1aa61": {
+      "jobId": "explore-jobs-netflix-net-careers-job-790313777659-solutions-software-engineer-5-los-angeles-california-united-states-of-america",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988605306834987",
+      "messageId": "1471490731955982409",
+      "postedAt": "2026-02-12T12:58:49.840Z"
     }
   }
 }
