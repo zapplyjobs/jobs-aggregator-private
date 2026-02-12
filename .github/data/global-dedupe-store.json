@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-12T08:56:42.475Z",
+  "lastUpdated": "2026-02-12T09:30:42.838Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8282,6 +8282,34 @@
       "channelId": "1462989324071997504",
       "messageId": "1471429798965542939",
       "postedAt": "2026-02-12T08:56:42.326Z"
+    },
+    "7b5a73d58200d8579ba3e3bfb6987f19837622333df0b9c17176017220c4afea": {
+      "jobId": "powertofly-com-jobs-detail-2496261",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471438347363680350",
+      "postedAt": "2026-02-12T09:30:40.315Z"
+    },
+    "c3f1e8cd3911248f38703c27301228dfbe0ebcb3402c1d1467140d84bae5694e": {
+      "jobId": "www-clearancejobs-com-jobs-8741522-cloud-engineer",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471438351273033870",
+      "postedAt": "2026-02-12T09:30:41.242Z"
+    },
+    "ea7463c7ecc66e3d7eafc57015db2c133b953f58b649b02967e94015297da7d6": {
+      "jobId": "careers-netapp-com-job-morrisville-software-engineer-cloud-solutions-27600-90791270368",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471438354406047789",
+      "postedAt": "2026-02-12T09:30:41.904Z"
+    },
+    "754a030b2515b908b49ca58c492bb0e57cfd6b119616f6e0079e1a69946b5936": {
+      "jobId": "www-talent-com-en-view",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471438357669089351",
+      "postedAt": "2026-02-12T09:30:42.688Z"
     }
   }
 }
