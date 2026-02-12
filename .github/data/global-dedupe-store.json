@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-12T04:56:16.655Z",
+  "lastUpdated": "2026-02-12T05:43:39.999Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8219,6 +8219,20 @@
       "channelId": "1462988605306834987",
       "messageId": "1471369292997066763",
       "postedAt": "2026-02-12T04:56:16.504Z"
+    },
+    "42775b818696a4a0527be6e55f49e517bede9780e7123aaa1b54d71fbca0dafc": {
+      "jobId": "careers-honda-com-us-en-job-9503-principal-communications-and-connectivity-software-engineer",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471381216941838380",
+      "postedAt": "2026-02-12T05:43:39.276Z"
+    },
+    "5a9bc15085c580f60883185a763e74f064d0f822ee40eaed70c18bc2d8d2bb9c": {
+      "jobId": "jobright-ai-jobs-info-6981a0687f40342e15dac2ae",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471381219496427672",
+      "postedAt": "2026-02-12T05:43:39.860Z"
     }
   }
 }
