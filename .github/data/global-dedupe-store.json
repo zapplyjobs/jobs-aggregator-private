@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-12T21:41:57.754Z",
+  "lastUpdated": "2026-02-12T21:59:38.608Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8499,6 +8499,20 @@
       "channelId": "1462989324071997504",
       "messageId": "1471611910603669636",
       "postedAt": "2026-02-12T21:00:20.946Z"
+    },
+    "12b8157af60b5403ed2da6bb3a98d957a3e92f4da2ee534f8b7bfed1f407d0ec": {
+      "jobId": "www-capitalonecareers-com-job-mclean-senior-manager-product-manager-data-products-1732-91661146912",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988811263934464",
+      "messageId": "1471626828572790784",
+      "postedAt": "2026-02-12T21:59:37.717Z"
+    },
+    "2703787f75ae2926f956ff3c568582c2f3ce7ba9663f042ac8ddd45d0f1f3149": {
+      "jobId": "www-talent-com-view",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471626831366197407",
+      "postedAt": "2026-02-12T21:59:38.459Z"
     }
   }
 }
