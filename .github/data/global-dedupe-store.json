@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-12T00:51:17.876Z",
+  "lastUpdated": "2026-02-12T01:52:54.776Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8009,6 +8009,69 @@
       "channelId": "1462989324071997504",
       "messageId": "1471307642293977403",
       "postedAt": "2026-02-12T00:51:17.743Z"
+    },
+    "c137d685c8bda28c169b5349a611ffd09ac48a69887321fa4f4c65abc30f0b10": {
+      "jobId": "www-talent-com-en-view",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471323121242865768",
+      "postedAt": "2026-02-12T01:52:48.200Z"
+    },
+    "f60cd41de07edfeae7418ce99d28a78b8a234aac298dae98bae3ecd640c0040d": {
+      "jobId": "www-samsara-com-company-careers-roles-7531457",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988811263934464",
+      "messageId": "1471323124053315597",
+      "postedAt": "2026-02-12T01:52:48.856Z"
+    },
+    "e7d5c8bfc933e5d892605c1f26da2dbc6845e498ec7b6b1b99b55a0206049d2f": {
+      "jobId": "amd-software-development-engineer-ai-group-us",
+      "sourceRepo": "Hardware",
+      "channelId": "1462989324071997504",
+      "messageId": "1471323126913564745",
+      "postedAt": "2026-02-12T01:52:49.574Z"
+    },
+    "b4aac0c49fbfc2b77f92968d1b1c111d901eb76f119b9c8f54c67bfe3db96da8": {
+      "jobId": "ai-jobs-computer-vision-engineer-boston",
+      "sourceRepo": "Hardware",
+      "channelId": "1462989324071997504",
+      "messageId": "1471323129489129554",
+      "postedAt": "2026-02-12T01:52:50.290Z"
+    },
+    "06afd2a4624c0f7919335fd5c2c12284ac895b02de57678605ac4df1440f41e9": {
+      "jobId": "ai-jobs-software-engineer-privacy-san-francisco",
+      "sourceRepo": "Hardware",
+      "channelId": "1462988811263934464",
+      "messageId": "1471323132806692968",
+      "postedAt": "2026-02-12T01:52:50.983Z"
+    },
+    "452e3786ee46d16ad562bcd6ed80ecb2167c46615b79093f0c8fb9364931c2ad": {
+      "jobId": "ai-jobs-emc-si-pi-engineer-san-francisco",
+      "sourceRepo": "Hardware",
+      "channelId": "1462988811263934464",
+      "messageId": "1471323136736886958",
+      "postedAt": "2026-02-12T01:52:51.902Z"
+    },
+    "9e526811ba15013fc25c5e579fa015ef0d74fca7498dcd54d79ea8b8a02749c8": {
+      "jobId": "ai-jobs-product-designer-growth-san-francisco",
+      "sourceRepo": "Hardware",
+      "channelId": "1462988811263934464",
+      "messageId": "1471323139500675204",
+      "postedAt": "2026-02-12T01:52:52.537Z"
+    },
+    "72e775b79fac428c21f4f173319b415985450060d08c1685f6563562dff39435": {
+      "jobId": "ai-jobs-mechanical-engineer-teleop-san-jose",
+      "sourceRepo": "Hardware",
+      "channelId": "1462988811263934464",
+      "messageId": "1471323143732854784",
+      "postedAt": "2026-02-12T01:52:53.550Z"
+    },
+    "86782ae55238332aa35f3ce6e47370249e510ab473d183b58c0456ae79e5aa2c": {
+      "jobId": "ai-jobs-computer-vision-engineer-salt-lake-city",
+      "sourceRepo": "Hardware",
+      "channelId": "1462989324071997504",
+      "messageId": "1471323146891169802",
+      "postedAt": "2026-02-12T01:52:54.673Z"
     }
   }
 }
