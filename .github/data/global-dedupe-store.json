@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-11T23:56:45.021Z",
+  "lastUpdated": "2026-02-12T00:51:17.876Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -7967,6 +7967,48 @@
       "channelId": "1462988831530680422",
       "messageId": "1471290594067218487",
       "postedAt": "2026-02-11T23:43:33.183Z"
+    },
+    "0a95d46f298e2b01bea18757c6b39afea41f3c8e33f8283b598fc0a0c456c841": {
+      "jobId": "careers-honda-com-us-en-job-9172-senior-user-experience-software-engineer",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471307627677089899",
+      "postedAt": "2026-02-12T00:51:14.308Z"
+    },
+    "d26254d70c9e2c6eb9d057621d38270a25815d1ff814887045026aabcd1a4eef": {
+      "jobId": "www-ziprecruiter-com-c-walmart-job-principal-software-engineer-conversational-ai-in-greenland-ar",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988811263934464",
+      "messageId": "1471307630390677640",
+      "postedAt": "2026-02-12T00:51:14.996Z"
+    },
+    "37873a5a0bc2966769d84a4db260e8cafee786485e4042d338ec44ce0d198128": {
+      "jobId": "tallo-com-jobs-technology-software-developer-engineer-pa-montgomery-software-engineer-staff-level-4-f26a783e7ac9",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471307633993584703",
+      "postedAt": "2026-02-12T00:51:15.722Z"
+    },
+    "2e0fb6d33da68befde71a863cedd65ca6a01dfb7bdf082a7eae2f63cd34a2251": {
+      "jobId": "www-learn4good-com-jobs-melbourne-florida-software_development-4850976320-e",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471307637239971943",
+      "postedAt": "2026-02-12T00:51:16.493Z"
+    },
+    "72141469c6188bccf26fe5b7138f0b36b7a26adce5d486229904adf490bf3f22": {
+      "jobId": "app-honestjobs-com-job-post-5e12b513-0edf-4d25-9ec0-fa10d7f6085c",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989279817891900",
+      "messageId": "1471307639597306030",
+      "postedAt": "2026-02-12T00:51:17.037Z"
+    },
+    "c9c07f220e8d2b33929f25b0de18b320fb5dd31686324a768971ef72c45f81aa": {
+      "jobId": "www-talent-com-view",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471307642293977403",
+      "postedAt": "2026-02-12T00:51:17.743Z"
     }
   }
 }
