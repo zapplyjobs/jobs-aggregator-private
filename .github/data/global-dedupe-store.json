@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-12T08:27:57.662Z",
+  "lastUpdated": "2026-02-12T08:56:42.475Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8261,6 +8261,27 @@
       "channelId": "1462989324071997504",
       "messageId": "1471415220386795573",
       "postedAt": "2026-02-12T07:58:46.399Z"
+    },
+    "4b710f3ab40ec5139421b6e6592e94a94024662c09def498cec6dc31015293d9": {
+      "jobId": "www-talent-com-view",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471429790165631082",
+      "postedAt": "2026-02-12T08:56:40.186Z"
+    },
+    "3b941768cb39a1ff2151c2531f8b4ad54ec387d732fbc59da42194acb23f64eb": {
+      "jobId": "www-snagajob-com-jobs-1215452027",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471429793902760132",
+      "postedAt": "2026-02-12T08:56:41.077Z"
+    },
+    "f12e2b1d3ee95f82cc8aa26d70dda0c08d3a58da37172230bbf97f48e2dd66a6": {
+      "jobId": "80961d557582b72a",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471429798965542939",
+      "postedAt": "2026-02-12T08:56:42.326Z"
     }
   }
 }
