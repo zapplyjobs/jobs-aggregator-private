@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-12T19:53:20.041Z",
+  "lastUpdated": "2026-02-12T20:24:14.933Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8457,6 +8457,27 @@
       "channelId": "1462988811263934464",
       "messageId": "1471590253121900627",
       "postedAt": "2026-02-12T19:34:17.377Z"
+    },
+    "e519bf054e812d9b64810482f57c6c9961c43c07c60e2ce01ce5a1c863e68628": {
+      "jobId": "jobs-lever-co-spotify-bd920487-cb6c-44b6-98c6-9a7c4ef8c673",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988605306834987",
+      "messageId": "1471602818509963336",
+      "postedAt": "2026-02-12T20:24:13.437Z"
+    },
+    "ea9981ee03cb305f26d8ff0ec21d2ae171f43c359cb56d569de21aebe6333cc8": {
+      "jobId": "www-coinbase-com-careers-positions-7588994",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989305181114450",
+      "messageId": "1471602822427447306",
+      "postedAt": "2026-02-12T20:24:14.198Z"
+    },
+    "cda2e6d8eb08f642aab9ea696e679facdcd2f68aa9620f49e356ff35681d2c65": {
+      "jobId": "boards-greenhouse-io-figma-jobs-5781928004",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988605306834987",
+      "messageId": "1471602824315011176",
+      "postedAt": "2026-02-12T20:24:14.777Z"
     }
   }
 }
