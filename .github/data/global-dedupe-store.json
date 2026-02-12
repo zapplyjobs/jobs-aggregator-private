@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-12T18:58:38.338Z",
+  "lastUpdated": "2026-02-12T19:34:17.530Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8436,6 +8436,27 @@
       "channelId": "1462989324071997504",
       "messageId": "1471574877013282919",
       "postedAt": "2026-02-12T18:33:11.763Z"
+    },
+    "90e7f0ce10f30093c44556333dce0bfa05bd2f7e969fe53a6c401068c70c7c28": {
+      "jobId": "job-boards-greenhouse-io-vercel-jobs-5798406004",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988811263934464",
+      "messageId": "1471590246155288689",
+      "postedAt": "2026-02-12T19:34:15.786Z"
+    },
+    "c399b3c7fbda043a7dc27d2c633e7e806367644f57c2518f5077d733c14d3809": {
+      "jobId": "boards-greenhouse-io-cloudflare-jobs-7607696",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988811263934464",
+      "messageId": "1471590250387345619",
+      "postedAt": "2026-02-12T19:34:16.801Z"
+    },
+    "8c2fb84fdb3c4ec3d3445bad5af3c42282f42a2c1c5933c08caabf3785780237": {
+      "jobId": "job-boards-greenhouse-io-vercel-jobs-5798416004",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988811263934464",
+      "messageId": "1471590253121900627",
+      "postedAt": "2026-02-12T19:34:17.377Z"
     }
   }
 }
