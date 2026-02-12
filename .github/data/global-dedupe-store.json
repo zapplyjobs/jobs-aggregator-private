@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-12T17:35:55.255Z",
+  "lastUpdated": "2026-02-12T18:00:26.567Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8415,6 +8415,20 @@
       "channelId": "1462989324071997504",
       "messageId": "1471551292475179244",
       "postedAt": "2026-02-12T16:59:29.003Z"
+    },
+    "c57ef72edd12f0d59dd331567348d3512a75d69fa61ed0e6c3fa22ec0bec2042": {
+      "jobId": "www-capitalonecareers-com-job-new-york-senior-lead-ai-engineer-fm-hosting-1732-88175972992",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988811263934464",
+      "messageId": "1471566616100737118",
+      "postedAt": "2026-02-12T18:00:21.949Z"
+    },
+    "d5cedec7f2b5dfb5ee7ed49a7da9e0498a2728d72e0433ab065769824e3e6f28": {
+      "jobId": "boards-greenhouse-io-figma-jobs-5551649004",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988811263934464",
+      "messageId": "1471566635080093799",
+      "postedAt": "2026-02-12T18:00:26.417Z"
     }
   }
 }
