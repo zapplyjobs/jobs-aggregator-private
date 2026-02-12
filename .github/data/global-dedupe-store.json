@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-12T11:52:46.093Z",
+  "lastUpdated": "2026-02-12T12:29:13.304Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8345,6 +8345,27 @@
       "channelId": "1462988721828794531",
       "messageId": "1471468003039379466",
       "postedAt": "2026-02-12T11:28:30.909Z"
+    },
+    "1f9902320a4f4aa3d05101d1b547468784182bb61881b9d49fad4ae122c10ff6": {
+      "jobId": "jobs-lever-co-spotify-d0e2b3b7-a372-4970-bb3b-08d31ba25c45",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988605306834987",
+      "messageId": "1471483273539485940",
+      "postedAt": "2026-02-12T12:29:11.533Z"
+    },
+    "a792ed47cc473d0e3cbca5a586627cce435ccb163a8afb243d0be738aa0c11fa": {
+      "jobId": "tallo-com-jobs-technology-software-developer-engineer-mn-hennepin-lead-software-engineer-minnetonka-mn-44d8d50ff9e3",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471483277343723584",
+      "postedAt": "2026-02-12T12:29:12.397Z"
+    },
+    "765abb2261af541b4650654ccf2caae31a44b840a6c46456104290e34e9b8f6e": {
+      "jobId": "careers-insidehighered-com-job-3458506-software-developer-2",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471483280594436180",
+      "postedAt": "2026-02-12T12:29:13.164Z"
     }
   }
 }
