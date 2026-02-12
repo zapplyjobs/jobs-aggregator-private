@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-12T03:18:00.110Z",
+  "lastUpdated": "2026-02-12T04:12:06.790Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8128,6 +8128,69 @@
       "channelId": "1462989324071997504",
       "messageId": "1471344561346314354",
       "postedAt": "2026-02-12T03:17:59.976Z"
+    },
+    "9985d164c5d57027f38d610be1e04429bf2b5a9cde5f6499a6e1556c276896c4": {
+      "jobId": "www-talent-com-view",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471358159955300373",
+      "postedAt": "2026-02-12T04:12:02.045Z"
+    },
+    "e4c40399e7926eb45a795f7df922087dc6cdfd34861cafb052b62ad17f71dc8c": {
+      "jobId": "careers-uabmedicine-org-us-en-job-uab001xv-information-security-engineer",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988605306834987",
+      "messageId": "1471358161045688380",
+      "postedAt": "2026-02-12T04:12:02.288Z"
+    },
+    "b3a317a9146f05081667c531395c141d30aca6bbcac7110a6c34464e88518f78": {
+      "jobId": "www-learn4good-com-jobs-carson-city-nevada-info_technology-4862488583-e",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471358163432378469",
+      "postedAt": "2026-02-12T04:12:02.958Z"
+    },
+    "28542253c9bca79491d7678df8b7ca1d64b2e87c6a7166ed3ffefe18caf94975": {
+      "jobId": "jobs-lever-co-spotify-bd920487-cb6c-44b6-98c6-9a7c4ef8c673",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988605306834987",
+      "messageId": "1471358165042991164",
+      "postedAt": "2026-02-12T04:12:03.301Z"
+    },
+    "c26a21103788073b97711763dd851fcbbb7f352b1a414b317b0a10e86acba6c3": {
+      "jobId": "careers-clarivate-com-job-jreq134888-waf-cyber-security-engineer",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471358167970615337",
+      "postedAt": "2026-02-12T04:12:03.955Z"
+    },
+    "380eb6e1b789743bb038ff39da640150906b8596b02efaac001799a49bbf45ff": {
+      "jobId": "www-clearancejobs-com-jobs-8741617-site-reliability-engineer-engineer-systems-architect-2-26999",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471358170554306875",
+      "postedAt": "2026-02-12T04:12:04.618Z"
+    },
+    "38836f23b97ea312f2cb48bc0b6d03e683c9128cb89a59da65d5dab6f32c548a": {
+      "jobId": "tallo-com-jobs-technology-cyber-information-security-engineer-analyst-az-pima-2026-raytheon-systems-security-engineer-i-onsite-83cc2b0518d5",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471358173054107700",
+      "postedAt": "2026-02-12T04:12:05.256Z"
+    },
+    "6e1e7945133e8a67f765e19dd522ee56cccf131c8a54eb3e2877cf4aead4466f": {
+      "jobId": "careers-zoom-us-jobs-site-reliability-engineer-san-jose-california-united-states-034a5b93-9e7f-4cb5-9f03-19a7ad94a5d7",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988811263934464",
+      "messageId": "1471358175763632189",
+      "postedAt": "2026-02-12T04:12:05.813Z"
+    },
+    "46a4d1aa774a54b9e7e12201614cc2207efeba0c1633baaece665931982d7a95": {
+      "jobId": "careers-zoom-us-jobs-senior-site-reliability-engineer-san-jose-california-united-states-1e4d47ec-cac3-4a29-8913-02c0aca864b8",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988811263934464",
+      "messageId": "1471358178296860804",
+      "postedAt": "2026-02-12T04:12:06.652Z"
     }
   }
 }
