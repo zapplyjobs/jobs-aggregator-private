@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-13T15:27:58.694Z",
+  "lastUpdated": "2026-02-13T15:54:53.368Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8702,6 +8702,13 @@
       "channelId": "1462989324071997504",
       "messageId": "1471890652261515399",
       "postedAt": "2026-02-13T15:27:58.142Z"
+    },
+    "4ffba56064c0b09bbd2773dbcce3261b9c7ee99eb884aa05e77016875bb65e63": {
+      "jobId": "jobs-lever-co-spotify-ad5ef898-b800-4213-a63e-e39a97df9cfb",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988831530680422",
+      "messageId": "1471897425953165354",
+      "postedAt": "2026-02-13T15:54:53.202Z"
     }
   }
 }
