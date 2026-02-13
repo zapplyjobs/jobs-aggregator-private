@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-13T07:55:58.706Z",
+  "lastUpdated": "2026-02-13T08:27:23.651Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8611,6 +8611,13 @@
       "channelId": "1462989324071997504",
       "messageId": "1471776903932285152",
       "postedAt": "2026-02-13T07:55:58.538Z"
+    },
+    "3c95bf85d101c7c7060bee71aff4d9c2d1bb812cf1d17d32d73b7185c978bea2": {
+      "jobId": "careers-cargurus-com-us-en-job-7607795-senior-data-scientist",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471784810178412565",
+      "postedAt": "2026-02-13T08:27:23.506Z"
     }
   }
 }
