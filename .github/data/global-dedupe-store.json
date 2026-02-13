@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-13T08:55:49.647Z",
+  "lastUpdated": "2026-02-13T09:28:31.229Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8618,6 +8618,20 @@
       "channelId": "1462989324071997504",
       "messageId": "1471784810178412565",
       "postedAt": "2026-02-13T08:27:23.506Z"
+    },
+    "8c46e6f49507826002e188d5ef92e6265983c87037a660f160f38dfa750a3dfc": {
+      "jobId": "www-talent-com-view",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988831530680422",
+      "messageId": "1471800190011838628",
+      "postedAt": "2026-02-13T09:28:30.250Z"
+    },
+    "a1d53ab4c517468da83721fcf024dcf21c160d148b6a88d1624a6742b2543ab0": {
+      "jobId": "jobs-lever-co-spotify-6ea8d335-e16c-4eac-ac2c-0f4fe02f4b17",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988831530680422",
+      "messageId": "1471800193015087204",
+      "postedAt": "2026-02-13T09:28:31.072Z"
     }
   }
 }
