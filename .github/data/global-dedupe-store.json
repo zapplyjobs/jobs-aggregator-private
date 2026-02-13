@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-13T06:11:03.471Z",
+  "lastUpdated": "2026-02-13T06:37:10.895Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8583,6 +8583,13 @@
       "channelId": "1462989324071997504",
       "messageId": "1471750500113317889",
       "postedAt": "2026-02-13T06:11:03.319Z"
+    },
+    "4e99498ede7e07127fe48c9c4a7f5cfb893704b76b2bde16e0299d993231f963": {
+      "jobId": "www-clearancejobs-com-jobs-8742157-full-stack-software-engineer",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471757074621923419",
+      "postedAt": "2026-02-13T06:37:10.746Z"
     }
   }
 }
