@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-13T20:24:05.617Z",
+  "lastUpdated": "2026-02-13T20:43:29.862Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8758,6 +8758,13 @@
       "channelId": "1462988811263934464",
       "messageId": "1471965173697740830",
       "postedAt": "2026-02-13T20:24:05.466Z"
+    },
+    "12745bdab9439625520c6547a8d1965472dc46b5fc2bd3dbd9f0dd6836752857": {
+      "jobId": "www-talent-com-view",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462989324071997504",
+      "messageId": "1471970057075818690",
+      "postedAt": "2026-02-13T20:43:29.708Z"
     }
   }
 }
