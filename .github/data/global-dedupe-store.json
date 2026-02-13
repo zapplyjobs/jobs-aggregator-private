@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-13T18:57:03.529Z",
+  "lastUpdated": "2026-02-13T19:30:08.769Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8730,6 +8730,20 @@
       "channelId": "1462988605306834987",
       "messageId": "1471943270438535338",
       "postedAt": "2026-02-13T18:57:03.373Z"
+    },
+    "96cc190960de8d86c329700222836ac98d05d5cb108b69d5f06606c93b0ae34b": {
+      "jobId": "www-talent-com-view",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988605306834987",
+      "messageId": "1471951595662086204",
+      "postedAt": "2026-02-13T19:30:08.233Z"
+    },
+    "70b9f6c8f53b1a56e09aa67d64580b8e139d1b93f12d0d7ae61ef3c366c88e57": {
+      "jobId": "careers-datadoghq-com-detail-7554877",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988605306834987",
+      "messageId": "1471951597369167984",
+      "postedAt": "2026-02-13T19:30:08.626Z"
     }
   }
 }
