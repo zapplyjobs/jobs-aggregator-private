@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-14T07:56:56.593Z",
+  "lastUpdated": "2026-02-14T08:23:01.030Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8835,6 +8835,20 @@
       "channelId": "1462989324071997504",
       "messageId": "1472131559976075304",
       "postedAt": "2026-02-14T07:25:15.231Z"
+    },
+    "5c36fd6e7be9b4079a3b81e8cea6f7bf4ae2be7fe80f0432f8c76c8dfe756ec3": {
+      "jobId": "www-talent-com-view",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988831530680422",
+      "messageId": "1472146094036095047",
+      "postedAt": "2026-02-14T08:23:00.225Z"
+    },
+    "ce94ee494331a4605bed9d14dcb7c4a3f4dbf6ca324706e2b1922d7433b86740": {
+      "jobId": "www-capitalonecareers-com-job-mclean-principal-associate-data-scientist-1732-91589940176",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988811263934464",
+      "messageId": "1472146096846405664",
+      "postedAt": "2026-02-14T08:23:00.876Z"
     }
   }
 }
