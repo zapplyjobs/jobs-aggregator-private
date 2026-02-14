@@ -414,6 +414,7 @@ async function main() {
   console.log('\n📤 Posting jobs to Discord...');
   let postedCount = 0;
   let skippedCount = 0;
+  let filteredCount = 0;
 
   for (const job of uniqueJobs) {
     try {
@@ -446,6 +447,11 @@ async function main() {
           category: industryRouting.category,
           type: 'industry'
         });
+      } else if (industryRouting && industryRouting.category === 'filtered') {
+        // Job was filtered out (doesn't match any active channels)
+        console.log(`  🚫 Filtered: ${job.job_title} @ ${job.employer_name} (${industryRouting.reason})`);
+        filteredCount++;
+        continue;
       }
 
       // Add location channel (if applicable)
@@ -509,6 +515,7 @@ async function main() {
   console.log(`\n📊 Posting Summary:`);
   console.log(`  ✅ Posted: ${postedCount} jobs`);
   console.log(`  ⏭️  Skipped (already posted): ${skippedCount} jobs`);
+  console.log(`  🚫 Filtered (non-tech roles): ${filteredCount} jobs`);
 
   // Save databases
   console.log('\n💾 Saving databases...');
