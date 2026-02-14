@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-02-14T05:40:33.629Z",
+  "lastUpdated": "2026-02-14T06:02:47.957Z",
   "fingerprints": {
     "73c8adbc4c8a169ec0a8de3b19d33f1b9d8cb83e8554d71bac9b431cd2df8149": {
       "jobId": "job-boards-greenhouse-io-anthropic-jobs-5102665008",
@@ -8807,6 +8807,20 @@
       "channelId": "1462989324071997504",
       "messageId": "1472092294617497621",
       "postedAt": "2026-02-14T04:49:13.472Z"
+    },
+    "ea06c7465869198f98c3ba443959a629eae511597d024561229ee0b49b6372e8": {
+      "jobId": "www-talent-com-view",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988831530680422",
+      "messageId": "1472110806001778771",
+      "postedAt": "2026-02-14T06:02:46.963Z"
+    },
+    "0cd06b415eb28958d167990288f4965a2a06da0af2c1ccc438bf57b3de6ca3fd": {
+      "jobId": "www-learn4good-com-jobs-hernando-mississippi-software_development-4865866198-e",
+      "sourceRepo": "New-Grad",
+      "channelId": "1462988811263934464",
+      "messageId": "1472110809483313213",
+      "postedAt": "2026-02-14T06:02:47.807Z"
     }
   }
 }
