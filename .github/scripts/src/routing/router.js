@@ -327,16 +327,18 @@ function getJobChannelDetails(job, CHANNEL_CONFIG) {
   }
 
   // ============================================================================
-  // PRIORITY 4 (LOWEST): Default Fallback to TECH
-  // (76% of jobs are tech, safest default)
+  // PRIORITY 4 (LOWEST): No Match - Filter Out
+  // Jobs that don't match any of the 4 active channels are filtered out
+  // (Updated 2026-02-14: Consolidated board to tech-focused roles only)
   // ============================================================================
   return {
-    channelId: CHANNEL_CONFIG.tech,
-    category: 'tech',
+    channelId: null,
+    category: 'filtered',
     matchedKeyword: null,
-    matchType: 'default-fallback',
-    priority: 'LOWEST',
-    source: 'default'
+    matchType: 'no-match-filtered',
+    priority: 'FILTERED',
+    source: 'none',
+    reason: 'Job does not match any active channel categories (tech, ai, data-science, finance)'
   };
 }
 
