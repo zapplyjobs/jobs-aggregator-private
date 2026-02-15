@@ -76,20 +76,53 @@ async function main() {
     console.log(`   - ATS: ${atsResult.jobs.length} jobs`);
     console.log('');
 
-    // Step 2: Validate and normalize jobs
-    console.log('📝 Step 2: Validating and normalizing jobs...');
+    // Step 2: Enhance jobs (add fingerprints, employment_types arrays, etc.)
+    console.log('🔄 Step 2: Enhancing jobs with required fields...');
     console.log('━'.repeat(60));
 
-    const { validJobs, invalidJobs, metrics: validationMetrics } = validateAndNormalizeJobs(allJobs);
+    // Add missing fields (fingerprints, normalize employment_types to arrays)
+    const helpers = require('./utils/helpers');
+    const enhancedJobs = allJobs.map(job => {
+      // Add fingerprint if missing
+      if (!job.fingerprint) {
+        job.fingerprint = helpers.generateFingerprint(job);
+      }
+
+      // Normalize employment_type/employment_types to array
+      if (!job.employment_types) {
+        const types = job.employment_type || job.employment_types || [];
+        if (Array.isArray(types)) {
+          job.employment_types = types.map(t => String(t).toUpperCase());
+        } else if (typeof types === 'string') {
+          job.employment_types = types.split(',').map(t => t.trim().toUpperCase());
+        } else if (types === null || types === undefined) {
+          job.employment_types = [];
+        } else {
+          job.employment_types = [String(types).toUpperCase()];
+        }
+      }
+
+      return job;
+    });
+
+    console.log('');
+    console.log(`✅ Step 2 complete: ${enhancedJobs.length} jobs enhanced`);
+    console.log('');
+
+    // Step 3: Validate and fix malformed fields
+    console.log('📝 Step 3: Validating and fixing malformed fields...');
+    console.log('━'.repeat(60));
+
+    const { validJobs, invalidJobs, metrics: validationMetrics } = validateAndNormalizeJobs(enhancedJobs);
 
     console.log('');
     printValidationSummary(validationMetrics);
     console.log('');
-    console.log(`✅ Step 2 complete: ${validJobs.length} valid jobs (${invalidJobs.length} filtered)`);
+    console.log(`✅ Step 3 complete: ${validJobs.length} valid jobs (${invalidJobs.length} filtered)`);
     console.log('');
 
-    // Step 2.5: Filter senior jobs
-    console.log('🎓 Step 2.5: Filtering senior-level jobs...');
+    // Step 4: Filter senior jobs
+    console.log('🎓 Step 4: Filtering senior-level jobs...');
     console.log('━'.repeat(60));
 
     const { entryLevelJobs, seniorJobs, metrics: seniorFilterMetrics } = filterSeniorJobs(validJobs);
@@ -97,39 +130,39 @@ async function main() {
     console.log('');
     printSeniorFilterSummary(seniorFilterMetrics);
     console.log('');
-    console.log(`✅ Step 2.5 complete: ${entryLevelJobs.length} entry-level jobs (${seniorJobs.length} senior filtered)`);
+    console.log(`✅ Step 4 complete: ${entryLevelJobs.length} entry-level jobs (${seniorJobs.length} senior filtered)`);
     console.log('');
 
-    // Step 2.75: Apply tags
-    console.log('🏷️  Step 2.75: Applying tags...');
+    // Step 5: Apply tags
+    console.log('🏷️  Step 5: Applying tags...');
     console.log('━'.repeat(60));
 
     const taggedJobs = tagJobs(entryLevelJobs);
 
-    console.log(`✅ Step 2.75 complete: ${taggedJobs.length} jobs tagged`);
+    console.log(`✅ Step 5 complete: ${taggedJobs.length} jobs tagged`);
     console.log('');
 
-    // Step 3: Deduplicate
-    console.log('🔍 Step 3: Deduplicating jobs...');
+    // Step 6: Deduplicate
+    console.log('🔍 Step 6: Deduplicating jobs...');
     console.log('━'.repeat(60));
 
     const { unique: dedupedJobs, duplicates, stats: dedupeStats } = deduplicateJobs(taggedJobs);
 
     console.log('');
-    console.log(`✅ Step 3 complete: ${dedupedJobs.length} unique jobs (${duplicates} duplicates removed)`);
+    console.log(`✅ Step 6 complete: ${dedupedJobs.length} unique jobs (${duplicates} duplicates removed)`);
     console.log('');
 
-    // Step 3.5: Generate tag statistics
-    console.log('📊 Step 3.5: Generating tag statistics...');
+    // Step 7: Generate tag statistics
+    console.log('📊 Step 7: Generating tag statistics...');
     console.log('━'.repeat(60));
 
     const tagStats = generateTagStats(dedupedJobs);
 
-    console.log(`✅ Step 3.5 complete: Tag statistics generated`);
+    console.log(`✅ Step 7 complete: Tag statistics generated`);
     console.log('');
 
-    // Step 4: Sort by date (newest first)
-    console.log('📊 Step 4: Sorting jobs by date...');
+    // Step 8: Sort by date (newest first)
+    console.log('📊 Step 8: Sorting jobs by date...');
     console.log('━'.repeat(60));
 
     const sortedJobs = dedupedJobs.sort((a, b) => {
@@ -138,11 +171,11 @@ async function main() {
       return dateB - dateA; // Newest first
     });
 
-    console.log(`✅ Step 4 complete: Jobs sorted`);
+    console.log(`✅ Step 8 complete: Jobs sorted`);
     console.log('');
 
-    // Step 5: Write output files
-    console.log('💾 Step 5: Writing output files...');
+    // Step 9: Write output files
+    console.log('💾 Step 9: Writing output files...');
     console.log('━'.repeat(60));
 
     // Write jobs (JSONL format)
@@ -154,26 +187,26 @@ async function main() {
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
-    console.log(`✅ Step 5 complete: Output files written`);
+    console.log(`✅ Step 9 complete: Output files written`);
     console.log('');
 
-    // Step 6: Print summary
+    // Step 10: Print summary
     printSummary(sortedJobs, dedupedJobs.length, duplicates, duration);
 
-    // Step 6.5: Print tag distribution
+    // Step 11: Print tag distribution
     printTagDistribution(sortedJobs);
 
-    // Step 7: Git commit (unless dry run)
+    // Step 12: Git commit (unless dry run)
     if (!isDryRun) {
-      console.log('📝 Step 6: Committing to git...');
+      console.log('📝 Step 12: Committing to git...');
       console.log('━'.repeat(60));
 
       await gitCommit(sortedJobs.length);
 
       console.log('');
-      console.log(`✅ Step 6 complete: Changes committed`);
+      console.log(`✅ Step 12 complete: Changes committed`);
     } else {
-      console.log('⏭️  Step 6: Skipping git commit (dry run)');
+      console.log('⏭️  Step 12: Skipping git commit (dry run)');
     }
 
     console.log('');
@@ -215,9 +248,12 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     // Count by source
     bySource[job.source] = (bySource[job.source] || 0) + 1;
 
-    // Count by employment type
-    for (const type of job.employment_types) {
-      byEmploymentType[type] = (byEmploymentType[type] || 0) + 1;
+    // Count by employment type (handle null/missing/non-array)
+    const types = job.employment_types || [];
+    if (Array.isArray(types)) {
+      for (const type of types) {
+        byEmploymentType[type] = (byEmploymentType[type] || 0) + 1;
+      }
     }
 
     // Count by job type
