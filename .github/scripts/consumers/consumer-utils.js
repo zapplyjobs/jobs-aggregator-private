@@ -15,8 +15,9 @@
 const https = require('https');
 
 // Aggregator output URL (raw GitHub content)
-const AGGREGATOR_URL = 'https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/jobs-shared.json';
-const METADATA_URL = 'https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/jobs-metadata.json';
+// NOTE: This is a PRIVATE repo - consumers need authentication to fetch
+const AGGREGATOR_URL = 'https://raw.githubusercontent.com/zapplyjobs/jobs-aggregator-private/main/.github/data/all_jobs.json';
+const METADATA_URL = 'https://raw.githubusercontent.com/zapplyjobs/jobs-aggregator-private/main/.github/data/jobs-metadata.json';
 
 /**
  * Fetch jobs from the aggregator
