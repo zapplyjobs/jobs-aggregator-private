@@ -31,7 +31,7 @@ const { writeJobsJSONL, writeMetadata } = require('./utils/file-writer');
 
 // Paths
 const DATA_DIR = path.join(process.cwd(), '.github', 'data');
-const JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'jobs-shared.json');
+const JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'all_jobs.json');
 const METADATA_OUTPUT_FILE = path.join(DATA_DIR, 'jobs-metadata.json');
 
 // Command line args
@@ -311,7 +311,7 @@ async function gitCommit(jobCount) {
     execSync('git config user.name "Data Bot"');
 
     // Add output files
-    execSync('git add .github/data/jobs-shared.json');
+    execSync('git add .github/data/all_jobs.json');
     execSync('git add .github/data/jobs-metadata.json');
     execSync('git add .github/data/dedupe-store.json');
 
