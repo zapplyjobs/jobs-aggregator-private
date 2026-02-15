@@ -55,7 +55,7 @@ jobs:
       if: always()
       run: |
         echo "📊 Output Files:"
-        ls -lh .github/data/jobs-shared.json || echo "jobs-shared.json not found"
+        ls -lh .github/data/all_jobs.json || echo "all_jobs.json not found"
         ls -lh .github/data/jobs-metadata.json || echo "jobs-metadata.json not found"
         ls -lh .github/data/dedupe-store.json || echo "dedupe-store.json not found"
 
