@@ -1,10 +1,7 @@
 name: Fetch All Jobs
 
 on:
-  schedule:
-    # Run every 15 minutes
-    - cron: '*/15 * * * *'
-  workflow_dispatch: # Allow manual triggering
+  workflow_dispatch: # Manual trigger only (private repo = paid minutes)
   push:
     branches: [ main ]
     paths:
@@ -110,6 +107,35 @@ jobs:
         fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push all_jobs.json to jobs-data-2026
+      if: success()
+      run: |
+        echo "📤 Pushing all_jobs.json to jobs-data-2026..."
+
+        # Clone jobs-data-2026 into a temp directory
+        git clone "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-data-2026.git" /tmp/jobs-data-2026
+
+        # Copy all_jobs.json and jobs-metadata.json
+        cp .github/data/all_jobs.json /tmp/jobs-data-2026/.github/data/all_jobs.json
+        cp .github/data/jobs-metadata.json /tmp/jobs-data-2026/.github/data/jobs-metadata.json
+
+        # Commit and push
+        cd /tmp/jobs-data-2026
+        git config user.email "bot@zapplyjobs.com"
+        git config user.name "Data Bot"
+        git add .github/data/all_jobs.json .github/data/jobs-metadata.json
+
+        if [ -n "$(git status --porcelain)" ]; then
+          JOB_COUNT=$(wc -l < .github/data/all_jobs.json)
+          git commit -m "Update jobs - $(date -u +%Y-%m-%d) - ${JOB_COUNT} jobs"
+          git push origin main
+          echo "✅ Pushed ${JOB_COUNT} jobs to jobs-data-2026"
+        else
+          echo "ℹ️ No changes to push (all_jobs.json unchanged)"
+        fi
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
 
     - name: Notify on failure
       if: failure()

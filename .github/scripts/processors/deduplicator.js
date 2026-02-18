@@ -139,72 +139,74 @@ function cleanupOldEntries(store) {
 
 /**
  * Deduplicate jobs
+ *
+ * Two separate concerns:
+ *   1. OUTPUT: all jobs within the 14-day active window (full catalog for consumer repos)
+ *   2. STORE: tracks every seen job+fingerprint for Discord re-post prevention
+ *
+ * A job is "within window" if its store entry was last seen within DEDUPE_TTL_MS.
+ * Net-new jobs (not yet in store) are also included and added to the store.
+ *
  * @param {Array} jobs - Array of normalized job objects
  * @returns {Object} - { unique: Array, duplicates: number, stats: Object }
  */
 function deduplicateJobs(jobs) {
-  console.log(`🔍 Deduplicating ${jobs.length} jobs...`);
+  console.log(`🔍 Processing ${jobs.length} jobs for 14-day active window...`);
 
   // Load existing dedupe store
   const store = loadDedupeStore();
 
-  // Clean up old entries first (TTL-based)
+  // Clean up old entries first (TTL-based) — removes entries > 14 days old
   const cleanupStats = cleanupOldEntries(store);
 
-  const unique = [];
-  const duplicateIds = [];
-  const duplicateFingerprints = [];
+  const activeWindow = []; // All jobs within 14-day window (output)
+  const newJobs = [];      // Jobs not previously seen (for logging)
   const now = Date.now();
 
   for (const job of jobs) {
-    // Check if already seen by ID
-    if (store.ids.has(job.id)) {
-      duplicateIds.push(job.id);
-      // Update timestamp (job is still being posted)
+    const seenById = store.ids.has(job.id);
+    const seenByFp = store.fingerprints.has(job.fingerprint);
+
+    if (seenById || seenByFp) {
+      // Job already in store — update timestamp (still active) and include in output
+      if (seenById) store.ids.set(job.id, now);
+      if (seenByFp) store.fingerprints.set(job.fingerprint, now);
+      activeWindow.push(job);
+    } else {
+      // Net-new job — add to store and include in output
       store.ids.set(job.id, now);
-      continue;
-    }
-
-    // Check if already seen by fingerprint
-    if (store.fingerprints.has(job.fingerprint)) {
-      duplicateFingerprints.push(job.fingerprint);
-      // Update timestamp (job is still being posted)
       store.fingerprints.set(job.fingerprint, now);
-      continue;
+      activeWindow.push(job);
+      newJobs.push(job);
     }
-
-    // Unique job - add to result and mark as seen
-    unique.push(job);
-    store.ids.set(job.id, now);
-    store.fingerprints.set(job.fingerprint, now);
   }
 
   // Save updated store
   saveDedupeStore(store);
 
   // Calculate stats
-  const totalDuplicates = duplicateIds.length + duplicateFingerprints.length;
+  const previouslySeen = activeWindow.length - newJobs.length;
   const stats = {
     input: jobs.length,
-    unique: unique.length,
-    duplicates_by_id: duplicateIds.length,
-    duplicates_by_fingerprint: duplicateFingerprints.length,
-    total_duplicates: totalDuplicates,
-    dedupe_rate: jobs.length > 0 ? ((totalDuplicates / jobs.length) * 100).toFixed(1) + '%' : '0%',
+    active_window: activeWindow.length,
+    net_new: newJobs.length,
+    previously_seen: previouslySeen,
+    store_size: store.ids.size,
     cleanup_removed: cleanupStats.removed_ids + cleanupStats.removed_fingerprints
   };
 
-  console.log(`✅ Deduplication complete:`);
+  console.log(`✅ Active window built:`);
   console.log(`   Input: ${stats.input} jobs`);
-  console.log(`   Unique: ${stats.unique} jobs`);
-  console.log(`   Duplicates (ID): ${stats.duplicates_by_id}`);
-  console.log(`   Duplicates (fingerprint): ${stats.duplicates_by_fingerprint}`);
-  console.log(`   Total removed: ${stats.total_duplicates} (${stats.dedupe_rate})`);
+  console.log(`   Output (14-day window): ${stats.active_window} jobs`);
+  console.log(`   Net-new this run: ${stats.net_new} jobs`);
+  console.log(`   Previously seen (refreshed): ${stats.previously_seen} jobs`);
+  console.log(`   Store size: ${stats.store_size} entries`);
   if (stats.cleanup_removed > 0) {
-    console.log(`   Old entries cleaned: ${stats.cleanup_removed}`);
+    console.log(`   Expired entries cleaned: ${stats.cleanup_removed}`);
   }
 
-  return { unique, duplicates: totalDuplicates, stats };
+  // Return active window as "unique" for backwards compatibility with callers
+  return { unique: activeWindow, duplicates: previouslySeen, stats };
 }
 
 /**
