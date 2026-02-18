@@ -178,8 +178,19 @@ async function main() {
     console.log('💾 Step 9: Writing output files...');
     console.log('━'.repeat(60));
 
+    // Strip pipeline internals before writing public output file
+    // (source, source_url, source_id, _raw are internal — not needed downstream)
+    const STRIP_FIELDS = ['source', 'source_url', 'source_id', '_raw'];
+    const publicJobs = sortedJobs.map(job => {
+      const stripped = { ...job };
+      for (const field of STRIP_FIELDS) {
+        delete stripped[field];
+      }
+      return stripped;
+    });
+
     // Write jobs (JSONL format)
-    await writeJobsJSONL(sortedJobs, JOBS_OUTPUT_FILE);
+    await writeJobsJSONL(publicJobs, JOBS_OUTPUT_FILE);
 
     // Write metadata
     const duration = Date.now() - startTime;
