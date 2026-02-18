@@ -1,33 +1,30 @@
 {
   "version": "1.0",
-  "generated": "2026-02-15T14:29:59.191Z",
-  "duration_ms": 24642,
-  "total_jobs": 1192,
-  "unique_jobs": 1192,
-  "duplicates_removed": 53,
+  "generated": "2026-02-18T14:45:18.482Z",
+  "duration_ms": 90133,
+  "total_jobs": 26,
+  "unique_jobs": 26,
+  "duplicates_removed": 1188,
   "by_source": {
-    "lever": 123,
-    "greenhouse": 1037,
-    "ashby": 32
+    "greenhouse": 22,
+    "lever": 4
   },
-  "by_employment_type": {
-    "FULLTIME": 32
-  },
+  "by_employment_type": {},
   "by_job_type": {
     "internship": 0,
     "new-grad": 0,
-    "other": 1192
+    "other": 26
   },
   "by_location": {
-    "remote": 29,
-    "onsite": 1163
+    "remote": 0,
+    "onsite": 26
   },
   "jsearch_stats": {
-    "date": "2026-02-15",
-    "requests_today": 0,
-    "remaining_today": 300,
-    "total_jobs_fetched": 0,
-    "avg_jobs_per_request": 0
+    "date": "2026-02-18",
+    "requests_today": 3,
+    "remaining_today": 297,
+    "total_jobs_fetched": 56,
+    "avg_jobs_per_request": "18.7"
   },
   "ats_stats": {
     "companies_total": 27,
@@ -36,55 +33,49 @@
     "ashby_companies": 5
   },
   "validation_stats": {
-    "total_input": 4666,
-    "valid_jobs": 4666,
-    "invalid_jobs": 0,
+    "total_input": 4657,
+    "valid_jobs": 4601,
+    "invalid_jobs": 56,
     "invalid_reasons": {
       "missing_title": 0,
-      "missing_company": 0,
+      "missing_company": 56,
       "missing_url": 0,
       "invalid_title_length": 0,
       "invalid_company_length": 0,
       "invalid_url_format": 0
     },
     "normalized_fields": {
-      "state_extracted": 1149,
-      "city_extracted": 4666
+      "state_extracted": 1145,
+      "city_extracted": 4601
     }
   },
   "senior_filter_stats": {
-    "total_input": 4666,
-    "entry_level_jobs": 1245,
-    "senior_jobs": 3421,
+    "total_input": 4601,
+    "entry_level_jobs": 1214,
+    "senior_jobs": 3387,
     "senior_reasons": {
-      "senior_title": 919,
-      "senior_experience": 697,
-      "both": 1805
+      "senior_title": 924,
+      "senior_experience": 696,
+      "both": 1767
     }
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 1030,
-      "mid_level": 78,
-      "internship": 84
+      "entry_level": 25,
+      "internship": 1
     },
     "domains": {
-      "general": 782,
-      "data_science": 90,
-      "product": 123,
-      "software": 202,
-      "hardware": 8
+      "general": 17,
+      "product": 4,
+      "software": 5
     },
-    "locations": {
-      "remote": 29,
-      "on_site": 3
-    },
+    "locations": {},
     "experience": {
-      "3_plus_years": 1023,
-      "under_3_years": 51,
-      "no_experience": 118
+      "3_plus_years": 23,
+      "no_experience": 2,
+      "under_3_years": 1
     },
     "special": {},
-    "total": 1192
+    "total": 26
   }
 }
