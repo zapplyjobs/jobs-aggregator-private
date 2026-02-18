@@ -1,10 +1,10 @@
 {
   "version": "1.0",
-  "generated": "2026-02-18T21:57:03.031Z",
-  "duration_ms": 96623,
+  "generated": "2026-02-18T22:01:16.474Z",
+  "duration_ms": 96004,
   "total_jobs": 1221,
   "unique_jobs": 1221,
-  "duplicates_removed": 1209,
+  "duplicates_removed": 1221,
   "by_source": {
     "greenhouse": 1065,
     "lever": 125,
@@ -26,8 +26,8 @@
     "date": "2026-02-18",
     "requests_today": 3,
     "remaining_today": 297,
-    "total_jobs_fetched": 131,
-    "avg_jobs_per_request": "43.7"
+    "total_jobs_fetched": 126,
+    "avg_jobs_per_request": "42.0"
   },
   "ats_stats": {
     "companies_total": 27,
@@ -36,19 +36,19 @@
     "ashby_companies": 5
   },
   "validation_stats": {
-    "total_input": 4746,
+    "total_input": 4741,
     "valid_jobs": 4615,
-    "invalid_jobs": 131,
+    "invalid_jobs": 126,
     "invalid_reasons": {
       "missing_title": 0,
-      "missing_company": 131,
+      "missing_company": 126,
       "missing_url": 0,
       "invalid_title_length": 0,
       "invalid_company_length": 0,
       "invalid_url_format": 0
     },
     "normalized_fields": {
-      "state_extracted": 1145,
+      "state_extracted": 1146,
       "city_extracted": 4615
     }
   },
@@ -57,9 +57,9 @@
     "entry_level_jobs": 1221,
     "senior_jobs": 3394,
     "senior_reasons": {
-      "senior_title": 921,
+      "senior_title": 922,
       "senior_experience": 700,
-      "both": 1773
+      "both": 1772
     }
   },
   "tag_stats": {
