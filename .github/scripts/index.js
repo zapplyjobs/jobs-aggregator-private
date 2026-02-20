@@ -323,10 +323,10 @@ function printSummary(jobs, uniqueCount, duplicateCount, duration) {
   console.log('📊 Execution Summary:');
   console.log('━'.repeat(60));
 
-  // Count by job type
-  const internships = jobs.filter(j => j.is_internship).length;
-  const newGrad = jobs.filter(j => j.is_new_grad).length;
-  const remote = jobs.filter(j => j.is_remote).length;
+  // Count by job type (use tag fields — is_internship/is_new_grad/is_remote are never set)
+  const internships = jobs.filter(j => j.tags?.employment === 'internship').length;
+  const newGrad = jobs.filter(j => j.tags?.employment === 'entry_level').length;
+  const remote = jobs.filter(j => j.tags?.locations?.includes('remote')).length;
 
   console.log(`Total jobs in output: ${jobs.length}`);
   console.log(`  - Internships: ${internships}`);
