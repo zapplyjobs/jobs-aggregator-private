@@ -89,23 +89,22 @@ function tagDomains(job) {
   const description = (job.description || '').toLowerCase();
   const tags = [];
 
-  // Software domain
+  // Software domain (removed bare 'developer' — too broad, matches 'developer relations', 'developer advocate')
   const softwareKeywords = [
     'software engineer', 'software developer', 'full stack', 'fullstack',
     'frontend', 'back end', 'backend', 'web developer', 'web dev',
     'mobile developer', 'ios developer', 'android developer',
     'devops', 'sre', 'site reliability', 'platform engineer',
-    'swe', 'developer'
+    'swe'
   ];
   if (softwareKeywords.some(kw => title.includes(kw))) {
     tags.push('software');
   }
 
-  // Data Science domain
+  // Data Science domain (title-only, specific keywords — avoid broad terms like 'analytics', 'intelligence')
   const dataScienceKeywords = [
-    'data scientist', 'data engineer', 'machine learning', 'ml engineer',
-    'ml engineer', 'ai engineer', 'analytics', 'data analyst',
-    'business analyst', 'intelligence', 'research scientist'
+    'data scientist', 'data engineer', 'data analyst',
+    'machine learning', 'ml engineer', 'ai engineer'
   ];
   if (dataScienceKeywords.some(kw => title.includes(kw))) {
     tags.push('data_science');
@@ -120,10 +119,10 @@ function tagDomains(job) {
     tags.push('hardware');
   }
 
-  // Nursing domain (removed ambiguous "rn" - matches inside "intern")
+  // Nursing domain (title-only, specific credentials — removed 'healthcare', 'clinical', 'patient care'
+  // which also appear in non-nursing titles like 'Clinical Data Analyst', 'Healthcare Software Engineer')
   const nursingKeywords = [
-    'registered nurse', 'nurse practitioner', 'nursing', 'lpn',
-    'healthcare', 'medical assistant', 'patient care', 'clinical'
+    'registered nurse', 'nurse practitioner', 'nursing', 'lpn', 'lvn', 'cna'
   ];
   if (nursingKeywords.some(kw => title.includes(kw))) {
     tags.push('nursing');
