@@ -146,23 +146,91 @@ function tagDomains(job) {
 }
 
 /**
+ * Non-US location indicators (city names, countries, regions)
+ * Used to detect ATS jobs with non-US locations (ATS normalizer sets job.location
+ * as a string but doesn't populate job.job_country, so is_us_only is unreliable for ATS)
+ */
+const NON_US_LOCATIONS = [
+  // Countries
+  'canada', 'mexico', 'ireland', 'united kingdom', 'uk', 'germany', 'france',
+  'netherlands', 'india', 'singapore', 'japan', 'australia', 'brazil', 'spain',
+  'sweden', 'denmark', 'norway', 'finland', 'switzerland', 'poland', 'czechia',
+  'romania', 'argentina', 'chile', 'colombia', 'peru', 'israel', 'turkey',
+  'south korea', 'china', 'taiwan', 'new zealand', 'south africa', 'portugal',
+  // Common non-US cities that appear in ATS feeds
+  'toronto', 'vancouver', 'montreal', 'ottawa', 'calgary', // Canada
+  'london', 'manchester', 'edinburgh', // UK
+  'dublin', 'cork', // Ireland
+  'berlin', 'munich', 'hamburg', // Germany
+  'amsterdam', 'rotterdam', // Netherlands
+  'bengaluru', 'bangalore', 'mumbai', 'hyderabad', 'pune', 'chennai', 'delhi', // India
+  'singapore',
+  'sydney', 'melbourne', 'brisbane', // Australia
+  'tokyo', 'osaka', // Japan
+  'mexico city', 'guadalajara', 'monterrey', // Mexico
+  'paris', 'lyon', // France
+  'stockholm', 'gothenburg', // Sweden
+  'tel aviv', 'jerusalem', // Israel
+  'zurich', 'geneva', // Switzerland
+  'warsaw', 'krakow', // Poland
+  'prague', // Czechia
+  'bucharest', // Romania
+  'madrid', 'barcelona', // Spain
+  'lisbon', 'porto', // Portugal
+];
+
+/**
  * Tag locations (multi-select)
+ * Handles both JSearch format (job.is_us_only, job.is_remote)
+ * and ATS format (job.location as string, no job_country field)
  */
 function tagLocations(job) {
   const tags = [];
 
+  // Combine all location fields for checking
+  const locationStr = (
+    job.location || job.job_city || job.job_location || job.job_country || ''
+  ).toLowerCase();
+
+  // Check for explicit non-US location in location string
+  const isExplicitlyNonUS = NON_US_LOCATIONS.some(place => locationStr.includes(place));
+  if (isExplicitlyNonUS) {
+    // Don't add 'us' tag — skip to remote check
+  } else if (job.is_us_only === true) {
+    // JSearch jobs: trust is_us_only flag
+    tags.push('us');
+  } else if (locationStr && !isExplicitlyNonUS) {
+    // ATS jobs with a location that didn't match non-US list: check for US indicators
+    const usStates = [
+      'alabama','alaska','arizona','arkansas','california','colorado','connecticut',
+      'delaware','florida','georgia','hawaii','idaho','illinois','indiana','iowa',
+      'kansas','kentucky','louisiana','maine','maryland','massachusetts','michigan',
+      'minnesota','mississippi','missouri','montana','nebraska','nevada',
+      'new hampshire','new jersey','new mexico','new york','north carolina',
+      'north dakota','ohio','oklahoma','oregon','pennsylvania','rhode island',
+      'south carolina','south dakota','tennessee','texas','utah','vermont',
+      'virginia','washington','west virginia','wisconsin','wyoming','district of columbia',
+      // Abbreviations and common city names
+      ', ca', ', tx', ', ny', ', wa', ', fl', ', il', ', ga', ', pa', ', oh', ', nc',
+      'san francisco', 'new york', 'los angeles', 'chicago', 'seattle', 'austin',
+      'boston', 'denver', 'atlanta', 'miami', 'dallas', 'houston', 'phoenix',
+      'remote' // Remote-only with no country = assume US for ATS companies
+    ];
+    if (usStates.some(s => locationStr.includes(s))) {
+      tags.push('us');
+    }
+    // If location exists but doesn't match US or non-US list, don't assume US
+  }
+
   // Check for remote
   if (job.is_remote === true) {
     tags.push('remote');
-  }
-
-  // Check for US-only
-  if (job.is_us_only === true) {
-    tags.push('us');
+  } else if (locationStr.includes('remote') && !isExplicitlyNonUS) {
+    tags.push('remote');
   }
 
   // Check for on-site (not remote)
-  if (job.is_remote === false) {
+  if (job.is_remote === false && !tags.includes('remote')) {
     tags.push('on_site');
   }
 
