@@ -15,19 +15,22 @@
 const fs = require('fs');
 const path = require('path');
 
+// Import from shared submodule (job-board-scripts/lib/aggregator/)
+const SHARED = path.join(__dirname, 'shared', 'lib', 'aggregator');
+
 // Import fetchers
-const { fetchFromJSearch, getUsageStats } = require('./fetchers/jsearch-fetcher');
-const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require('./fetchers/ats-fetcher');
+const { fetchFromJSearch, getUsageStats } = require(`${SHARED}/fetchers/jsearch-fetcher`);
+const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
 
 // Import processors
-const { validateAndNormalizeJobs, printValidationSummary } = require('./processors/validator');
-const { filterSeniorJobs, printSeniorFilterSummary } = require('./processors/senior-filter');
-const { deduplicateJobs } = require('./processors/deduplicator');
-const { tagJobs, generateTagStats } = require('./processors/tag-engine');
-const { printTagDistribution } = require('./processors/tag-monitor');
+const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
+const { filterSeniorJobs, printSeniorFilterSummary } = require(`${SHARED}/processors/senior-filter`);
+const { deduplicateJobs } = require(`${SHARED}/processors/deduplicator`);
+const { tagJobs, generateTagStats } = require(`${SHARED}/processors/tag-engine`);
+const { printTagDistribution } = require(`${SHARED}/processors/tag-monitor`);
 
 // Import utils
-const { writeJobsJSONL, writeMetadata } = require('./utils/file-writer');
+const { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);
 
 // Paths
 const DATA_DIR = path.join(process.cwd(), '.github', 'data');
@@ -81,7 +84,7 @@ async function main() {
     console.log('━'.repeat(60));
 
     // Add missing fields (fingerprints, normalize employment_types to arrays)
-    const helpers = require('./utils/helpers');
+    const helpers = require(`${SHARED}/utils/helpers`);
     const enhancedJobs = allJobs.map(job => {
       // Add fingerprint if missing
       if (!job.fingerprint) {

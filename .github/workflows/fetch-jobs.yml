@@ -27,6 +27,7 @@ jobs:
       with:
         ref: ${{ github.ref_name }}
         fetch-depth: 0  # Full history for proper rebasing
+        submodules: recursive
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
