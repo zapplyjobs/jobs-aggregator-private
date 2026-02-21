@@ -1,6 +1,8 @@
 name: Fetch All Jobs
 
 on:
+  schedule:
+    - cron: '*/15 * * * *'  # Every 15 min (96 req/day — matches QUERIES_PER_RUN=1)
   workflow_dispatch:
   push:
     branches: [ main ]
