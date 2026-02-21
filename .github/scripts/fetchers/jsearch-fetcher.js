@@ -7,14 +7,15 @@
  * Paid tier: 10,000 requests/month (~333 requests/day with safety margin)
  *
  * Features:
- * - Multi-query per run (3 queries = 72/day < 333 quota)
- * - Query rotation (distributes queries across hourly runs)
+ * - Single query per run (1 query × 96 runs/day = 96 requests/day << 333 quota)
+ * - Query rotation (distributes queries across 15-min runs)
  * - Rate limiting (respects daily quota)
  * - Usage tracking
  *
- * UPDATED 2026-02-05: Added entry-level queries for New-Grad-Jobs
- * - Mix of internship and entry-level queries (7 total, rotates 3 per run)
- * - Total: 96 runs × 3 queries = 288 requests/day (within 333 quota)
+ * UPDATED 2026-02-20: Redesigned query sets — one set per consumer domain
+ * - 15 queries total (software:4, datascience:4, hardware:4, nursing:3)
+ * - Rotates 1 per run: full domain coverage every 15 runs (~4 hours)
+ * - Total: 96 runs × 1 query = 96 requests/day (well within 333 quota)
  */
 
 const fs = require('fs');
@@ -24,36 +25,49 @@ const path = require('path');
 const JSEARCH_API_KEY = process.env.JSEARCH_API_KEY;
 const JSEARCH_BASE_URL = 'https://jsearch.p.rapidapi.com/search';
 const MAX_REQUESTS_PER_DAY = 300; // Paid tier: 10,000/month ÷ 30 = ~333/day (using 300 for safety)
-const QUERIES_PER_RUN = 3; // Run 3 queries per workflow run
+const QUERIES_PER_RUN = 1; // 1 query per run × 96 runs/day = 96 requests/day (<<333 quota)
 const USAGE_FILE = path.join(process.cwd(), '.github', 'data', 'jsearch-usage.json');
 
 // Query sets for Tagged Streams Aggregator
-// Organized by job type to ensure good coverage for all repos
+// One set per consumer repo domain. Each set covers both internship and entry-level
+// so the tag-engine can split them correctly downstream.
 const QUERY_SETS = {
-  // Internship queries (for Internships-2026)
-  internships: [
-    'software engineer intern internship co-op summer program',
-    'data science intern internship analytics',
-    'nursing intern internship healthcare medical'
+  // Software Engineering (for New-Grad-Software-Engineering-Jobs-2026 + Internships)
+  software: [
+    'software engineer intern',
+    'software engineer new graduate entry level',
+    'junior software engineer',
+    'associate software engineer'
   ],
-  // Entry-level queries (for New-Grad-Jobs-2026)
-  entryLevel: [
-    'entry level software engineer new graduate',
-    'associate software engineer',
-    'junior software engineer'
+  // Data Science (for New-Grad-Data-Science-Jobs-2026 + Internships)
+  datascience: [
+    'data science intern',
+    'data scientist entry level new graduate',
+    'data analyst entry level',
+    'machine learning engineer entry level'
   ],
-  // Mixed queries for broad coverage
-  mixed: [
-    'software engineer intern',  // Internship
-    'entry level software engineer'  // Entry-level
+  // Hardware Engineering (for New-Grad-Hardware-Engineering-Jobs-2026)
+  hardware: [
+    'hardware engineer entry level new graduate',
+    'electrical engineer entry level new graduate',
+    'embedded systems engineer entry level',
+    'firmware engineer entry level'
+  ],
+  // Nursing (for New-Grad-Nursing-Jobs-2026)
+  nursing: [
+    'registered nurse entry level new graduate',
+    'new grad nurse RN',
+    'nurse practitioner entry level'
   ]
 };
 
-// Use all queries - rotates through internship, entry-level, and mixed
+// Flat list — all queries across all domains
+// 15 total: rotates 3 per hour = 15 unique per 5-hour cycle = full coverage daily
 const ALL_QUERIES = [
-  ...QUERY_SETS.internships,
-  ...QUERY_SETS.entryLevel,
-  ...QUERY_SETS.mixed
+  ...QUERY_SETS.software,
+  ...QUERY_SETS.datascience,
+  ...QUERY_SETS.hardware,
+  ...QUERY_SETS.nursing
 ];
 
 /**
@@ -63,9 +77,9 @@ const ALL_QUERIES = [
  * @returns {Array} - Array of query strings to run
  */
 function selectQueriesForHour(hour) {
-  // Each hour runs 3 different queries
-  // Rotate through ALL_QUERIES (7 total: 3 internships, 3 entryLevel, 1 mixed)
-  // Pattern: hour 0 = [0,2,4], hour 1 = [1,3,5], hour 2 = [2,4,6], etc.
+  // Runs 1 query per 15-min interval
+  // Rotate through ALL_QUERIES (15 total across 4 domains)
+  // Full cycle every 15 runs (~4 hours) — all domains covered multiple times per day
 
   const startIndex = (hour * QUERIES_PER_RUN) % ALL_QUERIES.length;
   const queries = [];
