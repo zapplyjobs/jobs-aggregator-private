@@ -344,9 +344,8 @@ function printSummary(jobs, uniqueCount, duplicateCount, duration) {
   const jsearchStats = getUsageStats();
   console.log('');
   console.log('JSearch Usage:');
-  console.log(`  Requests today: ${jsearchStats.requests_today}/${jsearchStats.remaining_today + jsearchStats.requests_today}`);
-  console.log(`  Jobs fetched today: ${jsearchStats.total_jobs_fetched}`);
-  console.log(`  Avg per request: ${jsearchStats.avg_jobs_per_request}`);
+  console.log(`  Total fetched this run: ${jsearchStats.total_fetched}`);
+  jsearchStats.queries.forEach(q => console.log(`  "${q.query}": ${q.count} jobs`));
 }
 
 /**
