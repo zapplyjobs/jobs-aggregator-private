@@ -36,7 +36,7 @@ jobs:
         node-version: '20'
 
     - name: Install dependencies
-      run: npm install axios
+      run: npm ci
 
     - name: Create logs directory
       run: mkdir -p .github/logs
