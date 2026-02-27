@@ -39,7 +39,15 @@ jobs:
       run: npm ci
 
     - name: Create logs directory
-      run: mkdir -p .github/logs
+      run: mkdir -p .github/logs .github/data
+
+    - name: Seed all_jobs.json from jobs-data-2026
+      run: |
+        echo "📥 Seeding previous all_jobs.json from jobs-data-2026..."
+        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/all_jobs.json?t=$(date +%s)" \
+          -o .github/data/all_jobs.json && \
+          echo "✅ Seeded $(wc -l < .github/data/all_jobs.json) jobs from jobs-data-2026" || \
+          echo "⚠️ Could not seed all_jobs.json — starting fresh"
 
     - name: Fetch jobs from all sources
       run: node .github/scripts/index.js 2>&1 | tee .github/logs/fetch.log
