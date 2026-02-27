@@ -200,15 +200,20 @@ async function main() {
       const currentIds = new Set(publicJobs.map(j => j.id));
       const prevLines = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8').trim().split('\n').filter(Boolean);
       let mergedCount = 0;
+      let nullDateCount = 0;
       for (const line of prevLines) {
         try {
           const job = JSON.parse(line);
           if (currentIds.has(job.id)) continue; // current run already has this job
-          const postedTs = job.posted_at ? new Date(job.posted_at).getTime() : 0;
+          if (!job.posted_at) { nullDateCount++; continue; } // null date — cannot verify TTL, drop
+          const postedTs = new Date(job.posted_at).getTime();
           if (postedTs < cutoffMs) continue; // expired
           publicJobs.push(job);
           mergedCount++;
         } catch { /* skip malformed lines */ }
+      }
+      if (nullDateCount > 0) {
+        console.log(`⚠️ Rolling window: dropped ${nullDateCount} prior-run jobs with null posted_at (cannot verify TTL)`);
       }
       if (mergedCount > 0) {
         // Re-sort after merge (newest first)
