@@ -193,6 +193,17 @@ async function main() {
       return stripped;
     });
 
+    // Archive expiring jobs BEFORE overwriting all_jobs.json
+    const { getExpiringJobs, appendToWeeklyArchive } = require(`${SHARED}/utils/archiver`);
+    const ARCHIVE_DIR = path.join(DATA_DIR, 'archive');
+    const expiringJobs = getExpiringJobs(JOBS_OUTPUT_FILE, publicJobs);
+    if (expiringJobs.length > 0) {
+      const archiveFile = appendToWeeklyArchive(expiringJobs, ARCHIVE_DIR);
+      console.log(`📦 Archived ${expiringJobs.length} expiring jobs → ${path.basename(archiveFile)}`);
+    } else {
+      console.log('📦 No expiring jobs this run');
+    }
+
     // Write jobs (JSONL format)
     await writeJobsJSONL(publicJobs, JOBS_OUTPUT_FILE);
 
@@ -364,6 +375,7 @@ async function gitCommit(jobCount) {
     execSync('git add .github/data/all_jobs.json');
     execSync('git add .github/data/jobs-metadata.json');
     execSync('git add .github/data/dedupe-store.json');
+    execSync('git add .github/data/archive/ 2>/dev/null || true'); // archive dir may not exist yet
 
     // Check if there are changes
     const status = execSync('git status --porcelain', { encoding: 'utf8' });
