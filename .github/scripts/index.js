@@ -193,6 +193,32 @@ async function main() {
       return stripped;
     });
 
+    // Merge previous all_jobs.json into current run (rolling 14-day window)
+    // Jobs from prior runs that weren't re-fetched this run are preserved until their TTL expires.
+    if (fs.existsSync(JOBS_OUTPUT_FILE)) {
+      const cutoffMs = Date.now() - 14 * 24 * 60 * 60 * 1000;
+      const currentIds = new Set(publicJobs.map(j => j.id));
+      const prevLines = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8').trim().split('\n').filter(Boolean);
+      let mergedCount = 0;
+      for (const line of prevLines) {
+        try {
+          const job = JSON.parse(line);
+          if (currentIds.has(job.id)) continue; // current run already has this job
+          const postedTs = job.posted_at ? new Date(job.posted_at).getTime() : 0;
+          if (postedTs < cutoffMs) continue; // expired
+          publicJobs.push(job);
+          mergedCount++;
+        } catch { /* skip malformed lines */ }
+      }
+      if (mergedCount > 0) {
+        // Re-sort after merge (newest first)
+        publicJobs.sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0));
+        console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length})`);
+      } else {
+        console.log('🔄 No prior-run jobs to merge');
+      }
+    }
+
     // Archive expiring jobs BEFORE overwriting all_jobs.json
     const { getExpiringJobs, appendToWeeklyArchive } = require(`${SHARED}/utils/archiver`);
     const ARCHIVE_DIR = path.join(DATA_DIR, 'archive');
