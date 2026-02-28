@@ -1,33 +1,48 @@
 {
   "version": "1.0",
-  "generated": "2026-02-27T02:09:01.125Z",
-  "duration_ms": 79052,
-  "total_jobs": 3887,
-  "unique_jobs": 3887,
-  "duplicates_removed": 2305,
+  "generated": "2026-02-28T15:53:32.264Z",
+  "duration_ms": 84824,
+  "total_jobs": 3895,
+  "unique_jobs": 3895,
+  "duplicates_removed": 2219,
   "by_source": {
     "greenhouse": 3127,
-    "ashby": 420,
-    "lever": 340
+    "lever": 330,
+    "ashby": 421,
+    "jsearch": 17
   },
   "by_employment_type": {
     "FULLTIME": 411,
-    "CONTRACT": 1,
+    "FULL-TIME": 15,
+    "CONTRACT": 2,
     "TEMPORARY": 1,
     "INTERN": 7
   },
   "by_job_type": {
     "internship": 0,
     "new-grad": 0,
-    "other": 3887
+    "other": 3895
   },
   "by_location": {
-    "remote": 143,
-    "onsite": 3744
+    "remote": 144,
+    "onsite": 3751
   },
   "jsearch_stats": {
-    "queries": [],
-    "total_fetched": 0
+    "queries": [
+      {
+        "query": "new grad nurse RN",
+        "count": 6
+      },
+      {
+        "query": "nurse residency program 2026",
+        "count": 9
+      },
+      {
+        "query": "new graduate RN hospital",
+        "count": 6
+      }
+    ],
+    "total_fetched": 21
   },
   "ats_stats": {
     "companies_total": 46,
@@ -36,8 +51,8 @@
     "ashby_companies": 10
   },
   "validation_stats": {
-    "total_input": 12424,
-    "valid_jobs": 12422,
+    "total_input": 12467,
+    "valid_jobs": 12465,
     "invalid_jobs": 2,
     "invalid_reasons": {
       "missing_title": 0,
@@ -48,49 +63,50 @@
       "invalid_url_format": 0
     },
     "normalized_fields": {
-      "state_extracted": 1065,
-      "city_extracted": 1847
+      "state_extracted": 1066,
+      "city_extracted": 1871
     }
   },
   "senior_filter_stats": {
-    "total_input": 12422,
-    "entry_level_jobs": 3887,
-    "senior_jobs": 8535,
+    "total_input": 12465,
+    "entry_level_jobs": 3895,
+    "senior_jobs": 8570,
     "senior_reasons": {
-      "senior_title": 2358,
-      "senior_experience": 1538,
-      "both": 4639
+      "senior_title": 2356,
+      "senior_experience": 1535,
+      "both": 4679
     }
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 3465,
+      "entry_level": 3478,
       "mid_level": 215,
-      "internship": 204,
+      "internship": 199,
       "senior": 3
     },
     "domains": {
-      "general": 1935,
-      "software": 1311,
-      "ai": 79,
+      "nursing": 13,
+      "software": 1302,
+      "general": 1937,
+      "ai": 80,
       "data_science": 466,
-      "product": 304,
-      "hardware": 203
+      "product": 306,
+      "hardware": 206
     },
     "locations": {
-      "us": 2488,
-      "remote": 297,
-      "on_site": 274
+      "us": 2501,
+      "on_site": 290,
+      "remote": 305
     },
     "experience": {
-      "mid_level": 1339,
-      "unknown": 1297,
-      "senior_level": 333,
-      "entry_level": 918
+      "entry_level": 920,
+      "unknown": 1294,
+      "mid_level": 1345,
+      "senior_level": 336
     },
     "special": {
-      "unicorn": 367
+      "unicorn": 357
     },
-    "total": 3887
+    "total": 3895
   }
 }
