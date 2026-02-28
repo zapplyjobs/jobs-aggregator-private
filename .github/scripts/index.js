@@ -24,7 +24,7 @@ const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
-const { filterSeniorJobs, printSeniorFilterSummary } = require(`${SHARED}/processors/senior-filter`);
+const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob } = require(`${SHARED}/processors/senior-filter`);
 const { deduplicateJobs } = require(`${SHARED}/processors/deduplicator`);
 const { tagJobs, generateTagStats } = require(`${SHARED}/processors/tag-engine`);
 const { printTagDistribution } = require(`${SHARED}/processors/tag-monitor`);
@@ -208,6 +208,7 @@ async function main() {
           if (!job.posted_at) { nullDateCount++; continue; } // null date — cannot verify TTL, drop
           const postedTs = new Date(job.posted_at).getTime();
           if (postedTs < cutoffMs) continue; // expired
+          if (isSeniorJob(job)) continue; // re-apply senior filter (WD-F5: bypass fix)
           publicJobs.push(job);
           mergedCount++;
         } catch { /* skip malformed lines */ }
