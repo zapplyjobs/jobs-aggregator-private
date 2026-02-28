@@ -1,52 +1,49 @@
 {
   "version": "1.0",
-  "generated": "2026-02-26T22:52:50.270Z",
-  "duration_ms": 149906,
-  "total_jobs": 4042,
-  "unique_jobs": 4042,
-  "duplicates_removed": 2433,
+  "generated": "2026-02-28T14:11:17.276Z",
+  "duration_ms": 96724,
+  "total_jobs": 3890,
+  "unique_jobs": 3890,
+  "duplicates_removed": 2215,
   "by_source": {
-    "greenhouse": 3123,
-    "ashby": 470,
-    "lever": 340,
-    "jsearch": 109
+    "jsearch": 9,
+    "greenhouse": 3130,
+    "lever": 330,
+    "ashby": 421
   },
   "by_employment_type": {
-    "FULLTIME": 457,
-    "FULL-TIME": 100,
-    "PART-TIME": 2,
-    "CONTRACTOR": 4,
-    "CONTRACT": 4,
-    "INTERNSHIP": 1,
-    "FULL-TIME AND PART-TIME": 2,
+    "FULL-TIME": 8,
+    "FULL-TIME AND INTERNSHIP": 1,
+    "FULLTIME": 411,
+    "CONTRACT": 2,
     "TEMPORARY": 1,
-    "INTERN": 8
+    "INTERN": 7
   },
   "by_job_type": {
-    "internship": 4,
+    "internship": 1,
     "new-grad": 0,
-    "other": 4038
+    "other": 3889
   },
   "by_location": {
-    "remote": 192,
-    "onsite": 3850
+    "remote": 144,
+    "onsite": 3746
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "software engineer new graduate entry level",
-        "count": 6
+        "query": "hardware engineer entry level new graduate",
+        "count": 0
       },
       {
-        "query": "junior software engineer",
-        "count": 159
+        "query": "electrical engineer entry level new graduate",
+        "count": 8
       },
       {
-        "query": "associate software engineer",
-        "count": 34
+        "query": "embedded systems engineer entry level",
+        "count": 3
       }
     ],
-    "total_fetched": 199
+    "total_fetched": 11
   },
   "ats_stats": {
     "companies_total": 46,
@@ -55,8 +52,8 @@
     "ashby_companies": 10
   },
   "validation_stats": {
-    "total_input": 12614,
-    "valid_jobs": 12612,
+    "total_input": 12457,
+    "valid_jobs": 12455,
     "invalid_jobs": 2,
     "invalid_reasons": {
       "missing_title": 0,
@@ -67,50 +64,49 @@
       "invalid_url_format": 0
     },
     "normalized_fields": {
-      "state_extracted": 1065,
-      "city_extracted": 2039
+      "state_extracted": 1066,
+      "city_extracted": 1860
     }
   },
   "senior_filter_stats": {
-    "total_input": 12612,
-    "entry_level_jobs": 4042,
-    "senior_jobs": 8570,
+    "total_input": 12455,
+    "entry_level_jobs": 3890,
+    "senior_jobs": 8565,
     "senior_reasons": {
-      "senior_title": 2429,
-      "senior_experience": 1517,
-      "both": 4624
+      "senior_title": 2356,
+      "senior_experience": 1532,
+      "both": 4677
     }
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 3590,
-      "internship": 209,
-      "mid_level": 240,
+      "entry_level": 3472,
+      "internship": 200,
+      "mid_level": 215,
       "senior": 3
     },
     "domains": {
-      "software": 1417,
+      "general": 1937,
+      "hardware": 212,
+      "software": 1304,
       "ai": 80,
-      "data_science": 489,
-      "general": 1979,
-      "product": 309,
-      "hardware": 202
+      "data_science": 467,
+      "product": 306
     },
     "locations": {
-      "us": 2615,
-      "on_site": 383,
-      "remote": 346
+      "us": 2492,
+      "on_site": 282,
+      "remote": 306
     },
     "experience": {
-      "unknown": 1371,
-      "mid_level": 1374,
-      "entry_level": 935,
-      "senior_level": 362
+      "unknown": 1285,
+      "mid_level": 1347,
+      "entry_level": 920,
+      "senior_level": 338
     },
     "special": {
-      "fortune500": 15,
-      "unicorn": 368
+      "unicorn": 359
     },
-    "total": 4042
+    "total": 3890
   }
 }
