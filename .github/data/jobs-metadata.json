@@ -1,58 +1,62 @@
 {
   "version": "1.0",
-  "generated": "2026-02-28T19:52:25.015Z",
-  "duration_ms": 81560,
-  "total_jobs": 3898,
-  "unique_jobs": 3898,
-  "duplicates_removed": 2318,
+  "generated": "2026-02-28T20:52:11.903Z",
+  "duration_ms": 529894,
+  "total_jobs": 8633,
+  "unique_jobs": 8633,
+  "duplicates_removed": 3033,
   "by_source": {
+    "workday": 4737,
     "greenhouse": 3128,
+    "jsearch": 17,
     "lever": 330,
-    "ashby": 421,
-    "jsearch": 19
+    "ashby": 421
   },
   "by_employment_type": {
+    "INTERNSHIP": 1,
     "FULLTIME": 411,
-    "FULL-TIME": 16,
+    "FULL-TIME": 15,
     "CONTRACT": 2,
+    "CONTRACTOR": 1,
     "TEMPORARY": 1,
     "INTERN": 7
   },
   "by_job_type": {
-    "internship": 0,
+    "internship": 1,
     "new-grad": 0,
-    "other": 3898
+    "other": 8632
   },
   "by_location": {
-    "remote": 144,
-    "onsite": 3754
+    "remote": 147,
+    "onsite": 8486
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "new grad nurse RN",
-        "count": 7
+        "query": "data analyst entry level",
+        "count": 10
       },
       {
-        "query": "nurse residency program 2026",
-        "count": 9
+        "query": "machine learning engineer entry level",
+        "count": 10
       },
       {
-        "query": "new graduate RN hospital",
-        "count": 5
+        "query": "hardware engineer entry level new graduate",
+        "count": 0
       }
     ],
-    "total_fetched": 21
+    "total_fetched": 20
   },
   "ats_stats": {
-    "companies_total": 46,
+    "companies_total": 67,
     "greenhouse_companies": 33,
     "lever_companies": 3,
-    "ashby_companies": 10
+    "ashby_companies": 10,
+    "workday_tenants": 21
   },
   "validation_stats": {
-    "total_input": 12467,
-    "valid_jobs": 12465,
+    "total_input": 22128,
+    "valid_jobs": 22126,
     "invalid_jobs": 2,
     "invalid_reasons": {
       "missing_title": 0,
@@ -63,50 +67,52 @@
       "invalid_url_format": 0
     },
     "normalized_fields": {
-      "state_extracted": 1067,
-      "city_extracted": 1869
+      "state_extracted": 2746,
+      "city_extracted": 5784
     }
   },
   "senior_filter_stats": {
-    "total_input": 12465,
-    "entry_level_jobs": 3898,
-    "senior_jobs": 8567,
+    "total_input": 22126,
+    "entry_level_jobs": 8633,
+    "senior_jobs": 13493,
     "senior_reasons": {
-      "senior_title": 2355,
-      "senior_experience": 1532,
+      "senior_title": 7280,
+      "senior_experience": 1533,
       "both": 4680
     }
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 3481,
-      "mid_level": 215,
-      "internship": 199,
-      "senior": 3
+      "entry_level": 7167,
+      "internship": 533,
+      "mid_level": 922,
+      "senior": 11
     },
     "domains": {
-      "nursing": 15,
-      "software": 1303,
-      "general": 1937,
-      "ai": 80,
-      "data_science": 467,
-      "product": 306,
-      "hardware": 206
+      "software": 1756,
+      "data_science": 582,
+      "general": 5749,
+      "ai": 128,
+      "product": 556,
+      "hardware": 360,
+      "nursing": 1
     },
     "locations": {
-      "us": 2586,
-      "on_site": 292,
-      "remote": 304
+      "us": 4251,
+      "remote": 453,
+      "on_site": 287
     },
     "experience": {
-      "entry_level": 921,
-      "unknown": 1296,
-      "mid_level": 1345,
-      "senior_level": 336
+      "unknown": 5696,
+      "senior_level": 339,
+      "entry_level": 1251,
+      "mid_level": 1347
     },
     "special": {
-      "unicorn": 357
+      "unicorn": 357,
+      "faang": 121,
+      "fortune500": 371
     },
-    "total": 3898
+    "total": 8633
   }
 }
