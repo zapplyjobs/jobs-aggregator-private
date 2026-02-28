@@ -1,9 +1,7 @@
 name: Fetch All Jobs
 
 on:
-  schedule:
-    - cron: '*/15 * * * *'  # Every 15 min (288 req/day — QUERIES_PER_RUN=3)
-  workflow_dispatch:
+  workflow_dispatch:  # Triggered by job-board-cron-worker (Cloudflare) every 15 min
   push:
     branches: [ main ]
     paths:
