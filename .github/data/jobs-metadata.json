@@ -1,52 +1,54 @@
 {
   "version": "1.0",
-  "generated": "2026-02-28T22:51:29.175Z",
-  "duration_ms": 712236,
-  "total_jobs": 12176,
-  "unique_jobs": 12176,
-  "duplicates_removed": 9458,
+  "generated": "2026-03-01T00:23:00.148Z",
+  "duration_ms": 700528,
+  "total_jobs": 12168,
+  "unique_jobs": 12168,
+  "duplicates_removed": 9447,
   "by_source": {
-    "workday": 8277,
-    "greenhouse": 3125,
+    "workday": 8267,
+    "greenhouse": 3126,
     "lever": 330,
-    "ashby": 421,
-    "jsearch": 23
+    "jsearch": 24,
+    "ashby": 421
   },
   "by_employment_type": {
+    "FULL-TIME": 16,
+    "CONTRACTOR": 1,
     "FULLTIME": 411,
-    "FULL-TIME": 15,
     "CONTRACT": 2,
     "FULL-TIME AND INTERNSHIP": 1,
-    "INTERNSHIP": 4,
-    "PART-TIME": 2,
+    "INTERNSHIP": 3,
+    "PART-TIME": 1,
+    "FULL-TIME AND PART-TIME": 2,
     "TEMPORARY": 1,
     "INTERN": 7
   },
   "by_job_type": {
-    "internship": 8,
+    "internship": 9,
     "new-grad": 0,
-    "other": 12168
+    "other": 12159
   },
   "by_location": {
-    "remote": 144,
-    "onsite": 12032
+    "remote": 145,
+    "onsite": 12023
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "nurse residency program 2026",
+        "query": "software engineer intern",
         "count": 10
       },
       {
-        "query": "RN fellowship entry level",
-        "count": 8
+        "query": "new grad software engineer",
+        "count": 10
       },
       {
-        "query": "software engineer intern",
+        "query": "junior software engineer",
         "count": 10
       }
     ],
-    "total_fetched": 28
+    "total_fetched": 30
   },
   "ats_stats": {
     "companies_total": 76,
@@ -56,11 +58,11 @@
     "workday_tenants": 30
   },
   "validation_stats": {
-    "total_input": 26112,
-    "valid_jobs": 26094,
-    "invalid_jobs": 18,
+    "total_input": 26113,
+    "valid_jobs": 26097,
+    "invalid_jobs": 16,
     "invalid_reasons": {
-      "missing_title": 2,
+      "missing_title": 0,
       "missing_company": 0,
       "missing_url": 0,
       "invalid_title_length": 16,
@@ -68,51 +70,51 @@
       "invalid_url_format": 0
     },
     "normalized_fields": {
-      "state_extracted": 3837,
-      "city_extracted": 7618
+      "state_extracted": 3842,
+      "city_extracted": 7627
     }
   },
   "senior_filter_stats": {
-    "total_input": 26094,
-    "entry_level_jobs": 12176,
-    "senior_jobs": 13918,
+    "total_input": 26097,
+    "entry_level_jobs": 12168,
+    "senior_jobs": 13929,
     "senior_reasons": {
-      "senior_title": 7701,
-      "senior_experience": 1535,
-      "both": 4682
+      "senior_title": 7713,
+      "senior_experience": 1532,
+      "both": 4684
     }
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 10447,
       "internship": 609,
-      "mid_level": 1120
+      "entry_level": 10433,
+      "mid_level": 1126
     },
     "domains": {
-      "software": 1755,
-      "nursing": 1402,
-      "general": 7857,
-      "ai": 127,
+      "software": 1768,
       "data_science": 574,
-      "product": 595,
-      "hardware": 359
+      "ai": 127,
+      "general": 7289,
+      "product": 592,
+      "hardware": 360,
+      "nursing": 1956
     },
     "locations": {
-      "us": 8332,
+      "us": 8329,
       "on_site": 296,
-      "remote": 458
+      "remote": 459
     },
     "experience": {
-      "unknown": 9164,
-      "entry_level": 1329,
-      "mid_level": 1347,
-      "senior_level": 336
+      "entry_level": 1331,
+      "unknown": 9151,
+      "senior_level": 337,
+      "mid_level": 1349
     },
     "special": {
+      "fortune500": 374,
       "unicorn": 357,
-      "faang": 118,
-      "fortune500": 369
+      "faang": 118
     },
-    "total": 12176
+    "total": 12168
   }
 }
