@@ -21,6 +21,7 @@ const SHARED = path.join(__dirname, 'shared', 'lib', 'aggregator');
 // Import fetchers
 const { fetchFromJSearch, getUsageStats } = require(`${SHARED}/fetchers/jsearch-fetcher`);
 const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
+const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
@@ -69,14 +70,19 @@ async function main() {
     const jsearchJobs = await fetchFromJSearch();
     allJobs.push(...jsearchJobs);
 
-    // Fetch from ATS sources (Greenhouse, Lever, Ashby)
+    // Fetch from ATS sources (Greenhouse, Lever, Ashby, Workday)
     const atsResult = await fetchFromAllATS();
     allJobs.push(...atsResult.jobs);
+
+    // Fetch from Amazon Jobs
+    const amazonJobs = await fetchAllAmazonJobs();
+    allJobs.push(...amazonJobs);
 
     console.log('');
     console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
     console.log(`   - JSearch: ${jsearchJobs.length} jobs`);
     console.log(`   - ATS: ${atsResult.jobs.length} jobs`);
+    console.log(`   - Amazon: ${amazonJobs.length} jobs`);
     console.log('');
 
     // Step 2: Enhance jobs (add fingerprints, employment_types arrays, etc.)
