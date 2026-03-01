@@ -139,6 +139,7 @@ jobs:
         if [ -n "$(git status --porcelain)" ]; then
           JOB_COUNT=$(wc -l < .github/data/all_jobs.json)
           git commit -m "Update jobs - $(date -u +%Y-%m-%d) - ${JOB_COUNT} jobs"
+          git pull --rebase origin main
           git push origin main
           echo "✅ Pushed ${JOB_COUNT} jobs to jobs-data-2026"
         else
