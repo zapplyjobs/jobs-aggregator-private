@@ -198,13 +198,17 @@ async function main() {
     if (fs.existsSync(JOBS_OUTPUT_FILE)) {
       const cutoffMs = Date.now() - 14 * 24 * 60 * 60 * 1000;
       const currentIds = new Set(publicJobs.map(j => j.id));
+      // Fingerprint guard: prevents re-injection of jobs that changed ID (e.g. WD-ID-BUG fix)
+      const currentFingerprints = new Set(publicJobs.map(j => j.fingerprint).filter(Boolean));
       const prevLines = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8').trim().split('\n').filter(Boolean);
       let mergedCount = 0;
       let nullDateCount = 0;
+      let fpSkipCount = 0;
       for (const line of prevLines) {
         try {
           const job = JSON.parse(line);
           if (currentIds.has(job.id)) continue; // current run already has this job
+          if (job.fingerprint && currentFingerprints.has(job.fingerprint)) { fpSkipCount++; continue; } // same job, new ID — current version wins
           if (!job.posted_at) { nullDateCount++; continue; } // null date — cannot verify TTL, drop
           const postedTs = new Date(job.posted_at).getTime();
           if (postedTs < cutoffMs) continue; // expired
@@ -215,6 +219,9 @@ async function main() {
       }
       if (nullDateCount > 0) {
         console.log(`⚠️ Rolling window: dropped ${nullDateCount} prior-run jobs with null posted_at (cannot verify TTL)`);
+      }
+      if (fpSkipCount > 0) {
+        console.log(`🔄 Rolling window: skipped ${fpSkipCount} prior-run jobs with matching fingerprint (ID changed, current version wins)`);
       }
       if (mergedCount > 0) {
         // Re-sort after merge (newest first)
