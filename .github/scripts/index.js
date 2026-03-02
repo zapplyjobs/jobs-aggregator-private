@@ -227,7 +227,7 @@ async function main() {
     // Strip pipeline internals before writing public output file
     // (source_url, source_id, _raw are internal — not needed downstream)
     // Note: 'source' is kept for downstream observability (which ATS produced each job)
-    const STRIP_FIELDS = ['source_url', 'source_id', '_raw', 'description'];
+    const STRIP_FIELDS = ['source_url', 'source_id', '_raw', 'description', 'enriched', 'enriched_at', 'is_internship', 'is_new_grad', 'is_us_only', 'remote'];
     const publicJobs = sortedJobs.map(job => {
       const stripped = { ...job };
       for (const field of STRIP_FIELDS) {
