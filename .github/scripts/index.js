@@ -313,7 +313,9 @@ async function main() {
           const postedTs = new Date(job.posted_at).getTime();
           if (postedTs < cutoffMs) continue; // expired
           if (isSeniorJob(job)) continue; // re-apply senior filter (WD-F5: bypass fix)
-          publicJobs.push(job);
+          const strippedJob = { ...job };
+          for (const field of STRIP_FIELDS) delete strippedJob[field];
+          publicJobs.push(strippedJob);
           mergedCount++;
         } catch { /* skip malformed lines */ }
       }
