@@ -104,21 +104,32 @@ async function main() {
     // Workday descriptions are already in the sidecar (written by fetchWorkdayDescriptions above).
     // GH/Lever/Ashby/Amazon/JSearch include descriptions inline — capture them here
     // so enrich-jobs.js can read from sidecar instead of all_jobs.json.
+    //
+    // Pruning: rewrite the sidecar each run to only live IDs (jobs in allJobs).
+    // This mirrors the 14-day rolling window of all_jobs.json and prevents unbounded growth.
     const DESCRIPTIONS_FILE = require('path').join(DATA_DIR, 'descriptions.jsonl');
-    const existingDescIds = loadDescriptions(DESCRIPTIONS_FILE);
-    const newDescEntries = [];
+    const existingDescMap = loadDescriptions(DESCRIPTIONS_FILE);
+    const liveJobIds = new Set(allJobs.map(j => j.id));
+    const mergedDescMap = new Map();
+
+    // Carry forward existing entries that are still live
+    for (const [id, text] of existingDescMap) {
+      if (liveJobIds.has(id)) mergedDescMap.set(id, text);
+    }
+
+    // Add new non-Workday descriptions from this run
+    let newNonWorkdayCount = 0;
     for (const job of allJobs) {
-      if (job.source !== 'workday' && job.description && !existingDescIds.has(job.id)) {
-        newDescEntries.push({ id: job.id, description_text: job.description });
-        existingDescIds.set(job.id, job.description);
+      if (job.source !== 'workday' && job.description && !mergedDescMap.has(job.id)) {
+        mergedDescMap.set(job.id, job.description);
+        newNonWorkdayCount++;
       }
     }
-    if (newDescEntries.length > 0) {
-      appendDescriptions(DESCRIPTIONS_FILE, newDescEntries);
-      console.log(`📄 Descriptions sidecar: wrote ${newDescEntries.length} new entries (non-Workday)`);
-    } else {
-      console.log(`📄 Descriptions sidecar: no new non-Workday entries`);
-    }
+
+    // Rewrite sidecar atomically (prune + new entries in one write)
+    const allEntries = Array.from(mergedDescMap.entries()).map(([id, description_text]) => ({ id, description_text }));
+    fs.writeFileSync(DESCRIPTIONS_FILE, allEntries.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+    console.log(`📄 Descriptions sidecar: ${allEntries.length} total (${newNonWorkdayCount} new non-Workday, pruned to live pool)`);
 
     console.log('');
 
