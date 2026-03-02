@@ -22,6 +22,7 @@ const SHARED = path.join(__dirname, 'shared', 'lib', 'aggregator');
 const { fetchFromJSearch, getUsageStats } = require(`${SHARED}/fetchers/jsearch-fetcher`);
 const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
 const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
+const { fetchWorkdayDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
@@ -83,6 +84,22 @@ async function main() {
     console.log(`   - JSearch: ${jsearchJobs.length} jobs`);
     console.log(`   - ATS: ${atsResult.jobs.length} jobs`);
     console.log(`   - Amazon: ${amazonJobs.length} jobs`);
+    console.log('');
+
+    // Step 1b: Fetch Workday descriptions (incremental — only new IDs)
+    console.log('📄 Step 1b: Fetching Workday descriptions...');
+    console.log('━'.repeat(60));
+
+    const workdayJobs = allJobs.filter(j => j.source === 'workday');
+    const descriptionsMap = await fetchWorkdayDescriptions(workdayJobs, DATA_DIR);
+
+    // Inject fetched descriptions into job objects before _raw is stripped
+    for (const job of allJobs) {
+      if (job.source === 'workday' && descriptionsMap.has(job.id)) {
+        job.description = descriptionsMap.get(job.id);
+      }
+    }
+
     console.log('');
 
     // Step 2: Enhance jobs (add fingerprints, employment_types arrays, etc.)
@@ -421,6 +438,7 @@ async function gitCommit(jobCount) {
     execSync('git add .github/data/jobs-metadata.json');
     execSync('git add .github/data/dedupe-store.json');
     execSync('git add .github/data/archive/ 2>/dev/null || true'); // archive dir may not exist yet
+    execSync('git add .github/data/descriptions.jsonl 2>/dev/null || true'); // descriptions sidecar
 
     // Check if there are changes
     const status = execSync('git status --porcelain', { encoding: 'utf8' });
