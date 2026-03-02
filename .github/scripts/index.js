@@ -22,7 +22,7 @@ const SHARED = path.join(__dirname, 'shared', 'lib', 'aggregator');
 const { fetchFromJSearch, getUsageStats } = require(`${SHARED}/fetchers/jsearch-fetcher`);
 const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
 const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
-const { fetchWorkdayDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
+const { fetchWorkdayDescriptions, loadDescriptions, appendDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
@@ -98,6 +98,26 @@ async function main() {
       if (job.source === 'workday' && descriptionsMap.has(job.id)) {
         job.description = descriptionsMap.get(job.id);
       }
+    }
+
+    // Write descriptions from all non-Workday sources to sidecar.
+    // Workday descriptions are already in the sidecar (written by fetchWorkdayDescriptions above).
+    // GH/Lever/Ashby/Amazon/JSearch include descriptions inline — capture them here
+    // so enrich-jobs.js can read from sidecar instead of all_jobs.json.
+    const DESCRIPTIONS_FILE = require('path').join(DATA_DIR, 'descriptions.jsonl');
+    const existingDescIds = loadDescriptions(DESCRIPTIONS_FILE);
+    const newDescEntries = [];
+    for (const job of allJobs) {
+      if (job.source !== 'workday' && job.description && !existingDescIds.has(job.id)) {
+        newDescEntries.push({ id: job.id, description_text: job.description });
+        existingDescIds.set(job.id, job.description);
+      }
+    }
+    if (newDescEntries.length > 0) {
+      appendDescriptions(DESCRIPTIONS_FILE, newDescEntries);
+      console.log(`📄 Descriptions sidecar: wrote ${newDescEntries.length} new entries (non-Workday)`);
+    } else {
+      console.log(`📄 Descriptions sidecar: no new non-Workday entries`);
     }
 
     console.log('');
@@ -207,7 +227,7 @@ async function main() {
     // Strip pipeline internals before writing public output file
     // (source_url, source_id, _raw are internal — not needed downstream)
     // Note: 'source' is kept for downstream observability (which ATS produced each job)
-    const STRIP_FIELDS = ['source_url', 'source_id', '_raw'];
+    const STRIP_FIELDS = ['source_url', 'source_id', '_raw', 'description'];
     const publicJobs = sortedJobs.map(job => {
       const stripped = { ...job };
       for (const field of STRIP_FIELDS) {
