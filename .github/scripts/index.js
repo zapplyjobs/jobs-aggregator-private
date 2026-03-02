@@ -22,7 +22,7 @@ const SHARED = path.join(__dirname, 'shared', 'lib', 'aggregator');
 const { fetchFromJSearch, getUsageStats } = require(`${SHARED}/fetchers/jsearch-fetcher`);
 const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
 const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
-const { fetchWorkdayDescriptions, loadDescriptions, appendDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
+const { fetchWorkdayDescriptions, loadDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
@@ -200,11 +200,10 @@ async function main() {
     console.log(`✅ Step 8 complete: Jobs sorted`);
     console.log('');
 
-    // Step 8b: Write descriptions sidecar (must happen after dedup — use final sorted pool)
-    // Workday descriptions were already appended to the sidecar by fetchWorkdayDescriptions (Step 1b).
-    // Here we rewrite the full sidecar: Workday entries (pruned to live IDs) + non-Workday entries
-    // from the final deduped/sorted pool. Using sortedJobs (not raw allJobs) keeps the sidecar
-    // bounded to the same ~14-day window as all_jobs.json (~10-15K entries vs 47K pre-dedup).
+    // Step 8b: Write descriptions sidecar (Workday-only)
+    // Workday descriptions were appended to the sidecar by fetchWorkdayDescriptions (Step 1b).
+    // Here we prune to live IDs only and rewrite atomically.
+    // Non-Workday descriptions remain inline in all_jobs.json — no duplication needed.
     const DESCRIPTIONS_FILE = require('path').join(DATA_DIR, 'descriptions.jsonl');
     const existingDescMap = loadDescriptions(DESCRIPTIONS_FILE);
     const liveJobIds = new Set(sortedJobs.map(j => j.id));
@@ -215,19 +214,10 @@ async function main() {
       if (liveJobIds.has(id)) mergedDescMap.set(id, text);
     }
 
-    // Add non-Workday descriptions from the final deduped pool
-    let newNonWorkdayCount = 0;
-    for (const job of sortedJobs) {
-      if (job.source !== 'workday' && job.description && !mergedDescMap.has(job.id)) {
-        mergedDescMap.set(job.id, job.description);
-        newNonWorkdayCount++;
-      }
-    }
-
-    // Rewrite sidecar atomically (prune + new entries in one write)
+    // Rewrite sidecar atomically (Workday-only, pruned to live pool)
     const sidecarEntries = Array.from(mergedDescMap.entries()).map(([id, description_text]) => ({ id, description_text }));
     fs.writeFileSync(DESCRIPTIONS_FILE, sidecarEntries.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
-    console.log(`📄 Descriptions sidecar: ${sidecarEntries.length} total (${newNonWorkdayCount} new non-Workday, pruned to live pool)`);
+    console.log(`📄 Descriptions sidecar: ${sidecarEntries.length} Workday entries (pruned to live pool)`);
     console.log('');
 
     // Step 9: Write output files
