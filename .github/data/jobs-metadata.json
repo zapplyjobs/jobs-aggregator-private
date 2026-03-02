@@ -1,116 +1,119 @@
 {
   "version": "1.0",
-  "generated": "2026-03-01T23:56:23.966Z",
-  "duration_ms": 726861,
-  "total_jobs": 12496,
-  "unique_jobs": 12496,
-  "duplicates_removed": 9445,
+  "generated": "2026-03-02T23:39:56.887Z",
+  "duration_ms": 1507393,
+  "total_jobs": 21773,
+  "unique_jobs": 21773,
+  "duplicates_removed": 8983,
   "by_source": {
-    "workday": 8264,
-    "ashby": 423,
-    "greenhouse": 3472,
-    "lever": 330,
-    "jsearch": 7
+    "workday": 12421,
+    "greenhouse": 6311,
+    "ashby": 1407,
+    "lever": 1080,
+    "jsearch": 12,
+    "amazon": 542
   },
   "by_employment_type": {
-    "FULLTIME": 413,
-    "FULL-TIME": 6,
-    "CONTRACT": 2,
-    "TEMPORARY": 1,
-    "INTERN": 7
+    "FULLTIME": 1293,
+    "INTERN": 77,
+    "FULL-TIME": 8,
+    "CONTRACT": 28,
+    "INTERNSHIP": 4,
+    "PARTTIME": 8,
+    "TEMPORARY": 1
   },
   "by_job_type": {
-    "internship": 0,
+    "internship": 6,
     "new-grad": 0,
-    "other": 12496
+    "other": 21767
   },
   "by_location": {
-    "remote": 144,
-    "onsite": 12352
+    "remote": 373,
+    "onsite": 21400
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "embedded systems engineer entry level",
-        "count": 1
+        "query": "data science intern",
+        "count": 6
       },
       {
-        "query": "firmware engineer entry level",
+        "query": "entry level data scientist",
+        "count": 4
+      },
+      {
+        "query": "data analyst entry level",
         "count": 5
-      },
-      {
-        "query": "registered nurse entry level new graduate",
-        "count": 3
       }
     ],
-    "total_fetched": 9
+    "total_fetched": 15
   },
   "ats_stats": {
-    "companies_total": 80,
-    "greenhouse_companies": 37,
-    "lever_companies": 3,
-    "ashby_companies": 10,
-    "workday_tenants": 30
+    "companies_total": 256,
+    "greenhouse_companies": 99,
+    "lever_companies": 45,
+    "ashby_companies": 62,
+    "workday_tenants": 50
   },
   "validation_stats": {
-    "total_input": 26553,
-    "valid_jobs": 26537,
-    "invalid_jobs": 16,
+    "total_input": 48483,
+    "valid_jobs": 48445,
+    "invalid_jobs": 38,
     "invalid_reasons": {
-      "missing_title": 0,
+      "missing_title": 13,
       "missing_company": 0,
       "missing_url": 0,
-      "invalid_title_length": 16,
+      "invalid_title_length": 25,
       "invalid_company_length": 0,
       "invalid_url_format": 0
     },
     "normalized_fields": {
-      "state_extracted": 3833,
-      "city_extracted": 7157
+      "state_extracted": 6887,
+      "city_extracted": 15697
     }
   },
   "senior_filter_stats": {
-    "total_input": 26537,
-    "entry_level_jobs": 12496,
-    "senior_jobs": 14041,
+    "total_input": 48445,
+    "entry_level_jobs": 21773,
+    "senior_jobs": 26672,
     "senior_reasons": {
-      "senior_title": 7732,
-      "senior_experience": 1619,
-      "both": 4690
+      "senior_title": 14704,
+      "senior_experience": 2966,
+      "both": 9002
     }
   },
   "tag_stats": {
     "employment": {
-      "mid_level": 1126,
-      "entry_level": 10741,
-      "internship": 629
+      "internship": 1420,
+      "entry_level": 18768,
+      "mid_level": 1585
     },
     "domains": {
-      "hardware": 593,
-      "nursing": 2101,
-      "general": 7502,
-      "software": 1878,
-      "ai": 154,
-      "data_science": 662,
-      "finance": 70,
-      "product": 52
+      "general": 12763,
+      "software": 4391,
+      "data_science": 1516,
+      "ai": 372,
+      "finance": 141,
+      "product": 93,
+      "hardware": 959,
+      "nursing": 2663
     },
     "locations": {
-      "us": 8573,
-      "on_site": 282,
-      "remote": 459
+      "us": 13331,
+      "on_site": 1039,
+      "remote": 957
     },
     "experience": {
-      "mid_level": 1427,
-      "unknown": 9360,
-      "senior_level": 352,
-      "entry_level": 1357
+      "entry_level": 2358,
+      "unknown": 16391,
+      "mid_level": 2434,
+      "senior_level": 590
     },
     "special": {
-      "unicorn": 359,
-      "faang": 118,
-      "fortune500": 376
+      "unicorn": 473,
+      "faang": 570,
+      "fortune500": 848
     },
-    "total": 12496
+    "total": 21773
   }
 }
