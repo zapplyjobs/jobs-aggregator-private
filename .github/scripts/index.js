@@ -100,37 +100,6 @@ async function main() {
       }
     }
 
-    // Write descriptions from all non-Workday sources to sidecar.
-    // Workday descriptions are already in the sidecar (written by fetchWorkdayDescriptions above).
-    // GH/Lever/Ashby/Amazon/JSearch include descriptions inline — capture them here
-    // so enrich-jobs.js can read from sidecar instead of all_jobs.json.
-    //
-    // Pruning: rewrite the sidecar each run to only live IDs (jobs in allJobs).
-    // This mirrors the 14-day rolling window of all_jobs.json and prevents unbounded growth.
-    const DESCRIPTIONS_FILE = require('path').join(DATA_DIR, 'descriptions.jsonl');
-    const existingDescMap = loadDescriptions(DESCRIPTIONS_FILE);
-    const liveJobIds = new Set(allJobs.map(j => j.id));
-    const mergedDescMap = new Map();
-
-    // Carry forward existing entries that are still live
-    for (const [id, text] of existingDescMap) {
-      if (liveJobIds.has(id)) mergedDescMap.set(id, text);
-    }
-
-    // Add new non-Workday descriptions from this run
-    let newNonWorkdayCount = 0;
-    for (const job of allJobs) {
-      if (job.source !== 'workday' && job.description && !mergedDescMap.has(job.id)) {
-        mergedDescMap.set(job.id, job.description);
-        newNonWorkdayCount++;
-      }
-    }
-
-    // Rewrite sidecar atomically (prune + new entries in one write)
-    const allEntries = Array.from(mergedDescMap.entries()).map(([id, description_text]) => ({ id, description_text }));
-    fs.writeFileSync(DESCRIPTIONS_FILE, allEntries.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
-    console.log(`📄 Descriptions sidecar: ${allEntries.length} total (${newNonWorkdayCount} new non-Workday, pruned to live pool)`);
-
     console.log('');
 
     // Step 2: Enhance jobs (add fingerprints, employment_types arrays, etc.)
@@ -229,6 +198,36 @@ async function main() {
     });
 
     console.log(`✅ Step 8 complete: Jobs sorted`);
+    console.log('');
+
+    // Step 8b: Write descriptions sidecar (must happen after dedup — use final sorted pool)
+    // Workday descriptions were already appended to the sidecar by fetchWorkdayDescriptions (Step 1b).
+    // Here we rewrite the full sidecar: Workday entries (pruned to live IDs) + non-Workday entries
+    // from the final deduped/sorted pool. Using sortedJobs (not raw allJobs) keeps the sidecar
+    // bounded to the same ~14-day window as all_jobs.json (~10-15K entries vs 47K pre-dedup).
+    const DESCRIPTIONS_FILE = require('path').join(DATA_DIR, 'descriptions.jsonl');
+    const existingDescMap = loadDescriptions(DESCRIPTIONS_FILE);
+    const liveJobIds = new Set(sortedJobs.map(j => j.id));
+    const mergedDescMap = new Map();
+
+    // Carry forward Workday entries that are still live (written by fetchWorkdayDescriptions)
+    for (const [id, text] of existingDescMap) {
+      if (liveJobIds.has(id)) mergedDescMap.set(id, text);
+    }
+
+    // Add non-Workday descriptions from the final deduped pool
+    let newNonWorkdayCount = 0;
+    for (const job of sortedJobs) {
+      if (job.source !== 'workday' && job.description && !mergedDescMap.has(job.id)) {
+        mergedDescMap.set(job.id, job.description);
+        newNonWorkdayCount++;
+      }
+    }
+
+    // Rewrite sidecar atomically (prune + new entries in one write)
+    const sidecarEntries = Array.from(mergedDescMap.entries()).map(([id, description_text]) => ({ id, description_text }));
+    fs.writeFileSync(DESCRIPTIONS_FILE, sidecarEntries.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+    console.log(`📄 Descriptions sidecar: ${sidecarEntries.length} total (${newNonWorkdayCount} new non-Workday, pruned to live pool)`);
     console.log('');
 
     // Step 9: Write output files
