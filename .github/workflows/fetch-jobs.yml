@@ -47,6 +47,14 @@ jobs:
           echo "✅ Seeded $(wc -l < .github/data/all_jobs.json) jobs from jobs-data-2026" || \
           echo "⚠️ Could not seed all_jobs.json — starting fresh"
 
+    - name: Seed descriptions.jsonl from jobs-data-2026
+      run: |
+        echo "📥 Seeding descriptions.jsonl from jobs-data-2026..."
+        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions.jsonl?t=$(date +%s)" \
+          -o .github/data/descriptions.jsonl && \
+          echo "✅ Seeded $(wc -l < .github/data/descriptions.jsonl) descriptions from jobs-data-2026" || \
+          echo "⚠️ No descriptions.jsonl yet — starting fresh"
+
     - name: Fetch jobs from all sources
       run: node .github/scripts/index.js 2>&1 | tee .github/logs/fetch.log
       env:
@@ -126,15 +134,19 @@ jobs:
         # Clone jobs-data-2026 into a temp directory
         git clone "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-data-2026.git" /tmp/jobs-data-2026
 
-        # Copy all_jobs.json and jobs-metadata.json
+        # Copy all_jobs.json, jobs-metadata.json, and descriptions.jsonl
         cp .github/data/all_jobs.json /tmp/jobs-data-2026/.github/data/all_jobs.json
         cp .github/data/jobs-metadata.json /tmp/jobs-data-2026/.github/data/jobs-metadata.json
+        if [ -f ".github/data/descriptions.jsonl" ]; then
+          cp .github/data/descriptions.jsonl /tmp/jobs-data-2026/.github/data/descriptions.jsonl
+        fi
 
         # Commit and push
         cd /tmp/jobs-data-2026
         git config user.email "bot@zapplyjobs.com"
         git config user.name "Data Bot"
         git add .github/data/all_jobs.json .github/data/jobs-metadata.json
+        git add .github/data/descriptions.jsonl 2>/dev/null || true
 
         if [ -n "$(git status --porcelain)" ]; then
           JOB_COUNT=$(wc -l < .github/data/all_jobs.json)
