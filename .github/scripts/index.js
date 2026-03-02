@@ -200,24 +200,81 @@ async function main() {
     console.log(`✅ Step 8 complete: Jobs sorted`);
     console.log('');
 
-    // Step 8b: Write descriptions sidecar (Workday-only)
-    // Workday descriptions were appended to the sidecar by fetchWorkdayDescriptions (Step 1b).
-    // Here we prune to live IDs only and rewrite atomically.
-    // Non-Workday descriptions remain inline in all_jobs.json — no duplication needed.
-    const DESCRIPTIONS_FILE = require('path').join(DATA_DIR, 'descriptions.jsonl');
-    const existingDescMap = loadDescriptions(DESCRIPTIONS_FILE);
-    const liveJobIds = new Set(sortedJobs.map(j => j.id));
-    const mergedDescMap = new Map();
+    // Step 8b: Write per-source description sidecars
+    //
+    // One file per source: descriptions-{source}.jsonl
+    // Each file is rewritten atomically each run — pruned to live IDs only (no accumulation).
+    // Chunking rule: if a source would exceed SIDECAR_CHUNK_LIMIT_BYTES, split into
+    //   descriptions-{source}-1.jsonl, descriptions-{source}-2.jsonl, etc.
+    // This keeps every individual file under GitHub's 100 MB limit regardless of volume growth.
+    //
+    // Workday: descriptions were fetched live in Step 1b and injected as job.description.
+    // All other sources: descriptions are inline on job objects from their respective fetchers.
+    // After this step, all descriptions are in sidecar files. Step 9 strips description from publicJobs.
+    //
+    // enrich-jobs.js reads all files matching descriptions-*.jsonl — no code change needed there
+    // when chunks are added; new files are picked up automatically.
 
-    // Carry forward Workday entries that are still live (written by fetchWorkdayDescriptions)
-    for (const [id, text] of existingDescMap) {
-      if (liveJobIds.has(id)) mergedDescMap.set(id, text);
+    const SIDECAR_CHUNK_LIMIT_BYTES = 40 * 1024 * 1024; // 40 MB per file
+
+    // Group jobs by source, collect id + description for each
+    const bySource = {};
+    for (const job of sortedJobs) {
+      const src = job.source;
+      if (!src) continue;
+      if (!bySource[src]) bySource[src] = [];
+      if (job.description) {
+        bySource[src].push({ id: job.id, description_text: job.description });
+      }
     }
 
-    // Rewrite sidecar atomically (Workday-only, pruned to live pool)
-    const sidecarEntries = Array.from(mergedDescMap.entries()).map(([id, description_text]) => ({ id, description_text }));
-    fs.writeFileSync(DESCRIPTIONS_FILE, sidecarEntries.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
-    console.log(`📄 Descriptions sidecar: ${sidecarEntries.length} Workday entries (pruned to live pool)`);
+    // For Workday: descriptions were fetched in Step 1b and injected above.
+    // Load the existing Workday sidecar to carry forward any entries not in this run's sortedJobs
+    // (e.g. jobs still in rolling window from prior runs that weren't re-fetched).
+    const LEGACY_DESCRIPTIONS_FILE = path.join(DATA_DIR, 'descriptions.jsonl');
+    const legacyWorkdayMap = loadDescriptions(LEGACY_DESCRIPTIONS_FILE);
+    const liveJobIds = new Set(sortedJobs.map(j => j.id));
+    const currentRunWorkdayIds = new Set((bySource['workday'] || []).map(e => e.id));
+    for (const [id, description_text] of legacyWorkdayMap) {
+      if (liveJobIds.has(id) && !currentRunWorkdayIds.has(id) && description_text) {
+        if (!bySource['workday']) bySource['workday'] = [];
+        bySource['workday'].push({ id, description_text });
+      }
+    }
+
+    // Write per-source files (chunked if needed), delete legacy single-file sidecar
+    const writtenFiles = [];
+    for (const [src, entries] of Object.entries(bySource)) {
+      if (entries.length === 0) continue;
+
+      // Estimate total bytes for this source
+      const totalBytes = entries.reduce((sum, e) => sum + Buffer.byteLength(JSON.stringify(e), 'utf8') + 1, 0);
+      const numChunks = Math.ceil(totalBytes / SIDECAR_CHUNK_LIMIT_BYTES);
+
+      if (numChunks === 1) {
+        const filePath = path.join(DATA_DIR, `descriptions-${src}.jsonl`);
+        fs.writeFileSync(filePath, entries.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+        writtenFiles.push({ file: `descriptions-${src}.jsonl`, count: entries.length, bytes: totalBytes });
+      } else {
+        const perChunk = Math.ceil(entries.length / numChunks);
+        for (let i = 0; i < numChunks; i++) {
+          const chunk = entries.slice(i * perChunk, (i + 1) * perChunk);
+          const filePath = path.join(DATA_DIR, `descriptions-${src}-${i + 1}.jsonl`);
+          const chunkBytes = chunk.reduce((sum, e) => sum + Buffer.byteLength(JSON.stringify(e), 'utf8') + 1, 0);
+          fs.writeFileSync(filePath, chunk.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+          writtenFiles.push({ file: `descriptions-${src}-${i + 1}.jsonl`, count: chunk.length, bytes: chunkBytes });
+        }
+      }
+    }
+
+    // NOTE: do NOT delete descriptions.jsonl — it is the Workday incremental fetch cache.
+    // Step 1b reads it to know which Workday IDs are already fetched, avoiding redundant HTTP calls.
+    // descriptions-workday.jsonl (written above) is the published sidecar for enrich-jobs.js.
+    // descriptions.jsonl remains local state only — it is NOT staged for git push.
+
+    for (const f of writtenFiles) {
+      console.log(`📄 ${f.file}: ${f.count} entries (${(f.bytes / 1024 / 1024).toFixed(1)} MB)`);
+    }
     console.log('');
 
     // Step 9: Write output files
@@ -256,7 +313,9 @@ async function main() {
           const postedTs = new Date(job.posted_at).getTime();
           if (postedTs < cutoffMs) continue; // expired
           if (isSeniorJob(job)) continue; // re-apply senior filter (WD-F5: bypass fix)
-          publicJobs.push(job);
+          const strippedJob = { ...job };
+          for (const field of STRIP_FIELDS) delete strippedJob[field];
+          publicJobs.push(strippedJob);
           mergedCount++;
         } catch { /* skip malformed lines */ }
       }
@@ -458,7 +517,8 @@ async function gitCommit(jobCount) {
     execSync('git add .github/data/jobs-metadata.json');
     execSync('git add .github/data/dedupe-store.json');
     execSync('git add .github/data/archive/ 2>/dev/null || true'); // archive dir may not exist yet
-    execSync('git add .github/data/descriptions.jsonl 2>/dev/null || true'); // descriptions sidecar
+    execSync('git add .github/data/descriptions-*.jsonl 2>/dev/null || true'); // per-source description sidecars (published)
+    // descriptions.jsonl is Workday fetch cache — NOT staged (local state only, managed by Step 1b)
 
     // Check if there are changes
     const status = execSync('git status --porcelain', { encoding: 'utf8' });
