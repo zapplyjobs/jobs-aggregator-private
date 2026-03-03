@@ -441,17 +441,17 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
       }
     }
 
-    // Count by job type
-    if (job.is_internship) {
+    // Count by job type (use tags.employment — is_internship/is_new_grad stripped by STRIP_FIELDS)
+    if (job.tags?.employment === 'internship') {
       byInternship.internship++;
-    } else if (job.is_new_grad) {
+    } else if (job.tags?.employment === 'entry_level') {
       byInternship['new-grad']++;
     } else {
       byInternship.other++;
     }
 
-    // Count by remote
-    if (job.is_remote) {
+    // Count by remote (use tags.locations — is_remote stripped by STRIP_FIELDS)
+    if (job.tags?.locations?.includes('remote')) {
       byRemote.remote++;
     } else {
       byRemote.onsite++;
