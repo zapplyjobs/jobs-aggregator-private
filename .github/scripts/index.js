@@ -426,7 +426,7 @@ async function main() {
 function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics) {
   const bySource = {};
   const byEmploymentType = {};
-  const byInternship = { internship: 0, 'new-grad': 0, other: 0 };
+  const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
   const byRemote = { remote: 0, onsite: 0 };
 
   for (const job of jobs) {
@@ -447,7 +447,7 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     } else if (job.tags?.employment === 'entry_level') {
       byInternship['new-grad']++;
     } else {
-      byInternship.other++;
+      byInternship.mid_level++;
     }
 
     // Count by remote (use tags.locations — is_remote stripped by STRIP_FIELDS)
