@@ -203,19 +203,25 @@ async function main() {
     // Step 8b: Write per-source description sidecars
     //
     // One file per source: descriptions-{source}.jsonl
-    // Each file is rewritten atomically each run — pruned to live IDs only (no accumulation).
-    // Chunking rule: if a source would exceed SIDECAR_CHUNK_LIMIT_BYTES, split into
+    // Each file is rewritten atomically each run — entries are pruned to liveJobIds only,
+    // so individual descriptions expire automatically as jobs age out of the 14-day window.
+    //
+    // Chunking: if a source exceeds SIDECAR_CHUNK_LIMIT_BYTES, split into
     //   descriptions-{source}-1.jsonl, descriptions-{source}-2.jsonl, etc.
-    // This keeps every individual file under GitHub's 100 MB limit regardless of volume growth.
+    // This keeps every file well under GitHub's 100 MB hard limit.
+    //
+    // Stale file cleanup: when chunk count changes (1→2 or 2→1), old filenames are orphaned.
+    // After writing, we scan DATA_DIR for any descriptions-{src}*.jsonl files not written
+    // this run and delete them from disk + unstage from git. This handles both directions.
     //
     // Workday: descriptions were fetched live in Step 1b and injected as job.description.
     // All other sources: descriptions are inline on job objects from their respective fetchers.
     // After this step, all descriptions are in sidecar files. Step 9 strips description from publicJobs.
     //
-    // enrich-jobs.js reads all files matching descriptions-*.jsonl — no code change needed there
-    // when chunks are added; new files are picked up automatically.
+    // enrich-jobs.js reads all files matching descriptions-*.jsonl — auto-picks up new chunks.
 
     const SIDECAR_CHUNK_LIMIT_BYTES = 40 * 1024 * 1024; // 40 MB per file
+    const { execSync } = require('child_process');
 
     // Group jobs by source, collect id + description for each
     const bySource = {};
@@ -242,8 +248,8 @@ async function main() {
       }
     }
 
-    // Write per-source files (chunked if needed), delete legacy single-file sidecar
-    const writtenFiles = [];
+    // Write per-source files (chunked if needed)
+    const writtenFiles = new Set(); // track filenames written this run for stale-file cleanup
     for (const [src, entries] of Object.entries(bySource)) {
       if (entries.length === 0) continue;
 
@@ -252,18 +258,33 @@ async function main() {
       const numChunks = Math.ceil(totalBytes / SIDECAR_CHUNK_LIMIT_BYTES);
 
       if (numChunks === 1) {
-        const filePath = path.join(DATA_DIR, `descriptions-${src}.jsonl`);
-        fs.writeFileSync(filePath, entries.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
-        writtenFiles.push({ file: `descriptions-${src}.jsonl`, count: entries.length, bytes: totalBytes });
+        const fname = `descriptions-${src}.jsonl`;
+        fs.writeFileSync(path.join(DATA_DIR, fname), entries.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+        writtenFiles.add(fname);
+        console.log(`📄 ${fname}: ${entries.length} entries (${(totalBytes / 1024 / 1024).toFixed(1)} MB)`);
       } else {
         const perChunk = Math.ceil(entries.length / numChunks);
         for (let i = 0; i < numChunks; i++) {
           const chunk = entries.slice(i * perChunk, (i + 1) * perChunk);
-          const filePath = path.join(DATA_DIR, `descriptions-${src}-${i + 1}.jsonl`);
+          const fname = `descriptions-${src}-${i + 1}.jsonl`;
           const chunkBytes = chunk.reduce((sum, e) => sum + Buffer.byteLength(JSON.stringify(e), 'utf8') + 1, 0);
-          fs.writeFileSync(filePath, chunk.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
-          writtenFiles.push({ file: `descriptions-${src}-${i + 1}.jsonl`, count: chunk.length, bytes: chunkBytes });
+          fs.writeFileSync(path.join(DATA_DIR, fname), chunk.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+          writtenFiles.add(fname);
+          console.log(`📄 ${fname}: ${chunk.length} entries (${(chunkBytes / 1024 / 1024).toFixed(1)} MB)`);
         }
+      }
+    }
+
+    // Stale file cleanup: remove any descriptions-*.jsonl files on disk (and in git) that
+    // were not written this run. Covers both chunk-count transitions (1→2 and 2→1).
+    // descriptions.jsonl (no dash-source suffix) is the Workday fetch cache — never touched here.
+    const existingSidecarFiles = fs.readdirSync(DATA_DIR)
+      .filter(f => /^descriptions-.+\.jsonl$/.test(f)); // matches descriptions-{src}*.jsonl only
+    for (const fname of existingSidecarFiles) {
+      if (!writtenFiles.has(fname)) {
+        fs.unlinkSync(path.join(DATA_DIR, fname));
+        execSync(`git rm --cached ".github/data/${fname}" 2>/dev/null || true`);
+        console.log(`🗑️  Removed stale sidecar: ${fname}`);
       }
     }
 
@@ -272,9 +293,6 @@ async function main() {
     // descriptions-workday.jsonl (written above) is the published sidecar for enrich-jobs.js.
     // descriptions.jsonl remains local state only — it is NOT staged for git push.
 
-    for (const f of writtenFiles) {
-      console.log(`📄 ${f.file}: ${f.count} entries (${(f.bytes / 1024 / 1024).toFixed(1)} MB)`);
-    }
     console.log('');
 
     // Step 9: Write output files
