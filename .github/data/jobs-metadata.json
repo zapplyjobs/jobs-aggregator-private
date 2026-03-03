@@ -1,53 +1,52 @@
 {
   "version": "1.0",
-  "generated": "2026-03-03T01:09:25.263Z",
-  "duration_ms": 726500,
-  "total_jobs": 21823,
-  "unique_jobs": 21823,
-  "duplicates_removed": 14879,
+  "generated": "2026-03-03T03:10:26.506Z",
+  "duration_ms": 535654,
+  "total_jobs": 21855,
+  "unique_jobs": 21855,
+  "duplicates_removed": 14977,
   "by_source": {
-    "workday": 12413,
-    "greenhouse": 6373,
-    "amazon": 542,
-    "ashby": 1407,
+    "workday": 12432,
+    "greenhouse": 6378,
+    "amazon": 543,
+    "ashby": 1408,
     "lever": 1081,
-    "jsearch": 7
+    "jsearch": 13
   },
   "by_employment_type": {
     "INTERN": 78,
-    "FULLTIME": 1292,
-    "FULL-TIME": 5,
-    "FULL-TIME AND INTERNSHIP": 1,
+    "FULLTIME": 1293,
+    "FULL-TIME": 9,
+    "INTERNSHIP": 4,
     "CONTRACT": 28,
-    "INTERNSHIP": 1,
     "PARTTIME": 8,
     "TEMPORARY": 1
   },
   "by_job_type": {
-    "internship": 2,
+    "internship": 8,
     "new-grad": 0,
-    "other": 21821
+    "other": 21847
   },
   "by_location": {
-    "remote": 370,
-    "onsite": 21453
+    "remote": 374,
+    "onsite": 21481
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "electrical engineer entry level new graduate",
-        "count": 3
+        "query": "data science intern",
+        "count": 8
       },
       {
-        "query": "embedded systems engineer entry level",
-        "count": 0
-      },
-      {
-        "query": "firmware engineer entry level",
+        "query": "entry level data scientist",
         "count": 4
+      },
+      {
+        "query": "data analyst entry level",
+        "count": 3
       }
     ],
-    "total_fetched": 7
+    "total_fetched": 15
   },
   "ats_stats": {
     "companies_total": 256,
@@ -57,8 +56,8 @@
     "workday_tenants": 50
   },
   "validation_stats": {
-    "total_input": 48783,
-    "valid_jobs": 48751,
+    "total_input": 48782,
+    "valid_jobs": 48750,
     "invalid_jobs": 32,
     "invalid_reasons": {
       "missing_title": 6,
@@ -69,52 +68,52 @@
       "invalid_url_format": 0
     },
     "normalized_fields": {
-      "state_extracted": 6889,
-      "city_extracted": 15695
+      "state_extracted": 6863,
+      "city_extracted": 15689
     }
   },
   "senior_filter_stats": {
-    "total_input": 48751,
-    "entry_level_jobs": 21823,
-    "senior_jobs": 26928,
+    "total_input": 48750,
+    "entry_level_jobs": 21855,
+    "senior_jobs": 26895,
     "senior_reasons": {
-      "senior_title": 14633,
-      "senior_experience": 3005,
-      "both": 9290
+      "senior_title": 14754,
+      "senior_experience": 2971,
+      "both": 9170
     }
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 18815,
-      "internship": 1432,
-      "mid_level": 1576
+      "internship": 1439,
+      "entry_level": 18836,
+      "mid_level": 1580
     },
     "domains": {
-      "hardware": 972,
-      "general": 12790,
-      "software": 4402,
-      "ai": 372,
-      "data_science": 1515,
+      "general": 12802,
+      "data_science": 1526,
+      "software": 4417,
+      "ai": 375,
       "finance": 148,
-      "product": 97,
-      "nursing": 2660
+      "product": 96,
+      "hardware": 965,
+      "nursing": 2663
     },
     "locations": {
-      "us": 13357,
-      "on_site": 1037,
-      "remote": 963
+      "us": 13385,
+      "on_site": 1040,
+      "remote": 967
     },
     "experience": {
-      "entry_level": 2372,
-      "unknown": 16389,
-      "mid_level": 2459,
-      "senior_level": 603
+      "entry_level": 2380,
+      "unknown": 16426,
+      "mid_level": 2447,
+      "senior_level": 602
     },
     "special": {
-      "unicorn": 472,
-      "faang": 542,
-      "fortune500": 847
+      "unicorn": 473,
+      "faang": 573,
+      "fortune500": 855
     },
-    "total": 21823
+    "total": 21855
   }
 }
