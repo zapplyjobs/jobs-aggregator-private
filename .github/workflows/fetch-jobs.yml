@@ -137,12 +137,17 @@ jobs:
         # Clone jobs-data-2026 into a temp directory
         git clone "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-data-2026.git" /tmp/jobs-data-2026
 
-        # Copy all_jobs.json, jobs-metadata.json, descriptions.jsonl, and per-source sidecars
+        # Copy all_jobs.json, jobs-metadata.json, descriptions.jsonl, and per-source sidecars.
+        # Remove existing sidecar files in the clone first so stale chunks don't persist
+        # (e.g. descriptions-workday.jsonl orphaned when descriptions-workday-1.jsonl takes over).
         cp .github/data/all_jobs.json /tmp/jobs-data-2026/.github/data/all_jobs.json
         cp .github/data/jobs-metadata.json /tmp/jobs-data-2026/.github/data/jobs-metadata.json
         if [ -f ".github/data/descriptions.jsonl" ]; then
           cp .github/data/descriptions.jsonl /tmp/jobs-data-2026/.github/data/descriptions.jsonl
         fi
+        # Delete all existing per-source sidecars in the clone, then copy the current set.
+        # This ensures files removed by the aggregator's stale-file cleanup are also removed here.
+        rm -f /tmp/jobs-data-2026/.github/data/descriptions-*.jsonl
         for f in .github/data/descriptions-*.jsonl; do
           [ -f "$f" ] && cp "$f" /tmp/jobs-data-2026/.github/data/
         done
@@ -153,6 +158,9 @@ jobs:
         git config user.name "Data Bot"
         git add .github/data/all_jobs.json .github/data/jobs-metadata.json
         git add .github/data/descriptions.jsonl 2>/dev/null || true
+        # Stage per-source sidecars: -u picks up deletions of tracked files (stale chunks),
+        # then the glob add picks up any new files not yet tracked.
+        git add -u .github/data/ 2>/dev/null || true
         git add .github/data/descriptions-*.jsonl 2>/dev/null || true
 
         if [ -n "$(git status --porcelain)" ]; then
