@@ -159,19 +159,21 @@ async function main() {
     console.log(`✅ Step 4 complete: ${entryLevelJobs.length} entry-level jobs (${seniorJobs.length} senior filtered)`);
     console.log('');
 
-    // Step 4b: Write filtered-out jobs for analytics (PIPELINE-1)
-    // Senior jobs are discarded here and never appear in all_jobs.json — record them for analytics.
-    // File is rewritten each run (not appended) so it reflects the current run's filtered set.
-    const FILTERED_OUTPUT_FILE = path.join(DATA_DIR, 'filtered_jobs.jsonl');
-    if (seniorJobs.length > 0) {
-      const filteredLines = seniorJobs.map(j => JSON.stringify(j)).join('\n') + '\n';
-      fs.writeFileSync(FILTERED_OUTPUT_FILE, filteredLines, 'utf8');
-      console.log(`📋 Step 4b: Saved ${seniorJobs.length} senior-filtered jobs → filtered_jobs.jsonl`);
-    } else {
-      // Write empty file to ensure it always exists (avoids git untracked noise)
-      fs.writeFileSync(FILTERED_OUTPUT_FILE, '', 'utf8');
-      console.log('📋 Step 4b: No senior-filtered jobs this run');
+    // Step 4b: Write senior-filter analytics summary (PIPELINE-1)
+    // Summary counts only — full job objects are ~180 MB and exceed GitHub's 100 MB limit.
+    // Tags not yet available (Step 5), so breakdown is by source only.
+    const FILTERED_OUTPUT_FILE = path.join(DATA_DIR, 'filtered_jobs.json');
+    const bySource = {};
+    for (const job of seniorJobs) {
+      bySource[job.source || 'unknown'] = (bySource[job.source || 'unknown'] || 0) + 1;
     }
+    const filteredSummary = {
+      generated: new Date().toISOString(),
+      total_senior_filtered: seniorJobs.length,
+      by_source: bySource,
+    };
+    fs.writeFileSync(FILTERED_OUTPUT_FILE, JSON.stringify(filteredSummary, null, 2), 'utf8');
+    console.log(`📋 Step 4b: Senior-filter summary → filtered_jobs.json (${seniorJobs.length} total)`);
     console.log('');
 
     // Step 5: Apply tags
@@ -563,7 +565,7 @@ async function gitCommit(jobCount) {
     execSync('git add .github/data/all_jobs.json');
     execSync('git add .github/data/jobs-metadata.json');
     execSync('git add .github/data/dedupe-store.json');
-    execSync('git add .github/data/filtered_jobs.jsonl 2>/dev/null || true'); // senior-filtered jobs for analytics (PIPELINE-1)
+    execSync('git add .github/data/filtered_jobs.json 2>/dev/null || true'); // senior-filter summary for analytics (PIPELINE-1)
     execSync('git add .github/data/archive/ 2>/dev/null || true'); // archive dir may not exist yet
     execSync('git add .github/data/descriptions-*.jsonl 2>/dev/null || true'); // per-source description sidecars (published)
     // descriptions.jsonl is Workday fetch cache — NOT staged (local state only, managed by Step 1b)
