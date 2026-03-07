@@ -399,7 +399,7 @@ async function main() {
 
     // Write metadata
     const duration = Date.now() - startTime;
-    const metadata = generateMetadata(sortedJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics);
+    const metadata = generateMetadata(sortedJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
@@ -454,11 +454,15 @@ async function main() {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics) {
+function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
   const byRemote = { remote: 0, onsite: 0 };
+  const companyCounts = {};
+
+  const now = Date.now();
+  const freshness = { last_1h: 0, last_6h: 0, last_24h: 0, last_48h: 0 };
 
   for (const job of jobs) {
     // Count by source
@@ -487,6 +491,34 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     } else {
       byRemote.onsite++;
     }
+
+    // Freshness buckets
+    if (job.posted_at) {
+      const ageMs = now - new Date(job.posted_at).getTime();
+      if (ageMs <= 1 * 60 * 60 * 1000)  freshness.last_1h++;
+      if (ageMs <= 6 * 60 * 60 * 1000)  freshness.last_6h++;
+      if (ageMs <= 24 * 60 * 60 * 1000) freshness.last_24h++;
+      if (ageMs <= 48 * 60 * 60 * 1000) freshness.last_48h++;
+    }
+
+    // Company counts (for top-N)
+    const co = job.company_name;
+    if (co) companyCounts[co] = (companyCounts[co] || 0) + 1;
+  }
+
+  // Top 15 companies by job count
+  const top_companies = Object.entries(companyCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([company, count]) => ({ company, count }));
+
+  // Senior-filtered breakdown by source
+  const seniorBySource = {};
+  if (Array.isArray(seniorJobs)) {
+    for (const job of seniorJobs) {
+      const src = job.source || 'unknown';
+      seniorBySource[src] = (seniorBySource[src] || 0) + 1;
+    }
   }
 
   return {
@@ -510,10 +542,19 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     validation_stats: validationMetrics,
 
     // Senior filter statistics
-    senior_filter_stats: seniorFilterMetrics,
+    senior_filter_stats: {
+      ...seniorFilterMetrics,
+      by_source: seniorBySource,
+    },
 
     // Tag statistics (Phase 1)
-    tag_stats: tagStats
+    tag_stats: tagStats,
+
+    // Freshness — jobs posted within last N hours (entry-level pool)
+    freshness,
+
+    // Top 15 companies by job count (entry-level pool)
+    top_companies,
   };
 }
 
