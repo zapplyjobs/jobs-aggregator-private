@@ -166,8 +166,11 @@ jobs:
         if [ -n "$(git status --porcelain)" ]; then
           JOB_COUNT=$(wc -l < .github/data/all_jobs.json)
           git commit -m "Update jobs - $(date -u +%Y-%m-%d) - ${JOB_COUNT} jobs"
-          git pull --rebase origin main
-          git push origin main
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin main && break
+            echo "Push attempt $i failed, retrying in 5s..."
+            sleep 5
+          done
           echo "✅ Pushed ${JOB_COUNT} jobs to jobs-data-2026"
         else
           echo "ℹ️ No changes to push (all_jobs.json unchanged)"
