@@ -49,11 +49,15 @@ jobs:
 
     - name: Seed descriptions.jsonl from jobs-data-2026
       run: |
-        echo "📥 Seeding descriptions.jsonl from jobs-data-2026..."
-        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions.jsonl?t=$(date +%s)" \
+        echo "📥 Seeding Workday description cache from jobs-data-2026..."
+        # Seed from descriptions-workday.jsonl (the published sidecar) into descriptions.jsonl
+        # (the local Workday fetch cache read by workday-descriptions.js Step 1b).
+        # descriptions.jsonl is never pushed to jobs-data-2026 — seeding from it never worked.
+        # Without this seed, Step 1b starts from 0 cached IDs every run and never accumulates.
+        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-workday.jsonl?t=$(date +%s)" \
           -o .github/data/descriptions.jsonl && \
-          echo "✅ Seeded $(wc -l < .github/data/descriptions.jsonl) descriptions from jobs-data-2026" || \
-          echo "⚠️ No descriptions.jsonl yet — starting fresh"
+          echo "✅ Seeded $(wc -l < .github/data/descriptions.jsonl) Workday descriptions from cache" || \
+          echo "⚠️ No descriptions-workday.jsonl yet — starting fresh"
 
     - name: Fetch jobs from all sources
       run: node .github/scripts/index.js 2>&1 | tee .github/logs/fetch.log
