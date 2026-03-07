@@ -64,6 +64,93 @@ jobs:
       env:
         JSEARCH_API_KEY: ${{ secrets.JSEARCH_API_KEY }}
 
+    - name: Post-deploy invariant checks
+      run: |
+        echo "🔍 Running post-deploy invariant checks..."
+        PASS=true
+
+        # 1. all_jobs.json exists and has >20,000 lines
+        if [ ! -f ".github/data/all_jobs.json" ]; then
+          echo "❌ all_jobs.json missing"
+          PASS=false
+        else
+          LINE_COUNT=$(wc -l < .github/data/all_jobs.json)
+          if [ "$LINE_COUNT" -lt 20000 ]; then
+            echo "❌ all_jobs.json: $LINE_COUNT lines (expected >20000)"
+            PASS=false
+          else
+            echo "✅ all_jobs.json: $LINE_COUNT lines"
+          fi
+        fi
+
+        # 2. tags object present on a sample of records
+        TAGGED=$(head -5 .github/data/all_jobs.json | python3 -c "
+        import sys, json
+        ok = sum(1 for l in sys.stdin if l.strip() and 'tags' in json.loads(l))
+        print(ok)
+        " 2>/dev/null || echo 0)
+        if [ "$TAGGED" -lt 5 ]; then
+          echo "❌ tags field missing on sampled records ($TAGGED/5 have it)"
+          PASS=false
+        else
+          echo "✅ tags field present on sampled records"
+        fi
+
+        # 3. source field present on records
+        SOURCED=$(head -5 .github/data/all_jobs.json | python3 -c "
+        import sys, json
+        ok = sum(1 for l in sys.stdin if l.strip() and json.loads(l).get('source'))
+        print(ok)
+        " 2>/dev/null || echo 0)
+        if [ "$SOURCED" -lt 5 ]; then
+          echo "❌ source field missing on sampled records ($SOURCED/5 have it)"
+          PASS=false
+        else
+          echo "✅ source field present on sampled records"
+        fi
+
+        # 4. is_direct_apply field present on at least one JSearch record
+        JSEARCH_WITH_FLAG=$(python3 -c "
+        import json
+        count = 0
+        with open('.github/data/all_jobs.json') as f:
+          for line in f:
+            line = line.strip()
+            if not line: continue
+            j = json.loads(line)
+            if j.get('source') == 'jsearch' and 'is_direct_apply' in j:
+              count += 1
+              if count >= 1: break
+        print(count)
+        " 2>/dev/null || echo 0)
+        if [ "$JSEARCH_WITH_FLAG" -lt 1 ]; then
+          echo "⚠️  is_direct_apply field not yet on JSearch records (may appear after TTL refresh)"
+        else
+          echo "✅ is_direct_apply present on JSearch records"
+        fi
+
+        # 5. jobs-metadata.json has freshness and top_companies (new fields from df7e6a4)
+        if [ -f ".github/data/jobs-metadata.json" ]; then
+          HAS_FRESHNESS=$(python3 -c "
+        import json
+        m = json.load(open('.github/data/jobs-metadata.json'))
+        print(1 if 'freshness' in m and 'top_companies' in m else 0)
+        " 2>/dev/null || echo 0)
+          if [ "$HAS_FRESHNESS" -eq 1 ]; then
+            echo "✅ jobs-metadata.json has freshness + top_companies fields"
+          else
+            echo "❌ jobs-metadata.json missing freshness or top_companies fields"
+            PASS=false
+          fi
+        fi
+
+        if [ "$PASS" = "true" ]; then
+          echo "✅ All invariant checks passed"
+        else
+          echo "❌ One or more invariant checks failed — see above"
+          exit 1
+        fi
+
     - name: Display logs (always run)
       if: always()
       run: |
