@@ -218,8 +218,9 @@ async function main() {
     // Step 8b: Write per-source description sidecars
     //
     // One file per source: descriptions-{source}.jsonl
-    // Each file is rewritten atomically each run — entries are pruned to liveJobIds only,
-    // so individual descriptions expire automatically as jobs age out of the 14-day window.
+    // Each file is rewritten atomically each run.
+    // Non-Workday sources: pruned to liveJobIds (entry-level survivors).
+    // Workday: pruned to allWorkdayIds (full pre-filter pool, all seniorities) — see PIPELINE-3-FIX.
     //
     // Chunking: if a source exceeds SIDECAR_CHUNK_LIMIT_BYTES, split into
     //   descriptions-{source}-1.jsonl, descriptions-{source}-2.jsonl, etc.
@@ -249,19 +250,32 @@ async function main() {
       }
     }
 
-    // For Workday: descriptions were fetched in Step 1b and injected above.
-    // Load the existing Workday sidecar to carry forward any entries not in this run's sortedJobs
-    // (e.g. jobs still in rolling window from prior runs that weren't re-fetched).
+    // For Workday: build descriptions-workday.jsonl from ALL fetched descriptions,
+    // not just entry-level survivors. Root cause of PIPELINE-3-FIX: sortedJobs is
+    // entry-level only. 56% of fetched Workday descriptions are senior-filtered,
+    // so they never entered bySource['workday'], and the sidecar never grew past 42.
+    // The seed step read the unchanged sidecar (42 IDs) → re-fetched the same 200 senior
+    // jobs every run → infinite loop.
+    //
+    // Fix (Option C): merge descriptions from three sources into bySource['workday']:
+    //   1. descriptionsMap — current run's fetched descriptions (all seniorities)
+    //   2. legacyWorkdayMap — prior cached descriptions not re-fetched this run
+    //   3. bySource['workday'] — entry-level jobs already collected above (subset of #1)
+    // TTL: keep only IDs present in allJobs (the full pre-filter Workday pool, 14-day window).
+    // Senior descriptions are dead weight for enrich-jobs.js (which skips non-entry-level),
+    // but harmless — and they break the loop by allowing the sidecar to grow.
     const LEGACY_DESCRIPTIONS_FILE = path.join(DATA_DIR, 'descriptions.jsonl');
     const legacyWorkdayMap = loadDescriptions(LEGACY_DESCRIPTIONS_FILE);
-    const liveJobIds = new Set(sortedJobs.map(j => j.id));
-    const currentRunWorkdayIds = new Set((bySource['workday'] || []).map(e => e.id));
+    const allWorkdayIds = new Set(allJobs.filter(j => j.source === 'workday').map(j => j.id));
+    const workdaySidecarMap = new Map(); // id → description_text, deduplicated
+    // Priority: current run's fetched descriptions > prior cached
     for (const [id, description_text] of legacyWorkdayMap) {
-      if (liveJobIds.has(id) && !currentRunWorkdayIds.has(id) && description_text) {
-        if (!bySource['workday']) bySource['workday'] = [];
-        bySource['workday'].push({ id, description_text });
-      }
+      if (allWorkdayIds.has(id) && description_text) workdaySidecarMap.set(id, description_text);
     }
+    for (const [id, description_text] of descriptionsMap) {
+      if (description_text) workdaySidecarMap.set(id, description_text); // current run wins
+    }
+    bySource['workday'] = Array.from(workdaySidecarMap, ([id, description_text]) => ({ id, description_text }));
 
     // Write per-source files (chunked if needed)
     const writtenFiles = new Set(); // track filenames written this run for stale-file cleanup
