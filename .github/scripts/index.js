@@ -163,14 +163,14 @@ async function main() {
     // Summary counts only — full job objects are ~180 MB and exceed GitHub's 100 MB limit.
     // Tags not yet available (Step 5), so breakdown is by source only.
     const FILTERED_OUTPUT_FILE = path.join(DATA_DIR, 'filtered_jobs.json');
-    const bySource = {};
+    const seniorBySource = {};
     for (const job of seniorJobs) {
-      bySource[job.source || 'unknown'] = (bySource[job.source || 'unknown'] || 0) + 1;
+      seniorBySource[job.source || 'unknown'] = (seniorBySource[job.source || 'unknown'] || 0) + 1;
     }
     const filteredSummary = {
       generated: new Date().toISOString(),
       total_senior_filtered: seniorJobs.length,
-      by_source: bySource,
+      by_source: seniorBySource,
     };
     fs.writeFileSync(FILTERED_OUTPUT_FILE, JSON.stringify(filteredSummary, null, 2), 'utf8');
     console.log(`📋 Step 4b: Senior-filter summary → filtered_jobs.json (${seniorJobs.length} total)`);
