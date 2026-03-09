@@ -1,12 +1,12 @@
 {
-  "generated": "2026-03-09T17:27:45.818Z",
-  "total_senior_filtered": 27657,
+  "generated": "2026-03-09T17:41:49.512Z",
+  "total_senior_filtered": 27856,
   "by_source": {
-    "jsearch": 7,
-    "greenhouse": 14013,
-    "lever": 1490,
-    "ashby": 3157,
-    "workday": 8559,
+    "jsearch": 2,
+    "greenhouse": 14024,
+    "lever": 1489,
+    "ashby": 3158,
+    "workday": 8752,
     "amazon": 431
   }
 }
