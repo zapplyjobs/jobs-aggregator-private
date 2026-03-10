@@ -1,51 +1,51 @@
 {
   "version": "1.0",
-  "generated": "2026-03-10T18:10:08.158Z",
-  "duration_ms": 692092,
-  "total_jobs": 21386,
-  "unique_jobs": 21386,
-  "duplicates_removed": 14695,
+  "generated": "2026-03-10T18:37:38.582Z",
+  "duration_ms": 713471,
+  "total_jobs": 21247,
+  "unique_jobs": 21247,
+  "duplicates_removed": 14584,
   "by_source": {
-    "workday": 11656,
-    "greenhouse": 6638,
-    "lever": 1060,
+    "workday": 11519,
+    "greenhouse": 6639,
+    "lever": 1059,
     "ashby": 1445,
-    "amazon": 580,
-    "jsearch": 7
+    "amazon": 579,
+    "jsearch": 6
   },
   "by_employment_type": {
     "FULLTIME": 1283,
     "CONTRACT": 73,
     "INTERN": 80,
-    "FULL-TIME": 7,
+    "FULL-TIME": 6,
     "PARTTIME": 8,
     "TEMPORARY": 1
   },
   "by_job_type": {
-    "internship": 1375,
-    "new-grad": 18456,
-    "mid_level": 1555
+    "internship": 1359,
+    "new-grad": 18341,
+    "mid_level": 1547
   },
   "by_location": {
-    "remote": 1222,
-    "onsite": 20164
+    "remote": 1217,
+    "onsite": 20030
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "entry level data scientist",
-        "count": 5
+        "query": "firmware engineer entry level",
+        "count": 0
       },
       {
-        "query": "data analyst entry level",
+        "query": "registered nurse entry level new graduate",
         "count": 4
       },
       {
-        "query": "machine learning engineer entry level",
-        "count": 5
+        "query": "new grad nurse RN",
+        "count": 4
       }
     ],
-    "total_fetched": 14
+    "total_fetched": 8
   },
   "ats_stats": {
     "companies_total": 260,
@@ -55,11 +55,11 @@
     "workday_tenants": 50
   },
   "validation_stats": {
-    "total_input": 49786,
-    "valid_jobs": 49749,
-    "invalid_jobs": 37,
+    "total_input": 49282,
+    "valid_jobs": 49238,
+    "invalid_jobs": 44,
     "invalid_reasons": {
-      "missing_title": 7,
+      "missing_title": 14,
       "missing_company": 0,
       "missing_url": 0,
       "invalid_title_length": 30,
@@ -67,73 +67,73 @@
       "invalid_url_format": 0
     },
     "normalized_fields": {
-      "state_extracted": 6898,
-      "city_extracted": 15629
+      "state_extracted": 6904,
+      "city_extracted": 15350
     }
   },
   "senior_filter_stats": {
-    "total_input": 49749,
-    "entry_level_jobs": 21386,
-    "senior_jobs": 28363,
+    "total_input": 49238,
+    "entry_level_jobs": 21247,
+    "senior_jobs": 27991,
     "senior_reasons": {
-      "senior_title": 13503,
-      "senior_experience": 3724,
-      "both": 11136
+      "senior_title": 13185,
+      "senior_experience": 3743,
+      "both": 11063
     },
     "by_source": {
       "jsearch": 2,
-      "greenhouse": 13998,
-      "lever": 1485,
+      "greenhouse": 13906,
+      "lever": 1486,
       "ashby": 3148,
-      "workday": 9311,
-      "amazon": 419
+      "workday": 9029,
+      "amazon": 420
     }
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 18456,
-      "mid_level": 1555,
-      "internship": 1375
+      "entry_level": 18341,
+      "mid_level": 1547,
+      "internship": 1359
     },
     "domains": {
-      "data_science": 1624,
-      "software": 4617,
-      "general": 12135,
-      "ai": 388,
-      "product": 93,
+      "nursing": 2693,
+      "general": 12022,
+      "software": 4592,
+      "ai": 386,
+      "data_science": 1621,
+      "product": 90,
       "finance": 144,
-      "hardware": 944,
-      "nursing": 2688
+      "hardware": 941
     },
     "locations": {
-      "us": 13262,
+      "us": 13230,
       "on_site": 800,
-      "remote": 1222,
+      "remote": 1217,
       "hybrid": 189
     },
     "experience": {
-      "unknown": 14942,
-      "entry_level": 2569,
-      "mid_level": 3031,
-      "senior_level": 844
+      "unknown": 14795,
+      "mid_level": 3047,
+      "senior_level": 848,
+      "entry_level": 2557
     },
     "special": {
-      "unicorn": 474,
-      "faang": 562,
-      "fortune500": 884
+      "unicorn": 475,
+      "faang": 561,
+      "fortune500": 885
     },
-    "total": 21386
+    "total": 21247
   },
   "freshness": {
-    "last_1h": 1368,
-    "last_6h": 1488,
-    "last_24h": 2562,
-    "last_48h": 3034
+    "last_1h": 1274,
+    "last_6h": 1572,
+    "last_24h": 2626,
+    "last_48h": 3120
   },
   "top_companies": [
     {
       "company": "SpaceX",
-      "count": 1004
+      "count": 1003
     },
     {
       "company": "Speechify",
@@ -145,39 +145,39 @@
     },
     {
       "company": "Saint Luke's Health System",
-      "count": 471
+      "count": 472
     },
     {
       "company": "Ochsner Health",
-      "count": 469
+      "count": 470
     },
     {
       "company": "WVU Medicine",
-      "count": 461
+      "count": 463
     },
     {
       "company": "Cleveland Clinic",
       "count": 459
     },
     {
-      "company": "Vanderbilt University Medical Center",
-      "count": 444
-    },
-    {
       "company": "Intermountain Health",
       "count": 443
     },
     {
+      "company": "Vanderbilt University Medical Center",
+      "count": 443
+    },
+    {
       "company": "Banner Health",
-      "count": 440
+      "count": 441
     },
     {
       "company": "Mass General Brigham",
-      "count": 440
+      "count": 438
     },
     {
       "company": "Nationwide Children's",
-      "count": 432
+      "count": 431
     },
     {
       "company": "Anduril",
@@ -185,11 +185,11 @@
     },
     {
       "company": "AT&T",
-      "count": 374
+      "count": 376
     },
     {
       "company": "CACI",
-      "count": 356
+      "count": 357
     }
   ]
 }
