@@ -279,6 +279,26 @@ async function main() {
     }
     bySource['workday'] = Array.from(workdaySidecarMap, ([id, description_text]) => ({ id, description_text }));
 
+    // For JSearch: accumulate descriptions across runs.
+    // JSearch yields ~11–18 net-new jobs/run after dedup. Without accumulation, the sidecar
+    // only ever contains current-run net-new entries — existing-pool jobs lose their descriptions
+    // when the sidecar is rewritten. Fix: same legacy merge pattern as Workday.
+    // TTL: prune to live JSearch pool IDs only (mirrors 14-day all_jobs.json rolling window).
+    // No extra fetch cost — JSearch descriptions are inline on job objects from jsearch-fetcher.js.
+    const JSEARCH_SIDECAR_FILE = path.join(DATA_DIR, 'descriptions-jsearch.jsonl');
+    const legacyJSearchMap = loadDescriptions(JSEARCH_SIDECAR_FILE);
+    const allJSearchIds = new Set(allJobs.filter(j => j.source === 'jsearch').map(j => j.id));
+    const jsearchSidecarMap = new Map(); // id → description_text, deduplicated
+    // Seed with prior cached descriptions (legacy entries within live pool only)
+    for (const [id, description_text] of legacyJSearchMap) {
+      if (allJSearchIds.has(id) && description_text) jsearchSidecarMap.set(id, description_text);
+    }
+    // Current run's descriptions win (net-new jobs + any updated descriptions)
+    for (const entry of (bySource['jsearch'] || [])) {
+      if (entry.description_text) jsearchSidecarMap.set(entry.id, entry.description_text);
+    }
+    bySource['jsearch'] = Array.from(jsearchSidecarMap, ([id, description_text]) => ({ id, description_text }));
+
     // Write per-source files (chunked if needed)
     const writtenFiles = new Set(); // track filenames written this run for stale-file cleanup
     for (const [src, entries] of Object.entries(bySource)) {
