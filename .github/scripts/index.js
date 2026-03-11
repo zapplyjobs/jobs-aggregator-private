@@ -280,18 +280,21 @@ async function main() {
     bySource['workday'] = Array.from(workdaySidecarMap, ([id, description_text]) => ({ id, description_text }));
 
     // For JSearch: accumulate descriptions across runs.
-    // JSearch yields ~11–18 net-new jobs/run after dedup. Without accumulation, the sidecar
-    // only ever contains current-run net-new entries — existing-pool jobs lose their descriptions
-    // when the sidecar is rewritten. Fix: same legacy merge pattern as Workday.
-    // TTL: prune to live JSearch pool IDs only (mirrors 14-day all_jobs.json rolling window).
+    // JSearch yields ~11–18 net-new jobs/run. Without accumulation, the sidecar only ever
+    // contains current-run entries — prior pool jobs lose descriptions when sidecar is rewritten.
+    // Fix: load legacy sidecar, seed ALL prior entries (no TTL prune), overlay current-run descriptions.
+    //
+    // Why no TTL prune (unlike Workday): allJobs here is the current-run fetch (~14 new JSearch jobs),
+    // not the full 601-job rolling pool. Pruning to allJSearchIds would discard all legacy entries
+    // every run, keeping only ~14 entries. JSearch pool is ~600 jobs × ~3.5KB = ~2MB total — well
+    // under the 40MB chunk limit. Size growth is bounded by the 14-day pool TTL in all_jobs.json.
     // No extra fetch cost — JSearch descriptions are inline on job objects from jsearch-fetcher.js.
     const JSEARCH_SIDECAR_FILE = path.join(DATA_DIR, 'descriptions-jsearch.jsonl');
     const legacyJSearchMap = loadDescriptions(JSEARCH_SIDECAR_FILE);
-    const allJSearchIds = new Set(allJobs.filter(j => j.source === 'jsearch').map(j => j.id));
     const jsearchSidecarMap = new Map(); // id → description_text, deduplicated
-    // Seed with prior cached descriptions (legacy entries within live pool only)
+    // Seed ALL prior cached descriptions (no TTL prune — see comment above)
     for (const [id, description_text] of legacyJSearchMap) {
-      if (allJSearchIds.has(id) && description_text) jsearchSidecarMap.set(id, description_text);
+      if (description_text) jsearchSidecarMap.set(id, description_text);
     }
     // Current run's descriptions win (net-new jobs + any updated descriptions)
     for (const entry of (bySource['jsearch'] || [])) {
