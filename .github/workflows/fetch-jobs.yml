@@ -59,6 +59,17 @@ jobs:
           echo "✅ Seeded $(wc -l < .github/data/descriptions.jsonl) Workday descriptions from cache" || \
           echo "⚠️ No descriptions-workday.jsonl yet — starting fresh"
 
+    - name: Seed descriptions-jsearch.jsonl from jobs-data-2026
+      run: |
+        echo "📥 Seeding JSearch description cache from jobs-data-2026..."
+        # Seed prior descriptions-jsearch.jsonl so the accumulator in Step 8b can merge
+        # existing-pool descriptions. Without this, descriptions-jsearch.jsonl doesn't exist
+        # on the runner at start of each run and the legacy map is always empty.
+        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-jsearch.jsonl?t=$(date +%s)" \
+          -o .github/data/descriptions-jsearch.jsonl && \
+          echo "✅ Seeded $(wc -l < .github/data/descriptions-jsearch.jsonl) JSearch descriptions from cache" || \
+          echo "⚠️ No descriptions-jsearch.jsonl yet — starting fresh"
+
     - name: Fetch jobs from all sources
       run: node .github/scripts/index.js 2>&1 | tee .github/logs/fetch.log
       env:
