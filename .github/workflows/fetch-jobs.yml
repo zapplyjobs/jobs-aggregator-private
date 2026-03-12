@@ -254,6 +254,11 @@ jobs:
           [ -f "$f" ] && cp "$f" /tmp/jobs-data-2026/.github/data/
         done
 
+        # Generate ZJP_SNAPSHOT.json + ZJP_CONTEXT.md and write directly into the clone.
+        # Non-fatal: if this fails, job data still pushes normally.
+        echo "📊 Generating ZJP snapshot..."
+        node .github/scripts/generate-snapshot.js || echo "⚠️ Snapshot generation failed — continuing without it"
+
         # Commit and push
         cd /tmp/jobs-data-2026
         git config user.email "bot@zapplyjobs.com"
@@ -264,10 +269,11 @@ jobs:
         # then the glob add picks up any new files not yet tracked.
         git add -u .github/data/ 2>/dev/null || true
         git add .github/data/descriptions-*.jsonl 2>/dev/null || true
+        git add .github/data/ZJP_SNAPSHOT.json .github/data/ZJP_CONTEXT.md 2>/dev/null || true
 
         if [ -n "$(git status --porcelain)" ]; then
           JOB_COUNT=$(wc -l < .github/data/all_jobs.json)
-          git commit -m "Update jobs - $(date -u +%Y-%m-%d) - ${JOB_COUNT} jobs"
+          git commit -m "Update jobs - $(date -u +%Y-%m-%d %H:%M UTC) - ${JOB_COUNT} jobs"
           for i in 1 2 3; do
             git pull --rebase origin main && git push origin main && break
             echo "Push attempt $i failed, retrying in 5s..."
@@ -279,6 +285,43 @@ jobs:
         fi
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
+
+    - name: Generate dependency diagram (if submodule changed)
+      if: success()
+      run: |
+        # Only regenerate if submodule hash changed since last diagram was generated.
+        CURRENT_HASH=$(git -C .github/scripts/shared rev-parse HEAD 2>/dev/null | cut -c1-7 || echo "unknown")
+        PREV_HASH=$(cat /tmp/jobs-data-2026/.github/data/.dep-diagram-hash 2>/dev/null || echo "")
+        if [ "$CURRENT_HASH" = "$PREV_HASH" ]; then
+          echo "ℹ️ Submodule unchanged ($CURRENT_HASH) — skipping dependency diagram regeneration"
+        else
+          echo "🔍 Submodule changed ($PREV_HASH → $CURRENT_HASH) — regenerating dependency diagram..."
+          cd .github/scripts/shared
+          npx --yes dependency-cruiser@^16 \
+            --output-type mermaid \
+            --exclude "node_modules" \
+            --do-not-follow "node_modules" \
+            --max-depth 6 \
+            lib/aggregator/index.js lib/aggregator/processors/tag-engine.js \
+            > /tmp/dep-graph-raw.md 2>/dev/null || true
+          if [ -s /tmp/dep-graph-raw.md ]; then
+            echo "# ZJP Dependency Graph" > /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
+            echo "" >> /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
+            echo "Generated from submodule \`$CURRENT_HASH\`. Entry points: \`lib/aggregator/index.js\`, \`lib/aggregator/processors/tag-engine.js\`." >> /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
+            echo "" >> /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
+            cat /tmp/dep-graph-raw.md >> /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
+            echo "$CURRENT_HASH" > /tmp/jobs-data-2026/.github/data/.dep-diagram-hash
+            echo "✅ Dependency diagram written"
+            cd /tmp/jobs-data-2026
+            git add .github/data/ZJP_DEPENDENCY_GRAPH.md .github/data/.dep-diagram-hash 2>/dev/null || true
+            if [ -n "$(git status --porcelain)" ]; then
+              git commit -m "chore: regenerate dependency diagram for submodule $CURRENT_HASH"
+              git push origin main || echo "⚠️ Push failed — diagram will be included in next run"
+            fi
+          else
+            echo "⚠️ dependency-cruiser produced no output — skipping"
+          fi
+        fi
 
     - name: Notify on failure
       if: failure()
