@@ -1,53 +1,56 @@
 {
   "version": "1.0",
-  "generated": "2026-03-12T01:59:38.776Z",
-  "duration_ms": 687586,
-  "total_jobs": 30216,
-  "unique_jobs": 30216,
-  "duplicates_removed": 20443,
+  "generated": "2026-03-12T02:26:06.747Z",
+  "duration_ms": 721326,
+  "total_jobs": 30154,
+  "unique_jobs": 30154,
+  "duplicates_removed": 20376,
   "by_source": {
-    "workday": 18553,
+    "workday": 18490,
+    "greenhouse": 6442,
     "ashby": 1457,
-    "greenhouse": 6441,
     "smartrecruiters": 2006,
     "amazon": 584,
     "lever": 1064,
-    "jsearch": 8,
-    "eightfold": 103
+    "jsearch": 10,
+    "eightfold": 101
   },
   "by_employment_type": {
     "FULLTIME": 1285,
-    "FULL-TIME": 1699,
+    "FULL-TIME": 1697,
     "INTERN": 91,
+    "FULL-TIME AND INTERNSHIP": 2,
+    "FULL-TIME AND PART-TIME": 1,
     "CONTRACT": 76,
+    "INTERNSHIP": 2,
     "PARTTIME": 8,
     "TEMPORARY": 1
   },
   "by_job_type": {
-    "internship": 2864,
-    "new-grad": 25498,
-    "mid_level": 1854
+    "internship": 2862,
+    "new-grad": 25465,
+    "mid_level": 1827
   },
   "by_location": {
-    "remote": 1618,
-    "onsite": 28598
+    "remote": 1621,
+    "onsite": 28533
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "data science internship summer 2026",
-        "count": 2
-      },
-      {
-        "query": "data analyst entry level",
+        "query": "hardware engineer intern",
         "count": 3
       },
       {
-        "query": "machine learning intern",
+        "query": "electrical engineering internship",
         "count": 5
+      },
+      {
+        "query": "embedded systems engineer entry level",
+        "count": 4
       }
     ],
-    "total_fetched": 10
+    "total_fetched": 12
   },
   "ats_stats": {
     "companies_total": 332,
@@ -59,92 +62,92 @@
     "smartrecruiters_companies": 17
   },
   "validation_stats": {
-    "total_input": 67326,
-    "valid_jobs": 67293,
-    "invalid_jobs": 33,
+    "total_input": 67336,
+    "valid_jobs": 67280,
+    "invalid_jobs": 56,
     "invalid_reasons": {
-      "missing_title": 4,
+      "missing_title": 26,
       "missing_company": 0,
       "missing_url": 0,
-      "invalid_title_length": 29,
+      "invalid_title_length": 30,
       "invalid_company_length": 0,
       "invalid_url_format": 0
     },
     "normalized_fields": {
       "state_extracted": 13035,
-      "city_extracted": 22993
+      "city_extracted": 23001
     }
   },
   "senior_filter_stats": {
-    "total_input": 67293,
-    "entry_level_jobs": 30216,
-    "senior_jobs": 37077,
+    "total_input": 67280,
+    "entry_level_jobs": 30154,
+    "senior_jobs": 37126,
     "senior_reasons": {
-      "senior_title": 21183,
-      "senior_experience": 3900,
-      "both": 11994
+      "senior_title": 21133,
+      "senior_experience": 3942,
+      "both": 12051
     },
     "by_source": {
-      "jsearch": 1,
-      "greenhouse": 14589,
+      "jsearch": 2,
+      "greenhouse": 14597,
       "lever": 1505,
       "ashby": 3138,
-      "workday": 14856,
-      "eightfold": 97,
+      "workday": 14897,
+      "eightfold": 99,
       "smartrecruiters": 2469,
-      "amazon": 422
+      "amazon": 419
     }
   },
   "tag_stats": {
     "employment": {
-      "internship": 2864,
-      "entry_level": 25498,
-      "mid_level": 1854
+      "internship": 2862,
+      "mid_level": 1827,
+      "entry_level": 25465
     },
     "domains": {
-      "data_science": 2432,
-      "software": 6261,
-      "ai": 544,
-      "general": 14458,
+      "software": 6262,
+      "hardware": 3218,
+      "general": 14420,
       "sales": 1902,
-      "legal": 112,
-      "hardware": 3224,
-      "operations": 352,
+      "ai": 539,
+      "data_science": 2429,
+      "legal": 111,
+      "operations": 354,
       "product": 191,
-      "finance": 154,
+      "finance": 155,
       "hr": 113,
       "marketing": 138,
-      "healthcare": 3017
+      "healthcare": 3011
     },
     "locations": {
-      "us": 18318,
-      "on_site": 2429,
-      "remote": 1618,
+      "us": 18253,
+      "on_site": 2431,
+      "remote": 1621,
       "hybrid": 194
     },
     "experience": {
-      "entry_level": 4179,
-      "unknown": 21825,
-      "mid_level": 3295,
-      "senior_level": 917
+      "entry_level": 4188,
+      "unknown": 21707,
+      "mid_level": 3336,
+      "senior_level": 923
     },
     "special": {
       "unicorn": 474,
       "faang": 575,
       "fortune500": 871
     },
-    "total": 30216
+    "total": 30154
   },
   "freshness": {
-    "last_1h": 2069,
-    "last_6h": 2306,
-    "last_24h": 2852,
-    "last_48h": 3932
+    "last_1h": 2166,
+    "last_6h": 2369,
+    "last_24h": 2844,
+    "last_48h": 3925
   },
   "top_companies": [
     {
       "company": "SpaceX",
-      "count": 1024
+      "count": 1025
     },
     {
       "company": "Stryker",
@@ -175,16 +178,16 @@
       "count": 474
     },
     {
-      "company": "Ochsner Health",
-      "count": 472
-    },
-    {
       "company": "WVU Medicine",
       "count": 466
     },
     {
       "company": "Disney",
-      "count": 456
+      "count": 458
+    },
+    {
+      "company": "Ochsner Health",
+      "count": 458
     },
     {
       "company": "Cleveland Clinic",
@@ -199,8 +202,8 @@
       "count": 449
     },
     {
-      "company": "Morgan Stanley",
-      "count": 443
+      "company": "Vanderbilt University Medical Center",
+      "count": 442
     }
   ]
 }
