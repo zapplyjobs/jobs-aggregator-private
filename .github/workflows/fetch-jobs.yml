@@ -302,12 +302,12 @@ jobs:
             --exclude "node_modules" \
             --do-not-follow "node_modules" \
             --max-depth 6 \
-            lib/aggregator/index.js lib/aggregator/processors/tag-engine.js \
+            index.js lib/aggregator/processors/tag-engine.js \
             > /tmp/dep-graph-raw.md 2>/dev/null || true
           if [ -s /tmp/dep-graph-raw.md ]; then
             echo "# ZJP Dependency Graph" > /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
             echo "" >> /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
-            echo "Generated from submodule \`$CURRENT_HASH\`. Entry points: \`lib/aggregator/index.js\`, \`lib/aggregator/processors/tag-engine.js\`." >> /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
+            echo "Generated from submodule \`$CURRENT_HASH\`. Entry points: \`index.js\`, \`lib/aggregator/processors/tag-engine.js\`." >> /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
             echo "" >> /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
             cat /tmp/dep-graph-raw.md >> /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
             echo "$CURRENT_HASH" > /tmp/jobs-data-2026/.github/data/.dep-diagram-hash
