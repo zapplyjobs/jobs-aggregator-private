@@ -298,6 +298,7 @@ jobs:
           echo "🔍 Submodule changed ($PREV_HASH → $CURRENT_HASH) — regenerating dependency diagram..."
           cd .github/scripts/shared
           npx --yes dependency-cruiser@^16 \
+            --no-config \
             --output-type mermaid \
             --exclude "node_modules" \
             --do-not-follow "node_modules" \
