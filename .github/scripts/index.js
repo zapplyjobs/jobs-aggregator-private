@@ -22,6 +22,7 @@ const SHARED = path.join(__dirname, 'shared', 'lib', 'aggregator');
 const { fetchFromJSearch, getUsageStats } = require(`${SHARED}/fetchers/jsearch-fetcher`);
 const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
 const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
+const { fetchAllNetflixJobs } = require(`${SHARED}/fetchers/netflix`);
 const { fetchWorkdayDescriptions, loadDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
 
 // Import processors
@@ -79,11 +80,16 @@ async function main() {
     const amazonJobs = await fetchAllAmazonJobs();
     allJobs.push(...amazonJobs);
 
+    // Fetch from Netflix Jobs
+    const netflixJobs = await fetchAllNetflixJobs();
+    allJobs.push(...netflixJobs);
+
     console.log('');
     console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
     console.log(`   - JSearch: ${jsearchJobs.length} jobs`);
     console.log(`   - ATS: ${atsResult.jobs.length} jobs`);
     console.log(`   - Amazon: ${amazonJobs.length} jobs`);
+    console.log(`   - Netflix: ${netflixJobs.length} jobs`);
     console.log('');
 
     // Step 1b: Fetch Workday descriptions (incremental — only new IDs)
