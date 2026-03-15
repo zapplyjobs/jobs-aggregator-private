@@ -263,6 +263,17 @@ jobs:
         echo "📊 Generating ZJP snapshot..."
         node .github/scripts/generate-snapshot.js || echo "⚠️ Snapshot generation failed — continuing without it"
 
+        # Persist ZJP_SNAPSHOT.json to aggregator repo for delta tracking across runs.
+        # ZJP_CONTEXT.md is not committed — generated locally for Claude session context only.
+        if [ -f "/tmp/jobs-data-2026/.github/data/ZJP_SNAPSHOT.json" ]; then
+          cp /tmp/jobs-data-2026/.github/data/ZJP_SNAPSHOT.json "$GITHUB_WORKSPACE/.github/data/ZJP_SNAPSHOT.json"
+          cd "$GITHUB_WORKSPACE"
+          git add .github/data/ZJP_SNAPSHOT.json
+          git diff --cached --quiet || git commit -m "chore: update ZJP snapshot [skip ci]"
+          git push origin ${{ github.ref_name }} || echo "⚠️ Snapshot push failed — delta tracking will lag one run"
+          cd /tmp/jobs-data-2026
+        fi
+
         # Commit and push
         cd /tmp/jobs-data-2026
         git config user.email "bot@zapplyjobs.com"
@@ -289,44 +300,6 @@ jobs:
         fi
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
-
-    - name: Generate dependency diagram (if submodule changed)
-      if: success()
-      run: |
-        # Only regenerate if submodule hash changed since last diagram was generated.
-        CURRENT_HASH=$(git -C .github/scripts/shared rev-parse HEAD 2>/dev/null | cut -c1-7 || echo "unknown")
-        PREV_HASH=$(cat /tmp/jobs-data-2026/.github/data/.dep-diagram-hash 2>/dev/null || echo "")
-        if [ "$CURRENT_HASH" = "$PREV_HASH" ]; then
-          echo "ℹ️ Submodule unchanged ($CURRENT_HASH) — skipping dependency diagram regeneration"
-        else
-          echo "🔍 Submodule changed ($PREV_HASH → $CURRENT_HASH) — regenerating dependency diagram..."
-          cd .github/scripts/shared
-          npx --yes dependency-cruiser@^16 \
-            --no-config \
-            --output-type mermaid \
-            --exclude "node_modules" \
-            --do-not-follow "node_modules" \
-            --max-depth 6 \
-            index.js lib/aggregator/processors/tag-engine.js \
-            > /tmp/dep-graph-raw.md 2>/dev/null || true
-          if [ -s /tmp/dep-graph-raw.md ]; then
-            echo "# ZJP Dependency Graph" > /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
-            echo "" >> /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
-            echo "Generated from submodule \`$CURRENT_HASH\`. Entry points: \`index.js\`, \`lib/aggregator/processors/tag-engine.js\`." >> /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
-            echo "" >> /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
-            cat /tmp/dep-graph-raw.md >> /tmp/jobs-data-2026/.github/data/ZJP_DEPENDENCY_GRAPH.md
-            echo "$CURRENT_HASH" > /tmp/jobs-data-2026/.github/data/.dep-diagram-hash
-            echo "✅ Dependency diagram written"
-            cd /tmp/jobs-data-2026
-            # ZJP_DEPENDENCY_GRAPH.md + .dep-diagram-hash intentionally NOT staged — internal architecture, not public
-            if [ -n "$(git status --porcelain)" ]; then
-              git commit -m "chore: regenerate dependency diagram for submodule $CURRENT_HASH"
-              git push origin main || echo "⚠️ Push failed — diagram will be included in next run"
-            fi
-          else
-            echo "⚠️ dependency-cruiser produced no output — skipping"
-          fi
-        fi
 
     - name: Notify on failure
       if: failure()

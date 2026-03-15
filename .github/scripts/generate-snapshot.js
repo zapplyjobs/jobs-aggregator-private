@@ -12,8 +12,8 @@
  *   - .github/data/jobs-metadata.json    (aggregator stats)
  *   - .github/data/dedupe-store.json     (TTL expiry data)
  *   - /tmp/jobs-data-2026/.github/data/enrichment-stats.json  (enrichment rates)
- *   - /tmp/jobs-data-2026/.github/data/ZJP_OPEN_DECISIONS.md  (human-authored decisions)
- *   - /tmp/jobs-data-2026/.github/data/ZJP_SNAPSHOT.json      (previous snapshot for deltas)
+ *   - .github/scripts/shared/ZJP_OPEN_DECISIONS.md            (human-authored decisions — private submodule)
+ *   - .github/data/ZJP_SNAPSHOT.json                          (previous snapshot for deltas — aggregator private)
  *   - GitHub API: stars per consumer repo
  */
 
@@ -107,7 +107,8 @@ function readEnrichmentStats() {
 }
 
 function readPreviousSnapshot() {
-  const p = path.join(JOBS_DATA_DIR, 'ZJP_SNAPSHOT.json');
+  // Read from aggregator DATA_DIR — snapshot is persisted here between runs (not jobs-data-2026, which is public)
+  const p = path.join(DATA_DIR, 'ZJP_SNAPSHOT.json');
   if (!fs.existsSync(p)) return null;
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); }
   catch { return null; }
