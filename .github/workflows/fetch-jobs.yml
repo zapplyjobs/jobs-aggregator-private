@@ -269,8 +269,14 @@ jobs:
           cp /tmp/jobs-data-2026/.github/data/ZJP_SNAPSHOT.json "$GITHUB_WORKSPACE/.github/data/ZJP_SNAPSHOT.json"
           cd "$GITHUB_WORKSPACE"
           git add .github/data/ZJP_SNAPSHOT.json
-          git diff --cached --quiet || git commit -m "chore: update ZJP snapshot [skip ci]"
-          git push origin ${{ github.ref_name }} || echo "⚠️ Snapshot push failed — delta tracking will lag one run"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update ZJP snapshot [skip ci]"
+            for i in 1 2 3; do
+              git pull --rebase origin ${{ github.ref_name }} && git push origin ${{ github.ref_name }} && break
+              echo "Snapshot push attempt $i failed, retrying in 5s..."
+              sleep 5
+            done || echo "⚠️ Snapshot push failed — delta tracking will lag one run"
+          fi
           cd /tmp/jobs-data-2026
         fi
 
