@@ -114,7 +114,8 @@ function readPreviousSnapshot() {
 }
 
 function readOpenDecisions() {
-  const p = path.join(JOBS_DATA_DIR, 'ZJP_OPEN_DECISIONS.md');
+  // File lives in private submodule (job-board-scripts), not jobs-data-2026
+  const p = path.join(process.cwd(), '.github', 'scripts', 'shared', 'ZJP_OPEN_DECISIONS.md');
   if (!fs.existsSync(p)) return [];
   try {
     return fs.readFileSync(p, 'utf8')
