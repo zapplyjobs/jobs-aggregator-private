@@ -1,39 +1,39 @@
 {
   "meta": {
-    "generated_at": "2026-03-16T11:07:08.061Z",
+    "generated_at": "2026-03-16T11:24:35.089Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23139823008",
+    "aggregator_run_id": "23140392672",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 39778,
+    "total": 39724,
     "by_source": {
-      "workday": 27729,
-      "ashby": 1418,
+      "workday": 27675,
       "lever": 1037,
-      "greenhouse": 7040,
+      "ashby": 1418,
+      "greenhouse": 7039,
       "smartrecruiters": 1862,
-      "amazon": 492,
-      "jsearch": 13,
+      "amazon": 491,
+      "jsearch": 14,
       "netflix": 99,
-      "eightfold": 88
+      "eightfold": 89
     },
     "by_domain": {
-      "software": 6476,
-      "data_science": 2642,
-      "general": 22194,
-      "sales": 2540,
-      "ai": 601,
+      "data_science": 2675,
+      "software": 6474,
+      "general": 22173,
+      "sales": 2526,
+      "ai": 595,
       "legal": 146,
-      "hardware": 3259,
-      "operations": 446,
-      "product": 245,
-      "finance": 168,
-      "hr": 143,
+      "hardware": 3247,
+      "operations": 444,
+      "product": 244,
+      "finance": 167,
+      "hr": 141,
       "marketing": 171,
-      "healthcare": 3598
+      "healthcare": 3587
     },
-    "us_entry_level": 23747,
+    "us_entry_level": 23703,
     "us_interns": 3333,
     "ats_stats": {
       "companies_total": 421,
@@ -54,8 +54,8 @@
   "pipeline": {
     "submodule_head": "00d8455",
     "last_run_status": "success",
-    "last_run_at": "2026-03-16T11:07:08.061Z",
-    "last_run_id": "23139823008",
+    "last_run_at": "2026-03-16T11:24:35.089Z",
+    "last_run_id": "23140392672",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -94,7 +94,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-16T10:49:54.588Z",
-    "total_delta": 17
+    "compared_to": "2026-03-16T11:07:08.061Z",
+    "total_delta": -54
   }
 }
