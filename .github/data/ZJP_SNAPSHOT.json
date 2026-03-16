@@ -1,40 +1,40 @@
 {
   "meta": {
-    "generated_at": "2026-03-16T19:57:21.231Z",
+    "generated_at": "2026-03-16T20:12:52.994Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23162728515",
+    "aggregator_run_id": "23163323410",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 49165,
+    "total": 49224,
     "by_source": {
-      "workday": 36242,
-      "lever": 1241,
+      "workday": 36300,
+      "lever": 1240,
       "ashby": 1562,
-      "greenhouse": 7591,
+      "greenhouse": 7593,
       "smartrecruiters": 1829,
+      "jsearch": 16,
       "amazon": 500,
       "netflix": 100,
-      "jsearch": 16,
       "eightfold": 84
     },
     "by_domain": {
-      "ai": 707,
-      "data_science": 2921,
-      "software": 7105,
-      "hardware": 3657,
-      "general": 29214,
-      "sales": 3082,
-      "legal": 184,
-      "operations": 609,
+      "software": 7119,
+      "data_science": 2918,
+      "general": 29235,
+      "sales": 3081,
+      "ai": 702,
+      "legal": 183,
+      "hardware": 3668,
+      "operations": 611,
       "product": 288,
-      "finance": 200,
-      "hr": 161,
-      "marketing": 189,
-      "healthcare": 3914
+      "finance": 198,
+      "hr": 167,
+      "marketing": 190,
+      "healthcare": 3922
     },
     "us_entry_level": 28804,
-    "us_interns": 3902,
+    "us_interns": 3934,
     "ats_stats": {
       "companies_total": 558,
       "greenhouse_companies": 178,
@@ -54,8 +54,8 @@
   "pipeline": {
     "submodule_head": "919fed0",
     "last_run_status": "success",
-    "last_run_at": "2026-03-16T19:57:21.231Z",
-    "last_run_id": "23162728515",
+    "last_run_at": "2026-03-16T20:12:52.994Z",
+    "last_run_id": "23163323410",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -94,7 +94,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-16T19:42:51.686Z",
-    "total_delta": -156
+    "compared_to": "2026-03-16T19:57:21.231Z",
+    "total_delta": 59
   }
 }
