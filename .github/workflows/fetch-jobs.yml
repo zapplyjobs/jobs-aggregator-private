@@ -24,7 +24,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         ref: ${{ github.ref_name }}
-        fetch-depth: 0  # Full history for proper rebasing
+        fetch-depth: 1  # Shallow clone — rebase fetches missing objects on demand
         submodules: recursive
         token: ${{ secrets.GH_PAT }}
 
@@ -236,8 +236,8 @@ jobs:
       run: |
         echo "📤 Pushing all_jobs.json to jobs-data-2026..."
 
-        # Clone jobs-data-2026 into a temp directory
-        git clone "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-data-2026.git" /tmp/jobs-data-2026
+        # Clone jobs-data-2026 into a temp directory (shallow — working tree only, no history)
+        git clone --depth=1 "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-data-2026.git" /tmp/jobs-data-2026
 
         # Copy all_jobs.json, jobs-metadata.json, descriptions.jsonl, and per-source sidecars.
         # Remove existing sidecar files in the clone first so stale chunks don't persist
