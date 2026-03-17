@@ -1,40 +1,40 @@
 {
   "meta": {
-    "generated_at": "2026-03-17T08:45:33.730Z",
+    "generated_at": "2026-03-17T09:00:56.589Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23185272249",
+    "aggregator_run_id": "23185792764",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 48996,
+    "total": 50055,
     "by_source": {
-      "workday": 36119,
+      "workday": 37179,
       "ashby": 1560,
       "lever": 1243,
-      "greenhouse": 7586,
+      "greenhouse": 7588,
       "amazon": 506,
       "smartrecruiters": 1819,
-      "jsearch": 19,
+      "jsearch": 10,
       "netflix": 66,
-      "eightfold": 78
+      "eightfold": 84
     },
     "by_domain": {
-      "data_science": 2969,
-      "software": 7296,
-      "ai": 720,
-      "hardware": 3622,
-      "general": 28924,
-      "sales": 3117,
-      "legal": 186,
-      "operations": 611,
-      "product": 281,
-      "finance": 200,
-      "hr": 166,
-      "marketing": 190,
-      "healthcare": 3899
+      "general": 29948,
+      "software": 6881,
+      "hardware": 3728,
+      "sales": 3255,
+      "ai": 727,
+      "data_science": 2887,
+      "legal": 193,
+      "operations": 624,
+      "product": 295,
+      "finance": 199,
+      "hr": 165,
+      "marketing": 196,
+      "healthcare": 3926
     },
-    "us_entry_level": 28688,
-    "us_interns": 3901,
+    "us_entry_level": 29195,
+    "us_interns": 3905,
     "ats_stats": {
       "companies_total": 558,
       "greenhouse_companies": 178,
@@ -54,47 +54,47 @@
   "pipeline": {
     "submodule_head": "260dff9",
     "last_run_status": "success",
-    "last_run_at": "2026-03-17T08:45:33.730Z",
-    "last_run_id": "23185272249",
+    "last_run_at": "2026-03-17T09:00:56.589Z",
+    "last_run_id": "23185792764",
     "ttl_expiring_7d": 0
   },
   "repos": {
     "New-Grad": {
       "submodule": "260dff9",
       "stars": 100,
-      "workflowStatus": "success"
+      "workflowStatus": null
     },
     "Internships": {
       "submodule": "260dff9",
       "stars": 34,
-      "workflowStatus": "success"
+      "workflowStatus": null
     },
     "Software": {
       "submodule": "260dff9",
       "stars": 21,
-      "workflowStatus": "success"
+      "workflowStatus": null
     },
     "Data-Science": {
       "submodule": "260dff9",
       "stars": 32,
-      "workflowStatus": "success"
+      "workflowStatus": null
     },
     "Hardware": {
       "submodule": "260dff9",
       "stars": 29,
-      "workflowStatus": "success"
+      "workflowStatus": null
     },
     "Healthcare": {
       "submodule": "260dff9",
       "stars": 13,
-      "workflowStatus": "success"
+      "workflowStatus": null
     }
   },
   "open_decisions": [
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-17T08:30:38.538Z",
-    "total_delta": -66
+    "compared_to": "2026-03-17T08:45:33.730Z",
+    "total_delta": 1059
   }
 }
