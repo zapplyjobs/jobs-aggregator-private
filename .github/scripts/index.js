@@ -24,6 +24,7 @@ const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/
 const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
 const { fetchAllNetflixJobs } = require(`${SHARED}/fetchers/netflix`);
 const { fetchWorkdayDescriptions, loadDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
+const { fetchSRDescriptions } = require(`${SHARED}/fetchers/smartrecruiters-descriptions`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
@@ -103,6 +104,22 @@ async function main() {
     for (const job of allJobs) {
       if (job.source === 'workday' && descriptionsMap.has(job.id)) {
         job.description = descriptionsMap.get(job.id);
+      }
+    }
+
+    console.log('');
+
+    // Step 1c: Fetch SmartRecruiters descriptions (incremental — only new IDs)
+    console.log('📄 Step 1c: Fetching SmartRecruiters descriptions...');
+    console.log('━'.repeat(60));
+
+    const srJobs = allJobs.filter(j => j.source === 'smartrecruiters');
+    const srDescriptionsMap = await fetchSRDescriptions(srJobs, DATA_DIR);
+
+    // Inject fetched descriptions into job objects before _raw is stripped
+    for (const job of allJobs) {
+      if (job.source === 'smartrecruiters' && srDescriptionsMap.has(job.id)) {
+        job.description = srDescriptionsMap.get(job.id);
       }
     }
 
