@@ -1,40 +1,40 @@
 {
   "meta": {
-    "generated_at": "2026-03-17T12:21:41.795Z",
+    "generated_at": "2026-03-17T12:36:49.947Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23193152983",
+    "aggregator_run_id": "23193703687",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 49589,
+    "total": 49530,
     "by_source": {
-      "workday": 36708,
+      "workday": 36658,
       "lever": 1245,
       "ashby": 1563,
       "greenhouse": 7585,
-      "jsearch": 17,
+      "jsearch": 11,
       "amazon": 503,
-      "smartrecruiters": 1819,
+      "smartrecruiters": 1816,
       "netflix": 66,
       "eightfold": 83
     },
     "by_domain": {
-      "software": 7011,
-      "data_science": 2909,
-      "hardware": 3717,
-      "general": 29518,
-      "sales": 3161,
-      "ai": 727,
-      "legal": 188,
+      "software": 7017,
+      "data_science": 2913,
+      "general": 29471,
+      "sales": 3145,
+      "ai": 725,
+      "legal": 187,
+      "hardware": 3712,
       "operations": 617,
-      "product": 290,
-      "finance": 199,
+      "product": 289,
+      "finance": 200,
       "hr": 163,
-      "marketing": 194,
-      "healthcare": 3927
+      "marketing": 192,
+      "healthcare": 3926
     },
-    "us_entry_level": 28864,
-    "us_interns": 3903,
+    "us_entry_level": 28814,
+    "us_interns": 3892,
     "ats_stats": {
       "companies_total": 558,
       "greenhouse_companies": 178,
@@ -54,8 +54,8 @@
   "pipeline": {
     "submodule_head": "260dff9",
     "last_run_status": "success",
-    "last_run_at": "2026-03-17T12:21:41.795Z",
-    "last_run_id": "23193152983",
+    "last_run_at": "2026-03-17T12:36:49.947Z",
+    "last_run_id": "23193703687",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -94,7 +94,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-17T12:06:16.943Z",
-    "total_delta": -92
+    "compared_to": "2026-03-17T12:21:41.795Z",
+    "total_delta": -59
   }
 }
