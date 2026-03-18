@@ -1,40 +1,40 @@
 {
   "meta": {
-    "generated_at": "2026-03-18T05:47:29.157Z",
+    "generated_at": "2026-03-18T06:02:16.501Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23230613149",
+    "aggregator_run_id": "23230999319",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 47742,
+    "total": 49121,
     "by_source": {
-      "workday": 34910,
+      "workday": 36279,
       "lever": 1246,
       "ashby": 1563,
       "greenhouse": 7572,
       "smartrecruiters": 1786,
-      "jsearch": 13,
       "amazon": 509,
+      "jsearch": 15,
       "netflix": 62,
-      "eightfold": 81
+      "eightfold": 89
     },
     "by_domain": {
-      "software": 7007,
-      "data_science": 2937,
-      "general": 28241,
-      "sales": 3023,
-      "ai": 711,
-      "legal": 184,
-      "hardware": 3442,
-      "operations": 577,
-      "product": 273,
-      "finance": 198,
-      "hr": 156,
-      "marketing": 186,
-      "healthcare": 3884
+      "data_science": 2954,
+      "ai": 725,
+      "general": 29127,
+      "sales": 3181,
+      "software": 7170,
+      "legal": 189,
+      "hardware": 3617,
+      "operations": 599,
+      "product": 277,
+      "finance": 197,
+      "hr": 162,
+      "marketing": 190,
+      "healthcare": 3865
     },
-    "us_entry_level": 27831,
-    "us_interns": 3932,
+    "us_entry_level": 28904,
+    "us_interns": 3965,
     "ats_stats": {
       "companies_total": 558,
       "greenhouse_companies": 178,
@@ -54,8 +54,8 @@
   "pipeline": {
     "submodule_head": "40ab3e4",
     "last_run_status": "success",
-    "last_run_at": "2026-03-18T05:47:29.157Z",
-    "last_run_id": "23230613149",
+    "last_run_at": "2026-03-18T06:02:16.501Z",
+    "last_run_id": "23230999319",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -94,7 +94,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-18T05:32:17.727Z",
-    "total_delta": -1448
+    "compared_to": "2026-03-18T05:47:29.157Z",
+    "total_delta": 1379
   }
 }
