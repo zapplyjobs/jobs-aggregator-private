@@ -1,40 +1,40 @@
 {
   "meta": {
-    "generated_at": "2026-03-18T10:53:25.468Z",
+    "generated_at": "2026-03-18T11:09:24.931Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23240332203",
+    "aggregator_run_id": "23240904410",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 49546,
+    "total": 49531,
     "by_source": {
-      "workday": 36695,
-      "ashby": 1561,
+      "workday": 36694,
       "lever": 1248,
+      "ashby": 1561,
       "greenhouse": 7576,
       "smartrecruiters": 1786,
-      "amazon": 510,
-      "jsearch": 19,
+      "amazon": 506,
+      "jsearch": 9,
       "netflix": 62,
       "eightfold": 89
     },
     "by_domain": {
-      "software": 6996,
-      "data_science": 2907,
-      "hardware": 3684,
-      "general": 29571,
-      "sales": 3185,
-      "ai": 710,
+      "software": 6986,
+      "general": 29573,
+      "hardware": 3679,
+      "data_science": 2904,
+      "sales": 3182,
+      "ai": 716,
       "legal": 188,
-      "operations": 608,
-      "product": 288,
-      "finance": 199,
-      "hr": 163,
-      "marketing": 192,
-      "healthcare": 3894
+      "operations": 616,
+      "product": 286,
+      "finance": 198,
+      "hr": 164,
+      "marketing": 191,
+      "healthcare": 3888
     },
-    "us_entry_level": 28998,
-    "us_interns": 3938,
+    "us_entry_level": 28941,
+    "us_interns": 3925,
     "ats_stats": {
       "companies_total": 558,
       "greenhouse_companies": 178,
@@ -54,8 +54,8 @@
   "pipeline": {
     "submodule_head": "40ab3e4",
     "last_run_status": "success",
-    "last_run_at": "2026-03-18T10:53:25.468Z",
-    "last_run_id": "23240332203",
+    "last_run_at": "2026-03-18T11:09:24.931Z",
+    "last_run_id": "23240904410",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -94,7 +94,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-18T10:37:32.927Z",
-    "total_delta": -8
+    "compared_to": "2026-03-18T10:53:25.468Z",
+    "total_delta": -15
   }
 }
