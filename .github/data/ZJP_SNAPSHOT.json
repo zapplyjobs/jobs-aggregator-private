@@ -1,40 +1,40 @@
 {
   "meta": {
-    "generated_at": "2026-03-18T12:26:41.251Z",
+    "generated_at": "2026-03-18T12:42:04.592Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23243665159",
+    "aggregator_run_id": "23244225518",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 49382,
+    "total": 49374,
     "by_source": {
-      "workday": 36536,
+      "workday": 36532,
       "lever": 1248,
       "ashby": 1561,
-      "greenhouse": 7579,
+      "greenhouse": 7578,
       "smartrecruiters": 1784,
+      "jsearch": 11,
       "amazon": 508,
-      "jsearch": 15,
-      "netflix": 62,
+      "netflix": 63,
       "eightfold": 89
     },
     "by_domain": {
-      "software": 7018,
-      "data_science": 2922,
-      "hardware": 3639,
-      "general": 29435,
-      "sales": 3175,
-      "ai": 709,
+      "software": 7035,
+      "data_science": 2930,
+      "general": 29426,
+      "sales": 3164,
+      "ai": 714,
       "legal": 188,
-      "operations": 617,
-      "product": 282,
+      "hardware": 3625,
+      "operations": 613,
+      "product": 281,
       "finance": 199,
       "hr": 166,
-      "marketing": 190,
-      "healthcare": 3886
+      "marketing": 189,
+      "healthcare": 3888
     },
-    "us_entry_level": 28887,
-    "us_interns": 3929,
+    "us_entry_level": 28872,
+    "us_interns": 3917,
     "ats_stats": {
       "companies_total": 558,
       "greenhouse_companies": 178,
@@ -54,8 +54,8 @@
   "pipeline": {
     "submodule_head": "40ab3e4",
     "last_run_status": "success",
-    "last_run_at": "2026-03-18T12:26:41.251Z",
-    "last_run_id": "23243665159",
+    "last_run_at": "2026-03-18T12:42:04.592Z",
+    "last_run_id": "23244225518",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -94,7 +94,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-18T12:11:04.305Z",
-    "total_delta": -50
+    "compared_to": "2026-03-18T12:26:41.251Z",
+    "total_delta": -8
   }
 }
