@@ -552,10 +552,10 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     if (co) companyCounts[co] = (companyCounts[co] || 0) + 1;
   }
 
-  // Top 15 companies by job count
+  // Top 20 companies by job count
   const top_companies = Object.entries(companyCounts)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
+    .slice(0, 20)
     .map(([company, count]) => ({ company, count }));
 
   // Senior-filtered breakdown by source
@@ -599,7 +599,7 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     // Freshness — jobs posted within last N hours (entry-level pool)
     freshness,
 
-    // Top 15 companies by job count (entry-level pool)
+    // Top 20 companies by job count (entry-level pool)
     top_companies,
   };
 }

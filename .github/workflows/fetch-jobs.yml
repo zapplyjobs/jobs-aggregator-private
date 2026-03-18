@@ -244,7 +244,7 @@ jobs:
         # (e.g. descriptions-workday.jsonl orphaned when descriptions-workday-1.jsonl takes over).
         cp .github/data/all_jobs.json /tmp/jobs-data-2026/.github/data/all_jobs.json
         # Strip sensitive fields before copying to public repo (ATS counts, top companies, per-source filter rates)
-        jq 'del(.ats_stats, .top_companies) | .senior_filter_stats = (.senior_filter_stats | del(.by_source))' \
+        jq 'del(.ats_stats) | .senior_filter_stats = (.senior_filter_stats | del(.by_source))' \
           .github/data/jobs-metadata.json > /tmp/jobs-metadata-public.json \
           && cp /tmp/jobs-metadata-public.json /tmp/jobs-data-2026/.github/data/jobs-metadata.json \
           || cp .github/data/jobs-metadata.json /tmp/jobs-data-2026/.github/data/jobs-metadata.json
