@@ -1,40 +1,40 @@
 {
   "meta": {
-    "generated_at": "2026-03-18T09:05:37.027Z",
+    "generated_at": "2026-03-18T09:20:30.937Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23236349641",
+    "aggregator_run_id": "23236891864",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 49901,
+    "total": 49350,
     "by_source": {
-      "workday": 37062,
+      "workday": 36497,
       "lever": 1247,
       "ashby": 1563,
-      "greenhouse": 7573,
+      "greenhouse": 7574,
       "smartrecruiters": 1786,
+      "jsearch": 22,
       "amazon": 509,
-      "jsearch": 9,
       "netflix": 62,
       "eightfold": 90
     },
     "by_domain": {
-      "software": 6939,
-      "general": 29872,
-      "hardware": 3700,
-      "sales": 3253,
-      "ai": 713,
-      "data_science": 2885,
-      "legal": 195,
-      "operations": 617,
-      "product": 286,
+      "software": 6918,
+      "data_science": 2899,
+      "general": 29428,
+      "ai": 709,
+      "hardware": 3671,
+      "sales": 3220,
+      "legal": 191,
+      "operations": 609,
+      "product": 284,
       "finance": 198,
-      "hr": 165,
-      "marketing": 191,
+      "hr": 162,
+      "marketing": 189,
       "healthcare": 3896
     },
-    "us_entry_level": 29230,
-    "us_interns": 3944,
+    "us_entry_level": 28783,
+    "us_interns": 3926,
     "ats_stats": {
       "companies_total": 558,
       "greenhouse_companies": 178,
@@ -54,8 +54,8 @@
   "pipeline": {
     "submodule_head": "40ab3e4",
     "last_run_status": "success",
-    "last_run_at": "2026-03-18T09:05:37.027Z",
-    "last_run_id": "23236349641",
+    "last_run_at": "2026-03-18T09:20:30.937Z",
+    "last_run_id": "23236891864",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -94,7 +94,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-18T08:50:20.377Z",
-    "total_delta": -65
+    "compared_to": "2026-03-18T09:05:37.027Z",
+    "total_delta": -551
   }
 }
