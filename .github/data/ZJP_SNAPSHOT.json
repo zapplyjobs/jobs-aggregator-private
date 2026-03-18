@@ -1,40 +1,40 @@
 {
   "meta": {
-    "generated_at": "2026-03-18T03:13:17.189Z",
+    "generated_at": "2026-03-18T03:28:42.426Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23226662771",
+    "aggregator_run_id": "23227025944",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 49322,
+    "total": 49332,
     "by_source": {
-      "workday": 36480,
-      "lever": 1245,
+      "workday": 36500,
       "ashby": 1565,
+      "lever": 1245,
       "greenhouse": 7571,
       "smartrecruiters": 1786,
-      "jsearch": 13,
-      "amazon": 508,
+      "amazon": 509,
+      "jsearch": 14,
       "netflix": 62,
-      "eightfold": 92
+      "eightfold": 80
     },
     "by_domain": {
-      "software": 7073,
-      "data_science": 2917,
-      "hardware": 3634,
-      "general": 29380,
-      "sales": 3168,
-      "ai": 713,
-      "legal": 187,
-      "operations": 605,
-      "product": 278,
+      "software": 7079,
+      "data_science": 2937,
+      "general": 29371,
+      "sales": 3165,
+      "ai": 716,
+      "legal": 189,
+      "hardware": 3621,
+      "operations": 607,
+      "product": 277,
       "finance": 197,
-      "hr": 165,
-      "marketing": 193,
-      "healthcare": 3883
+      "hr": 163,
+      "marketing": 191,
+      "healthcare": 3895
     },
-    "us_entry_level": 28992,
-    "us_interns": 3979,
+    "us_entry_level": 28987,
+    "us_interns": 3970,
     "ats_stats": {
       "companies_total": 558,
       "greenhouse_companies": 178,
@@ -54,8 +54,8 @@
   "pipeline": {
     "submodule_head": "40ab3e4",
     "last_run_status": "success",
-    "last_run_at": "2026-03-18T03:13:17.189Z",
-    "last_run_id": "23226662771",
+    "last_run_at": "2026-03-18T03:28:42.426Z",
+    "last_run_id": "23227025944",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -94,7 +94,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-18T02:57:11.947Z",
-    "total_delta": -4
+    "compared_to": "2026-03-18T03:13:17.189Z",
+    "total_delta": 10
   }
 }
