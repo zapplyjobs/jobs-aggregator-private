@@ -444,8 +444,10 @@ async function main() {
     await writeJobsJSONL(publicJobs, JOBS_OUTPUT_FILE);
 
     // Write metadata
+    // Use publicJobs (full 14-day rolling window) for pool-level stats (by_source, top_companies, freshness).
+    // sortedJobs is current-run only — by_source.jsearch would show ~15 instead of ~400.
     const duration = Date.now() - startTime;
-    const metadata = generateMetadata(sortedJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs);
+    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
