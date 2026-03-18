@@ -1,40 +1,40 @@
 {
   "meta": {
-    "generated_at": "2026-03-18T01:39:41.261Z",
+    "generated_at": "2026-03-18T01:55:25.018Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23224340018",
+    "aggregator_run_id": "23224749862",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 49482,
+    "total": 49436,
     "by_source": {
-      "workday": 36634,
-      "lever": 1244,
+      "workday": 36591,
+      "lever": 1245,
       "ashby": 1565,
       "greenhouse": 7570,
-      "smartrecruiters": 1785,
-      "jsearch": 20,
+      "smartrecruiters": 1787,
+      "jsearch": 14,
       "amazon": 508,
       "netflix": 62,
       "eightfold": 94
     },
     "by_domain": {
-      "general": 29511,
-      "data_science": 2909,
-      "software": 7031,
-      "hardware": 3658,
-      "sales": 3181,
-      "ai": 713,
+      "software": 7009,
+      "data_science": 2920,
+      "general": 29473,
+      "sales": 3193,
+      "ai": 714,
       "legal": 190,
-      "operations": 613,
-      "product": 284,
+      "hardware": 3645,
+      "operations": 612,
+      "product": 280,
       "finance": 197,
-      "hr": 166,
-      "marketing": 193,
-      "healthcare": 3880
+      "hr": 167,
+      "marketing": 194,
+      "healthcare": 3879
     },
-    "us_entry_level": 29029,
-    "us_interns": 3995,
+    "us_entry_level": 29042,
+    "us_interns": 3968,
     "ats_stats": {
       "companies_total": 558,
       "greenhouse_companies": 178,
@@ -54,8 +54,8 @@
   "pipeline": {
     "submodule_head": "40ab3e4",
     "last_run_status": "success",
-    "last_run_at": "2026-03-18T01:39:41.261Z",
-    "last_run_id": "23224340018",
+    "last_run_at": "2026-03-18T01:55:25.018Z",
+    "last_run_id": "23224749862",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -94,7 +94,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-18T01:24:04.072Z",
-    "total_delta": -37
+    "compared_to": "2026-03-18T01:39:41.261Z",
+    "total_delta": -46
   }
 }
