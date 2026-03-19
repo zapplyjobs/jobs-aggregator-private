@@ -1,40 +1,40 @@
 {
   "meta": {
-    "generated_at": "2026-03-19T18:48:42.091Z",
+    "generated_at": "2026-03-19T19:16:01.688Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23311276758",
+    "aggregator_run_id": "23311916470",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 64322,
+    "total": 64406,
     "by_source": {
-      "workday": 49631,
-      "lever": 1325,
-      "ashby": 1659,
-      "greenhouse": 8611,
+      "workday": 49711,
+      "lever": 1327,
+      "ashby": 1660,
       "smartrecruiters": 1973,
-      "jsearch": 429,
-      "amazon": 545,
+      "greenhouse": 8613,
+      "jsearch": 432,
+      "amazon": 544,
       "netflix": 62,
-      "eightfold": 87
+      "eightfold": 84
     },
     "by_domain": {
-      "hardware": 3785,
-      "general": 29694,
-      "software": 7110,
-      "data_science": 2898,
-      "ai": 724,
-      "sales": 3292,
+      "data_science": 2903,
+      "software": 7119,
+      "general": 29768,
+      "sales": 3295,
+      "ai": 709,
       "legal": 201,
-      "operations": 613,
-      "product": 277,
+      "hardware": 3755,
+      "operations": 612,
+      "product": 275,
       "finance": 202,
       "hr": 170,
       "marketing": 189,
-      "healthcare": 3873
+      "healthcare": 3810
     },
-    "us_entry_level": 29279,
-    "us_interns": 3892,
+    "us_entry_level": 29267,
+    "us_interns": 3895,
     "ats_stats": {
       "companies_total": 560,
       "greenhouse_companies": 178,
@@ -49,13 +49,13 @@
     "total_enriched": 5989,
     "total_has_description": 4588,
     "workday_waiting_for_desc": 2397,
-    "jsearch_sidecar_lines": 439
+    "jsearch_sidecar_lines": 441
   },
   "pipeline": {
     "submodule_head": "def4634",
     "last_run_status": "success",
-    "last_run_at": "2026-03-19T18:48:42.091Z",
-    "last_run_id": "23311276758",
+    "last_run_at": "2026-03-19T19:16:01.688Z",
+    "last_run_id": "23311916470",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -94,7 +94,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-19T18:39:06.311Z",
-    "total_delta": 0
+    "compared_to": "2026-03-19T18:48:42.091Z",
+    "total_delta": 84
   }
 }
