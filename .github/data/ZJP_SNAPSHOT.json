@@ -1,40 +1,40 @@
 {
   "meta": {
-    "generated_at": "2026-03-19T08:32:51.983Z",
+    "generated_at": "2026-03-19T08:48:39.549Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23285862322",
+    "aggregator_run_id": "23286351265",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 63456,
+    "total": 63436,
     "by_source": {
-      "workday": 48803,
+      "workday": 48767,
       "lever": 1320,
       "ashby": 1649,
       "greenhouse": 8609,
       "smartrecruiters": 1971,
-      "jsearch": 412,
+      "jsearch": 418,
       "amazon": 545,
       "netflix": 64,
-      "eightfold": 83
+      "eightfold": 93
     },
     "by_domain": {
-      "software": 7201,
-      "data_science": 2904,
-      "general": 29373,
-      "sales": 3221,
-      "ai": 715,
-      "legal": 196,
-      "hardware": 3780,
-      "operations": 612,
+      "software": 7210,
+      "data_science": 2899,
+      "ai": 717,
+      "general": 29363,
+      "hardware": 3786,
+      "sales": 3218,
+      "legal": 197,
+      "operations": 614,
       "product": 274,
-      "finance": 201,
+      "finance": 200,
       "hr": 167,
-      "marketing": 190,
-      "healthcare": 3892
+      "marketing": 189,
+      "healthcare": 3889
     },
-    "us_entry_level": 29072,
-    "us_interns": 3912,
+    "us_entry_level": 29063,
+    "us_interns": 3921,
     "ats_stats": {
       "companies_total": 560,
       "greenhouse_companies": 178,
@@ -46,16 +46,16 @@
     }
   },
   "enrichment": {
-    "total_enriched": 5981,
-    "total_has_description": 4628,
+    "total_enriched": 5982,
+    "total_has_description": 4635,
     "workday_waiting_for_desc": 2308,
     "jsearch_sidecar_lines": 418
   },
   "pipeline": {
     "submodule_head": "def4634",
     "last_run_status": "success",
-    "last_run_at": "2026-03-19T08:32:51.983Z",
-    "last_run_id": "23285862322",
+    "last_run_at": "2026-03-19T08:48:39.549Z",
+    "last_run_id": "23286351265",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -94,7 +94,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-19T08:17:24.940Z",
-    "total_delta": -276
+    "compared_to": "2026-03-19T08:32:51.983Z",
+    "total_delta": -20
   }
 }
