@@ -1,8 +1,8 @@
 {
   "meta": {
-    "generated_at": "2026-03-20T18:40:40.026Z",
+    "generated_at": "2026-03-20T20:05:19.943Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23357412269",
+    "aggregator_run_id": "23360368053",
     "stale_if_older_than_hours": 2
   },
   "pool": {
@@ -54,47 +54,47 @@
   "pipeline": {
     "submodule_head": "98bc86a",
     "last_run_status": "success",
-    "last_run_at": "2026-03-20T18:40:40.026Z",
-    "last_run_id": "23357412269",
+    "last_run_at": "2026-03-20T20:05:19.943Z",
+    "last_run_id": "23360368053",
     "ttl_expiring_7d": 0
   },
   "repos": {
     "New-Grad": {
       "submodule": "98bc86a",
       "stars": 102,
-      "workflowStatus": "failure"
+      "workflowStatus": "success"
     },
     "Internships": {
       "submodule": "98bc86a",
       "stars": 35,
-      "workflowStatus": "failure"
+      "workflowStatus": "success"
     },
     "Software": {
       "submodule": "98bc86a",
       "stars": 21,
-      "workflowStatus": "failure"
+      "workflowStatus": "success"
     },
     "Data-Science": {
       "submodule": "98bc86a",
       "stars": 34,
-      "workflowStatus": "failure"
+      "workflowStatus": "success"
     },
     "Hardware": {
       "submodule": "98bc86a",
       "stars": 29,
-      "workflowStatus": "failure"
+      "workflowStatus": "success"
     },
     "Healthcare": {
       "submodule": "98bc86a",
       "stars": 13,
-      "workflowStatus": "failure"
+      "workflowStatus": "success"
     }
   },
   "open_decisions": [
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-20T18:03:09.287Z",
+    "compared_to": "2026-03-20T18:40:40.026Z",
     "total_delta": 0
   }
 }
