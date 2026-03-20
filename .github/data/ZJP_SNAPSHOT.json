@@ -1,40 +1,40 @@
 {
   "meta": {
-    "generated_at": "2026-03-20T06:45:19.401Z",
+    "generated_at": "2026-03-20T07:00:46.189Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23331821315",
+    "aggregator_run_id": "23332172074",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 64346,
+    "total": 64502,
     "by_source": {
-      "workday": 49710,
+      "workday": 49866,
       "lever": 1334,
       "ashby": 1666,
       "greenhouse": 8578,
       "smartrecruiters": 1960,
       "amazon": 537,
-      "jsearch": 423,
+      "jsearch": 422,
       "netflix": 62,
-      "eightfold": 76
+      "eightfold": 77
     },
     "by_domain": {
-      "software": 7421,
-      "data_science": 2938,
-      "general": 28892,
-      "hardware": 3688,
+      "software": 7498,
+      "data_science": 2947,
+      "hardware": 3686,
       "sales": 3168,
-      "ai": 718,
+      "ai": 721,
       "legal": 191,
-      "operations": 600,
-      "product": 265,
+      "general": 28786,
+      "operations": 594,
+      "product": 268,
       "finance": 204,
-      "hr": 169,
-      "marketing": 184,
-      "healthcare": 3859
+      "hr": 168,
+      "marketing": 187,
+      "healthcare": 3848
     },
-    "us_entry_level": 28938,
-    "us_interns": 3914,
+    "us_entry_level": 28858,
+    "us_interns": 3890,
     "ats_stats": {
       "companies_total": 560,
       "greenhouse_companies": 178,
@@ -54,8 +54,8 @@
   "pipeline": {
     "submodule_head": "def4634",
     "last_run_status": "success",
-    "last_run_at": "2026-03-20T06:45:19.401Z",
-    "last_run_id": "23331821315",
+    "last_run_at": "2026-03-20T07:00:46.189Z",
+    "last_run_id": "23332172074",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -94,7 +94,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-20T06:30:12.639Z",
-    "total_delta": 206
+    "compared_to": "2026-03-20T06:45:19.401Z",
+    "total_delta": 156
   }
 }
