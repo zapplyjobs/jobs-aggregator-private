@@ -1,8 +1,8 @@
 {
   "meta": {
-    "generated_at": "2026-03-20T18:03:09.287Z",
+    "generated_at": "2026-03-20T18:40:40.026Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23355424878",
+    "aggregator_run_id": "23357412269",
     "stale_if_older_than_hours": 2
   },
   "pool": {
@@ -46,55 +46,55 @@
     }
   },
   "enrichment": {
-    "total_enriched": 5975,
-    "total_has_description": 4816,
-    "workday_waiting_for_desc": 2476,
+    "total_enriched": 5971,
+    "total_has_description": 4811,
+    "workday_waiting_for_desc": 2478,
     "jsearch_sidecar_lines": 486
   },
   "pipeline": {
-    "submodule_head": "def4634",
+    "submodule_head": "98bc86a",
     "last_run_status": "success",
-    "last_run_at": "2026-03-20T18:03:09.287Z",
-    "last_run_id": "23355424878",
+    "last_run_at": "2026-03-20T18:40:40.026Z",
+    "last_run_id": "23357412269",
     "ttl_expiring_7d": 0
   },
   "repos": {
     "New-Grad": {
-      "submodule": "def4634",
+      "submodule": "98bc86a",
       "stars": 102,
-      "workflowStatus": "success"
+      "workflowStatus": "failure"
     },
     "Internships": {
-      "submodule": "def4634",
+      "submodule": "98bc86a",
       "stars": 35,
-      "workflowStatus": "success"
+      "workflowStatus": "failure"
     },
     "Software": {
-      "submodule": "def4634",
+      "submodule": "98bc86a",
       "stars": 21,
-      "workflowStatus": "success"
+      "workflowStatus": "failure"
     },
     "Data-Science": {
-      "submodule": "def4634",
+      "submodule": "98bc86a",
       "stars": 34,
-      "workflowStatus": "success"
+      "workflowStatus": "failure"
     },
     "Hardware": {
-      "submodule": "def4634",
+      "submodule": "98bc86a",
       "stars": 29,
-      "workflowStatus": "success"
+      "workflowStatus": "failure"
     },
     "Healthcare": {
-      "submodule": "def4634",
+      "submodule": "98bc86a",
       "stars": 13,
-      "workflowStatus": "success"
+      "workflowStatus": "failure"
     }
   },
   "open_decisions": [
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-20T17:46:29.294Z",
-    "total_delta": -98
+    "compared_to": "2026-03-20T18:03:09.287Z",
+    "total_delta": 0
   }
 }
