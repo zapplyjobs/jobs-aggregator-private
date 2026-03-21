@@ -309,6 +309,42 @@ jobs:
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
 
+    - name: Push archive to jobs-archive-private
+      if: success()
+      run: |
+        ARCHIVE_DIR=".github/data/archive"
+        if [ ! -d "$ARCHIVE_DIR" ] || [ -z "$(ls -A $ARCHIVE_DIR 2>/dev/null)" ]; then
+          echo "ℹ️ No archive files to push"
+          exit 0
+        fi
+
+        echo "📤 Pushing archive files to jobs-archive-private..."
+        git clone --depth=1 "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-archive-private.git" /tmp/jobs-archive-private
+
+        # Copy all weekly archive files
+        mkdir -p /tmp/jobs-archive-private/data
+        cp $ARCHIVE_DIR/*.jsonl /tmp/jobs-archive-private/data/ 2>/dev/null || true
+
+        cd /tmp/jobs-archive-private
+        git config user.email "bot@zapplyjobs.com"
+        git config user.name "Data Bot"
+        git add data/
+
+        if [ -n "$(git status --porcelain)" ]; then
+          WEEK=$(ls data/*.jsonl 2>/dev/null | tail -1 | xargs basename 2>/dev/null || echo "unknown")
+          git commit -m "archive: update ${WEEK} - $(date -u +%Y-%m-%d)"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin main && break
+            echo "Archive push attempt $i failed, retrying in 5s..."
+            sleep 5
+          done
+          echo "✅ Archive pushed to jobs-archive-private"
+        else
+          echo "ℹ️ No new archive data to push"
+        fi
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+
     - name: Notify on failure
       if: failure()
       run: |
