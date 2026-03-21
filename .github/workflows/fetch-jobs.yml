@@ -292,7 +292,9 @@ jobs:
         # then the glob add picks up any new files not yet tracked.
         git add -u .github/data/ 2>/dev/null || true
         git add .github/data/descriptions-*.jsonl 2>/dev/null || true
-        # ZJP_CONTEXT.md + ZJP_SNAPSHOT.json intentionally NOT staged — generated locally for Claude only, not public
+        # ZJP_CONTEXT.md + ZJP_SNAPSHOT.json intentionally NOT staged — private ops data.
+        # zjp-public-snapshot.json IS staged — stripped version safe for public consumption (no run IDs, no decisions, no enrichment internals).
+        git add .github/data/zjp-public-snapshot.json 2>/dev/null || true
 
         if [ -n "$(git status --porcelain)" ]; then
           JOB_COUNT=$(wc -l < .github/data/all_jobs.json)

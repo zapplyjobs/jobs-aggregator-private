@@ -430,10 +430,38 @@ async function main() {
     { repos, aggregatorSubmodule: canonicalSubmodule }
   );
 
-  // Write ZJP_SNAPSHOT.json
+  // Write ZJP_SNAPSHOT.json (full — private, stays in aggregator repo)
   const snapshotPath = path.join(JOBS_DATA_DIR, 'ZJP_SNAPSHOT.json');
   fs.writeFileSync(snapshotPath, JSON.stringify(snapshot, null, 2) + '\n');
   console.log(`[generate-snapshot] ZJP_SNAPSHOT.json written`);
+
+  // Write public snapshot (stripped — committed to jobs-data-2026 for dashboard)
+  const publicSnapshot = {
+    meta: {
+      generated_at: snapshot.meta.generated_at,
+      generated_by: snapshot.meta.generated_by,
+      stale_if_older_than_hours: snapshot.meta.stale_if_older_than_hours,
+    },
+    pool: {
+      total: snapshot.pool.total,
+      by_source: snapshot.pool.by_source,
+      by_domain: snapshot.pool.by_domain,
+      us_entry_level: snapshot.pool.us_entry_level,
+      us_interns: snapshot.pool.us_interns,
+      g1_metric: snapshot.pool.g1_metric,
+      ats_stats: snapshot.pool.ats_stats,
+    },
+    pipeline: {
+      submodule_head: snapshot.pipeline.submodule_head,
+      last_run_status: snapshot.pipeline.last_run_status,
+      last_run_at: snapshot.pipeline.last_run_at,
+    },
+    repos: snapshot.repos,
+    deltas: snapshot.deltas,
+  };
+  const publicSnapshotPath = path.join(JOBS_DATA_DIR, 'zjp-public-snapshot.json');
+  fs.writeFileSync(publicSnapshotPath, JSON.stringify(publicSnapshot, null, 2) + '\n');
+  console.log(`[generate-snapshot] zjp-public-snapshot.json written`);
 
   // Write ZJP_CONTEXT.md
   const contextPath = path.join(JOBS_DATA_DIR, 'ZJP_CONTEXT.md');
