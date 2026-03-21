@@ -325,6 +325,20 @@ async function main() {
     }
     bySource['jsearch'] = Array.from(jsearchSidecarMap, ([id, description_text]) => ({ id, description_text }));
 
+    // For SmartRecruiters: same fix as PIPELINE-3-FIX for Workday.
+    // bySource['smartrecruiters'] is built from sortedJobs (entry-level only) — but SR descriptions
+    // are fetched for all seniorities (srDescriptionsMap). The sidecar was being overwritten with
+    // only the ~123 entry-level descriptions, discarding the 200 newly fetched each run.
+    // Fix: replace bySource['smartrecruiters'] with the full srDescriptionsMap (all seniorities).
+    // Senior descriptions are dead weight for enrich-jobs.js but harmless, and break the loop.
+    // TTL: keep only IDs present in allJobs (full pre-filter SR pool, 14-day window).
+    const allSRIds = new Set(allJobs.filter(j => j.source === 'smartrecruiters').map(j => j.id));
+    const srSidecarMap = new Map();
+    for (const [id, description_text] of srDescriptionsMap) {
+      if (allSRIds.has(id) && description_text) srSidecarMap.set(id, description_text);
+    }
+    bySource['smartrecruiters'] = Array.from(srSidecarMap, ([id, description_text]) => ({ id, description_text }));
+
     // Write per-source files (chunked if needed)
     const writtenFiles = new Set(); // track filenames written this run for stale-file cleanup
     for (const [src, entries] of Object.entries(bySource)) {
