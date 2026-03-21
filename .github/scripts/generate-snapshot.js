@@ -136,6 +136,37 @@ function readDescriptionSidecarLines(source) {
 
 // ─── Computation helpers ───────────────────────────────────────────────────
 
+/**
+ * Compute G1 metric: general-tag rate among US jobs from all_jobs.json JSONL.
+ * This is the canonical measurement for PRODUCT_GOALS.md G1.
+ * Returns { us_total, us_general, us_general_rate } or null if file unreadable.
+ */
+function computeG1Metric() {
+  const p = path.join(JOBS_DATA_DIR, 'all_jobs.json');
+  if (!fs.existsSync(p)) return null;
+  try {
+    const lines = fs.readFileSync(p, 'utf8').split('\n').filter(l => l.trim());
+    let usTotal = 0;
+    let usGeneral = 0;
+    for (const line of lines) {
+      try {
+        const job = JSON.parse(line);
+        const locations = job.tags?.locations || [];
+        if (!locations.includes('us')) continue;
+        usTotal++;
+        const domains = job.tags?.domains || [];
+        if (domains.includes('general')) usGeneral++;
+      } catch { /* skip malformed */ }
+    }
+    if (usTotal === 0) return null;
+    return {
+      us_total: usTotal,
+      us_general: usGeneral,
+      us_general_rate: Math.round((usGeneral / usTotal) * 1000) / 10, // one decimal %
+    };
+  } catch { return null; }
+}
+
 function computeTtlExpiring7d(dedupeStore) {
   if (!dedupeStore?.ids) return null;
   const now = Date.now();
@@ -165,6 +196,7 @@ async function buildSnapshot(meta, repoStats) {
 
   // Pool counts
   const tagStats = metadata?.tag_stats || {};
+  const g1 = computeG1Metric();
   const pool = {
     total: metadata?.total_jobs ?? null,
     by_source: metadata?.by_source
@@ -173,6 +205,7 @@ async function buildSnapshot(meta, repoStats) {
     by_domain: tagStats.domains || null,
     us_entry_level: tagStats.locations?.us ?? null,
     us_interns: tagStats.employment?.internship ?? null,
+    g1_metric: g1,
     ats_stats: metadata?.ats_stats || null,
   };
 
@@ -305,6 +338,7 @@ function generateContextMd(snapshot) {
 | Pool total | ${formatNumber(pool.total)} jobs |
 | US entry-level | ${formatNumber(pool.us_entry_level)} |
 | Interns (US) | ${formatNumber(pool.us_interns)} |
+| G1 general rate | ${pool.g1_metric ? `${pool.g1_metric.us_general_rate}% (${formatNumber(pool.g1_metric.us_general)}/${formatNumber(pool.g1_metric.us_total)} US jobs) — target: <40%` : 'n/a'} |
 | Submodule | \`${pipeline.submodule_head || '?'}\` |
 ${deltaLine}
 ---
