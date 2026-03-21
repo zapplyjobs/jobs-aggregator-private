@@ -655,7 +655,7 @@ async function gitCommit(jobCount) {
     execSync('git add .github/data/jobs-metadata.json');
     execSync('git add .github/data/dedupe-store.json');
     execSync('git add .github/data/filtered_jobs.json 2>/dev/null || true'); // senior-filter summary for analytics (PIPELINE-1)
-    execSync('git add .github/data/archive/ 2>/dev/null || true'); // archive dir may not exist yet
+    // archive/ is NOT staged here — pushed separately to jobs-archive-private repo via workflow
     execSync('git add .github/data/descriptions-*.jsonl 2>/dev/null || true'); // per-source description sidecars (published)
     // descriptions.jsonl is Workday fetch cache — NOT staged (local state only, managed by Step 1b)
 

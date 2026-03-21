@@ -22,3 +22,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 .tmp/
+
+# Job archive — stored in jobs-archive-private repo, not here
+.github/data/archive/
