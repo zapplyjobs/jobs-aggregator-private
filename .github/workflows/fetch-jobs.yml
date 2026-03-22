@@ -243,10 +243,11 @@ jobs:
         fi
         # Delete aggregator-owned sidecars in the clone, then copy the current set.
         # Preserve enrichment-owned files (WD/SR descriptions + enriched sidecar).
+        # Only delete inline-source sidecars that the aggregator will re-create.
         find /tmp/jobs-data-2026/.github/data/ -name 'descriptions-*.jsonl' \
-          ! -name 'descriptions-enriched.jsonl' \
-          ! -name 'descriptions-workday.jsonl' \
-          ! -name 'descriptions-smartrecruiters.jsonl' \
+          ! -name 'descriptions-enriched*' \
+          ! -name 'descriptions-workday*' \
+          ! -name 'descriptions-smartrecruiters*' \
           -delete 2>/dev/null || true
         for f in .github/data/descriptions-*.jsonl; do
           [ -f "$f" ] && cp "$f" /tmp/jobs-data-2026/.github/data/
