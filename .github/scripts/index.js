@@ -23,8 +23,7 @@ const { fetchFromJSearch, getUsageStats } = require(`${SHARED}/fetchers/jsearch-
 const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
 const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
 const { fetchAllNetflixJobs } = require(`${SHARED}/fetchers/netflix`);
-const { fetchWorkdayDescriptions, loadDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
-const { fetchSRDescriptions } = require(`${SHARED}/fetchers/smartrecruiters-descriptions`);
+const { loadDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
@@ -93,36 +92,9 @@ async function main() {
     console.log(`   - Netflix: ${netflixJobs.length} jobs`);
     console.log('');
 
-    // Step 1b: Fetch Workday descriptions (incremental — only new IDs)
-    console.log('📄 Step 1b: Fetching Workday descriptions...');
-    console.log('━'.repeat(60));
-
-    const workdayJobs = allJobs.filter(j => j.source === 'workday');
-    const descriptionsMap = await fetchWorkdayDescriptions(workdayJobs, DATA_DIR);
-
-    // Inject fetched descriptions into job objects before _raw is stripped
-    for (const job of allJobs) {
-      if (job.source === 'workday' && descriptionsMap.has(job.id)) {
-        job.description = descriptionsMap.get(job.id);
-      }
-    }
-
-    console.log('');
-
-    // Step 1c: Fetch SmartRecruiters descriptions (incremental — only new IDs)
-    console.log('📄 Step 1c: Fetching SmartRecruiters descriptions...');
-    console.log('━'.repeat(60));
-
-    const srJobs = allJobs.filter(j => j.source === 'smartrecruiters');
-    const srDescriptionsMap = await fetchSRDescriptions(srJobs, DATA_DIR);
-
-    // Inject fetched descriptions into job objects before _raw is stripped
-    for (const job of allJobs) {
-      if (job.source === 'smartrecruiters' && srDescriptionsMap.has(job.id)) {
-        job.description = srDescriptionsMap.get(job.id);
-      }
-    }
-
+    // Steps 1b/1c REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment
+    // workflow in jobs-data-2026 (targeted: only tech+US jobs, no waste on senior/non-US).
+    console.log('📄 Steps 1b/1c: WD/SR descriptions → handled by enrichment workflow');
     console.log('');
 
     // Step 2: Enhance jobs (add fingerprints, employment_types arrays, etc.)
@@ -275,32 +247,9 @@ async function main() {
       }
     }
 
-    // For Workday: build descriptions-workday.jsonl from ALL fetched descriptions,
-    // not just entry-level survivors. Root cause of PIPELINE-3-FIX: sortedJobs is
-    // entry-level only. 56% of fetched Workday descriptions are senior-filtered,
-    // so they never entered bySource['workday'], and the sidecar never grew past 42.
-    // The seed step read the unchanged sidecar (42 IDs) → re-fetched the same 200 senior
-    // jobs every run → infinite loop.
-    //
-    // Fix (Option C): merge descriptions from three sources into bySource['workday']:
-    //   1. descriptionsMap — current run's fetched descriptions (all seniorities)
-    //   2. legacyWorkdayMap — prior cached descriptions not re-fetched this run
-    //   3. bySource['workday'] — entry-level jobs already collected above (subset of #1)
-    // TTL: keep only IDs present in allJobs (the full pre-filter Workday pool, 14-day window).
-    // Senior descriptions are dead weight for enrich-jobs.js (which skips non-entry-level),
-    // but harmless — and they break the loop by allowing the sidecar to grow.
-    const LEGACY_DESCRIPTIONS_FILE = path.join(DATA_DIR, 'descriptions.jsonl');
-    const legacyWorkdayMap = loadDescriptions(LEGACY_DESCRIPTIONS_FILE);
-    const allWorkdayIds = new Set(allJobs.filter(j => j.source === 'workday').map(j => j.id));
-    const workdaySidecarMap = new Map(); // id → description_text, deduplicated
-    // Priority: current run's fetched descriptions > prior cached
-    for (const [id, description_text] of legacyWorkdayMap) {
-      if (allWorkdayIds.has(id) && description_text) workdaySidecarMap.set(id, description_text);
-    }
-    for (const [id, description_text] of descriptionsMap) {
-      if (description_text) workdaySidecarMap.set(id, description_text); // current run wins
-    }
-    bySource['workday'] = Array.from(workdaySidecarMap, ([id, description_text]) => ({ id, description_text }));
+    // WD sidecar REMOVED (DESC-MIGRATE-1): WD descriptions now owned by enrichment workflow.
+    // bySource['workday'] from sortedJobs is empty (WD jobs have description=null since Step 1b removed).
+    delete bySource['workday'];
 
     // For JSearch: accumulate descriptions across runs.
     // JSearch yields ~11–18 net-new jobs/run. Without accumulation, the sidecar only ever
@@ -325,19 +274,8 @@ async function main() {
     }
     bySource['jsearch'] = Array.from(jsearchSidecarMap, ([id, description_text]) => ({ id, description_text }));
 
-    // For SmartRecruiters: same fix as PIPELINE-3-FIX for Workday.
-    // bySource['smartrecruiters'] is built from sortedJobs (entry-level only) — but SR descriptions
-    // are fetched for all seniorities (srDescriptionsMap). The sidecar was being overwritten with
-    // only the ~123 entry-level descriptions, discarding the 200 newly fetched each run.
-    // Fix: replace bySource['smartrecruiters'] with the full srDescriptionsMap (all seniorities).
-    // Senior descriptions are dead weight for enrich-jobs.js but harmless, and break the loop.
-    // TTL: keep only IDs present in allJobs (full pre-filter SR pool, 14-day window).
-    const allSRIds = new Set(allJobs.filter(j => j.source === 'smartrecruiters').map(j => j.id));
-    const srSidecarMap = new Map();
-    for (const [id, description_text] of srDescriptionsMap) {
-      if (allSRIds.has(id) && description_text) srSidecarMap.set(id, description_text);
-    }
-    bySource['smartrecruiters'] = Array.from(srSidecarMap, ([id, description_text]) => ({ id, description_text }));
+    // SR sidecar REMOVED (DESC-MIGRATE-1): SR descriptions now owned by enrichment workflow.
+    delete bySource['smartrecruiters'];
 
     // Write per-source files (chunked if needed)
     const writtenFiles = new Set(); // track filenames written this run for stale-file cleanup

@@ -47,19 +47,7 @@ jobs:
           echo "✅ Seeded $(wc -l < .github/data/all_jobs.json) jobs from jobs-data-2026" || \
           echo "⚠️ Could not seed all_jobs.json — starting fresh"
 
-    - name: Restore Workday descriptions cache
-      # actions/cache persists descriptions.jsonl (the WD fetch cache) across runs.
-      # Previously this was seeded via curl from raw.githubusercontent.com, which truncates
-      # files >~1MB — descriptions-workday.jsonl is 35MB+ so curl silently returned ~225 lines
-      # instead of 6760, causing Step 1b to start near-zero every run and never accumulate.
-      # Cache key rotates each run so the latest state is always saved; restore-keys picks up
-      # the most recent prior run's cache on a miss (e.g. first run after this change).
-      uses: actions/cache@v4
-      with:
-        path: .github/data/descriptions.jsonl
-        key: workday-descriptions-${{ github.run_id }}
-        restore-keys: |
-          workday-descriptions-
+    # WD descriptions cache REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment workflow
 
     - name: Seed descriptions-jsearch.jsonl from jobs-data-2026
       run: |
@@ -76,14 +64,6 @@ jobs:
       run: node .github/scripts/index.js 2>&1 | tee .github/logs/fetch.log
       env:
         JSEARCH_API_KEY: ${{ secrets.JSEARCH_API_KEY }}
-
-    - name: Save Workday descriptions cache
-      # Save BEFORE the pull step which runs `git restore .github/data/descriptions.jsonl`
-      # (line in "Pull latest changes" step) — that would wipe the freshly-fetched descriptions.
-      uses: actions/cache/save@v4
-      with:
-        path: .github/data/descriptions.jsonl
-        key: workday-descriptions-${{ github.run_id }}
 
     - name: Post-deploy invariant checks
       run: |
@@ -220,7 +200,7 @@ jobs:
         echo "📥 Pulling latest changes..."
         # descriptions.jsonl is Workday fetch cache — modified each run but not staged.
         # Discard unstaged changes so git pull --rebase can proceed.
-        git restore .github/data/descriptions.jsonl 2>/dev/null || true
+        # descriptions.jsonl restore removed — WD desc fetch moved to enrichment workflow
         git fetch origin ${{ github.ref_name }}
         # Use rebase instead of reset to preserve local commits
         if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/${{ github.ref_name }})" ]; then
