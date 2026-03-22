@@ -370,7 +370,7 @@ async function main() {
     // were not written this run. Covers both chunk-count transitions (1→2 and 2→1).
     // descriptions.jsonl (no dash-source suffix) is the Workday fetch cache — never touched here.
     const existingSidecarFiles = fs.readdirSync(DATA_DIR)
-      .filter(f => /^descriptions-.+\.jsonl$/.test(f)); // matches descriptions-{src}*.jsonl only
+      .filter(f => /^descriptions-.+\.jsonl$/.test(f) && f !== 'descriptions-enriched.jsonl'); // skip enrichment-owned file
     for (const fname of existingSidecarFiles) {
       if (!writtenFiles.has(fname)) {
         fs.unlinkSync(path.join(DATA_DIR, fname));
