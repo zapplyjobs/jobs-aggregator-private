@@ -460,6 +460,7 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
   const byRemote = { remote: 0, onsite: 0 };
   const companyCounts = {};
+  const companyDomains = {};  // DASH-4b: track domain distribution per company
 
   const now = Date.now();
   const freshness = { last_1h: 0, last_6h: 0, last_24h: 0, last_48h: 0 };
@@ -501,16 +502,29 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
       if (ageMs <= 48 * 60 * 60 * 1000) freshness.last_48h++;
     }
 
-    // Company counts (for top-N)
+    // Company counts + domain tracking (for top-N with domain)
     const co = job.company_name;
-    if (co) companyCounts[co] = (companyCounts[co] || 0) + 1;
+    if (co) {
+      companyCounts[co] = (companyCounts[co] || 0) + 1;
+      // DASH-4b: track primary domain per company
+      const domains = (job.tags && job.tags.domains) || [];
+      if (!companyDomains[co]) companyDomains[co] = {};
+      for (const d of domains) {
+        companyDomains[co][d] = (companyDomains[co][d] || 0) + 1;
+      }
+    }
   }
 
   // Top 20 companies by job count
+  // DASH-4b: includes primary domain (most common domain tag for that company)
   const top_companies = Object.entries(companyCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 20)
-    .map(([company, count]) => ({ company, count }));
+    .map(([company, count]) => {
+      const domains = companyDomains[company] || {};
+      const primaryDomain = Object.entries(domains).sort((a, b) => b[1] - a[1])[0];
+      return { company, count, domain: primaryDomain ? primaryDomain[0] : 'general' };
+    });
 
   // Senior-filtered breakdown by source
   const seniorBySource = {};
