@@ -261,34 +261,46 @@ async function main() {
     }
 
     // WD sidecar REMOVED (DESC-MIGRATE-1): WD descriptions now owned by enrichment workflow.
-    // bySource['workday'] from sortedJobs is empty (WD jobs have description=null since Step 1b removed).
     delete bySource['workday'];
-
-    // For JSearch: accumulate descriptions across runs.
-    // JSearch yields ~11–18 net-new jobs/run. Without accumulation, the sidecar only ever
-    // contains current-run entries — prior pool jobs lose descriptions when sidecar is rewritten.
-    // Fix: load legacy sidecar, seed ALL prior entries (no TTL prune), overlay current-run descriptions.
-    //
-    // Why no TTL prune (unlike Workday): allJobs here is the current-run fetch (~14 new JSearch jobs),
-    // not the full 601-job rolling pool. Pruning to allJSearchIds would discard all legacy entries
-    // every run, keeping only ~14 entries. JSearch pool is ~600 jobs × ~3.5KB = ~2MB total — well
-    // under the 40MB chunk limit. Size growth is bounded by the 14-day pool TTL in all_jobs.json.
-    // No extra fetch cost — JSearch descriptions are inline on job objects from jsearch-fetcher.js.
-    const JSEARCH_SIDECAR_FILE = path.join(DATA_DIR, 'descriptions-jsearch.jsonl');
-    const legacyJSearchMap = loadDescriptions(JSEARCH_SIDECAR_FILE);
-    const jsearchSidecarMap = new Map(); // id → description_text, deduplicated
-    // Seed ALL prior cached descriptions (no TTL prune — see comment above)
-    for (const [id, description_text] of legacyJSearchMap) {
-      if (description_text) jsearchSidecarMap.set(id, description_text);
-    }
-    // Current run's descriptions win (net-new jobs + any updated descriptions)
-    for (const entry of (bySource['jsearch'] || [])) {
-      if (entry.description_text) jsearchSidecarMap.set(entry.id, entry.description_text);
-    }
-    bySource['jsearch'] = Array.from(jsearchSidecarMap, ([id, description_text]) => ({ id, description_text }));
-
     // SR sidecar REMOVED (DESC-MIGRATE-1): SR descriptions now owned by enrichment workflow.
     delete bySource['smartrecruiters'];
+
+    // ENR-2 description accumulation fix (S229): accumulate descriptions across runs for ALL sources.
+    // Without this, sidecars are rewritten from scratch each run — carried-forward jobs in the
+    // rolling window lose their descriptions. GH lost 713, Ashby 194, Lever 174 per run.
+    // Fix: load prior sidecar entries, overlay current-run data, write merged result.
+    // Size is bounded by the 14-day pool TTL — old jobs expire from all_jobs.json and their
+    // descriptions are no longer needed. Chunking (40MB limit) handles large sources.
+    // Pattern originally applied to JSearch only — now generalized to all sources.
+    for (const src of Object.keys(bySource)) {
+      // Load ALL prior sidecar files for this source (handles chunked files too)
+      const priorMap = new Map();
+      const priorFiles = fs.readdirSync(DATA_DIR)
+        .filter(f => f.startsWith(`descriptions-${src}`) && f.endsWith('.jsonl'));
+      for (const fname of priorFiles) {
+        const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
+        for (const line of lines) {
+          try {
+            const { id, description_text } = JSON.parse(line);
+            if (id && description_text) priorMap.set(id, description_text);
+          } catch (_) {}
+        }
+      }
+
+      // Merge: prior entries as base, current-run entries win on conflict
+      const merged = new Map(priorMap);
+      for (const entry of bySource[src]) {
+        if (entry.description_text) merged.set(entry.id, entry.description_text);
+      }
+
+      const priorCount = priorMap.size;
+      const newCount = merged.size - priorCount;
+      if (priorCount > 0 && newCount !== 0) {
+        console.log(`   📎 ${src}: accumulated ${priorCount} prior + ${bySource[src].length} current → ${merged.size} total`);
+      }
+
+      bySource[src] = Array.from(merged, ([id, description_text]) => ({ id, description_text }));
+    }
 
     // Write per-source files (chunked if needed)
     const writtenFiles = new Set(); // track filenames written this run for stale-file cleanup
