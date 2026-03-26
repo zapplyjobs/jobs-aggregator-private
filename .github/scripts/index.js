@@ -66,22 +66,35 @@ async function main() {
     console.log('📡 Step 1: Fetching jobs from all sources...');
     console.log('━'.repeat(60));
 
+    // AGG-5 (S229): Overall timeout per fetcher. Prevents one hung API from blocking
+    // the entire pipeline (Amazon API hung for 23 min on 2026-03-26T00:15 run).
+    // Rolling window merge preserves prior-run jobs — skipping a source is safe.
+    function withTimeout(promise, ms, label) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms/1000}s`)), ms))
+      ]).catch(err => {
+        console.error(`⚠️ ${label}: ${err.message} — continuing with 0 jobs`);
+        return label.includes('ATS') ? { jobs: [] } : [];
+      });
+    }
+
     let allJobs = [];
 
-    // Fetch from JSearch
-    const jsearchJobs = await fetchFromJSearch();
+    // Fetch from JSearch (normal: ~12s, timeout: 60s)
+    const jsearchJobs = await withTimeout(fetchFromJSearch(), 60_000, 'JSearch');
     allJobs.push(...jsearchJobs);
 
-    // Fetch from ATS sources (Greenhouse, Lever, Ashby, Workday)
-    const atsResult = await fetchFromAllATS();
+    // Fetch from ATS sources (normal: ~9.5 min, timeout: 12 min)
+    const atsResult = await withTimeout(fetchFromAllATS(), 720_000, 'ATS');
     allJobs.push(...atsResult.jobs);
 
-    // Fetch from Amazon Jobs
-    const amazonJobs = await fetchAllAmazonJobs();
+    // Fetch from Amazon Jobs (normal: ~23s, timeout: 120s)
+    const amazonJobs = await withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon');
     allJobs.push(...amazonJobs);
 
-    // Fetch from Netflix Jobs
-    const netflixJobs = await fetchAllNetflixJobs();
+    // Fetch from Netflix Jobs (normal: ~2.5 min, timeout: 5 min)
+    const netflixJobs = await withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix');
     allJobs.push(...netflixJobs);
 
     console.log('');
