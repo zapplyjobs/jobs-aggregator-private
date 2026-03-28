@@ -373,6 +373,30 @@ async function main() {
       // Fingerprint guard: prevents re-injection of jobs that changed ID (e.g. WD-ID-BUG fix)
       const currentFingerprints = new Set(publicJobs.map(j => j.fingerprint).filter(Boolean));
       const prevLines = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8').trim().split('\n').filter(Boolean);
+
+      // AGG-6: Preserve earliest posted_at for re-fetched jobs.
+      // Workday returns "Posted 30+ Days Ago" which parsePostedOn converts to today-30d
+      // each run, preventing these jobs from ever aging past 31 days. By keeping the
+      // earlier date from the prior run, jobs age naturally and eventually expire via TTL.
+      const priorDates = new Map();
+      for (const line of prevLines) {
+        try {
+          const job = JSON.parse(line);
+          if (job.id && job.posted_at) priorDates.set(job.id, job.posted_at);
+        } catch { /* skip malformed */ }
+      }
+      let datePreservedCount = 0;
+      for (const job of publicJobs) {
+        const prior = priorDates.get(job.id);
+        if (prior && new Date(prior) < new Date(job.posted_at)) {
+          job.posted_at = prior;
+          datePreservedCount++;
+        }
+      }
+      if (datePreservedCount > 0) {
+        console.log(`📅 Preserved earlier posted_at for ${datePreservedCount} re-fetched jobs`);
+      }
+
       let mergedCount = 0;
       let nullDateCount = 0;
       let fpSkipCount = 0;
