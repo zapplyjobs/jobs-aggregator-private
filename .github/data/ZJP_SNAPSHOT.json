@@ -1,30 +1,30 @@
 {
   "meta": {
-    "generated_at": "2026-03-28T10:09:23.571Z",
+    "generated_at": "2026-03-28T10:24:11.901Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "23682824126",
+    "aggregator_run_id": "23683072015",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 52355,
+    "total": 52356,
     "by_source": {
-      "workday": 37888,
+      "workday": 37887,
       "lever": 1453,
       "ashby": 1772,
       "greenhouse": 8062,
       "smartrecruiters": 2027,
       "jsearch": 446,
-      "amazon": 561,
+      "amazon": 563,
       "netflix": 64,
       "eightfold": 82
     },
     "by_domain": {
-      "hardware": 3410,
-      "software": 5154,
-      "data_science": 2726,
-      "ai": 575,
+      "hardware": 3400,
+      "software": 5153,
+      "general": 17372,
+      "data_science": 2740,
+      "ai": 579,
       "sales": 2806,
-      "general": 17370,
       "legal": 253,
       "hr": 453,
       "operations": 618,
@@ -36,11 +36,11 @@
       "logistics": 272,
       "healthcare": 362
     },
-    "us_entry_level": 18664,
-    "us_interns": 2796,
+    "us_entry_level": 18669,
+    "us_interns": 2800,
     "g1_metric": {
-      "us_total": 29906,
-      "us_general": 14538,
+      "us_total": 29907,
+      "us_general": 14536,
       "us_general_rate": 48.6
     },
     "ats_stats": {
@@ -54,16 +54,16 @@
     }
   },
   "enrichment": {
-    "total_enriched": 7279,
-    "total_has_description": 7256,
+    "total_enriched": 7280,
+    "total_has_description": 7257,
     "workday_waiting_for_desc": null,
-    "jsearch_sidecar_lines": 768
+    "jsearch_sidecar_lines": 769
   },
   "pipeline": {
     "submodule_head": "c9afd7a",
     "last_run_status": "success",
-    "last_run_at": "2026-03-28T10:09:23.571Z",
-    "last_run_id": "23682824126",
+    "last_run_at": "2026-03-28T10:24:11.901Z",
+    "last_run_id": "23683072015",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -102,7 +102,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-03-28T09:54:35.212Z",
-    "total_delta": 4
+    "compared_to": "2026-03-28T10:09:23.571Z",
+    "total_delta": 1
   }
 }
