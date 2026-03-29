@@ -275,12 +275,9 @@ async function main() {
     const SIDECAR_CHUNK_LIMIT_BYTES = 40 * 1024 * 1024; // 40 MB per file
     const { execSync } = require('child_process');
 
-    // Group jobs by source, collect id + description for each.
-    // Use enhancedJobs (all fetched, pre-filter) instead of sortedJobs (post-filter) so that
-    // descriptions from senior-filtered and deduped jobs are still captured in sidecars.
-    // This prevents the JSearch sidecar gap where rolling-window jobs lose descriptions.
+    // Group jobs by source, collect id + description for each
     const bySource = {};
-    for (const job of enhancedJobs) {
+    for (const job of sortedJobs) {
       const src = job.source;
       if (!src) continue;
       if (!bySource[src]) bySource[src] = [];
