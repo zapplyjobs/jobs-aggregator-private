@@ -214,22 +214,9 @@ async function main() {
     console.log('🏷️  Step 5: Applying tags...');
     console.log('━'.repeat(60));
 
-    const { tagDomains: tagDomainsDebug } = require(`${SHARED}/processors/tag-engine`);
     const taggedJobs = tagJobs(entryLevelJobs);
 
-    // Classification source breakdown (TAG-7 measurement)
-    const sourceCounts = {};
-    for (const job of taggedJobs) {
-      const result = tagDomainsDebug(job, { debug: true });
-      for (const m of result.matches) {
-        sourceCounts[m.source] = (sourceCounts[m.source] || 0) + 1;
-      }
-    }
     console.log(`✅ Step 5 complete: ${taggedJobs.length} jobs tagged`);
-    console.log('   Classification sources:');
-    Object.entries(sourceCounts).sort((a, b) => b[1] - a[1]).forEach(([s, n]) =>
-      console.log(`     ${s}: ${n} (${(n / taggedJobs.length * 100).toFixed(1)}%)`)
-    );
     console.log('');
 
     // Step 6: Deduplicate
