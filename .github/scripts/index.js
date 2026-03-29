@@ -295,7 +295,7 @@ async function main() {
     // Without this, sidecars are rewritten from scratch each run — carried-forward jobs in the
     // rolling window lose their descriptions. GH lost 713, Ashby 194, Lever 174 per run.
     // Fix: load prior sidecar entries, overlay current-run data, write merged result.
-    // Size is bounded by the 14-day pool TTL — old jobs expire from all_jobs.json and their
+    // Size is bounded by the 7-day pool TTL — old jobs expire from all_jobs.json and their
     // descriptions are no longer needed. Chunking (40MB limit) handles large sources.
     // Pattern originally applied to JSearch only — now generalized to all sources.
     for (const src of Object.keys(bySource)) {
@@ -391,10 +391,10 @@ async function main() {
       return stripped;
     });
 
-    // Merge previous all_jobs.json into current run (rolling 14-day window)
+    // Merge previous all_jobs.json into current run (rolling 7-day window)
     // Jobs from prior runs that weren't re-fetched this run are preserved until their TTL expires.
     if (fs.existsSync(JOBS_OUTPUT_FILE)) {
-      const cutoffMs = Date.now() - 14 * 24 * 60 * 60 * 1000;
+      const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
       const currentIds = new Set(publicJobs.map(j => j.id));
       // Fingerprint guard: prevents re-injection of jobs that changed ID (e.g. WD-ID-BUG fix)
       const currentFingerprints = new Set(publicJobs.map(j => j.fingerprint).filter(Boolean));
@@ -471,7 +471,7 @@ async function main() {
     await writeJobsJSONL(publicJobs, JOBS_OUTPUT_FILE);
 
     // Write metadata
-    // Use publicJobs (full 14-day rolling window) for pool-level stats (by_source, top_companies, freshness).
+    // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
     // sortedJobs is current-run only — by_source.jsearch would show ~15 instead of ~400.
     const duration = Date.now() - startTime;
     const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs);
