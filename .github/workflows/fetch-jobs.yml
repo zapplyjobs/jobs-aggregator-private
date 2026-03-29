@@ -49,7 +49,15 @@ jobs:
           echo "✅ Seeded $(wc -l < .github/data/all_jobs.json) jobs from jobs-data-2026" || \
           echo "⚠️ Could not seed all_jobs.json — starting fresh"
 
-    # WD descriptions cache REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment workflow
+    - name: Seed descriptions-enriched.jsonl from jobs-data-2026
+      run: |
+        echo "📥 Seeding enriched descriptions (WD/SR) from jobs-data-2026..."
+        # TAG-7: WD/SR descriptions needed before tagging (Step 5) for description fallback.
+        # Enrichment workflow fetches these; aggregator seeds them for classification.
+        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-enriched.jsonl?t=$(date +%s)" \
+          -o .github/data/descriptions-enriched.jsonl && \
+          echo "✅ Seeded $(wc -l < .github/data/descriptions-enriched.jsonl) enriched descriptions" || \
+          echo "⚠️ No descriptions-enriched.jsonl yet — description fallback will be inactive"
 
     - name: Seed descriptions-jsearch.jsonl from jobs-data-2026
       run: |

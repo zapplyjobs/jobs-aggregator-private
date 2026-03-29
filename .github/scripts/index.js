@@ -184,6 +184,32 @@ async function main() {
     console.log(`📋 Step 4b: Senior-filter summary → filtered_jobs.json (${seniorJobs.length} total)`);
     console.log('');
 
+    // Step 4c: Inject WD/SR descriptions from enrichment sidecar (TAG-7)
+    // Descriptions needed for tag engine's description fallback on general-tagged jobs.
+    // Sidecar populated by enrichment workflow in jobs-data-2026.
+    const enrichedDescPath = path.join(DATA_DIR, 'descriptions-enriched.jsonl');
+    if (fs.existsSync(enrichedDescPath)) {
+      const descLines = fs.readFileSync(enrichedDescPath, 'utf8').trim().split('\n').filter(Boolean);
+      const descMap = new Map();
+      for (const line of descLines) {
+        try {
+          const { id, description_text } = JSON.parse(line);
+          if (id && description_text) descMap.set(id, description_text);
+        } catch { /* skip malformed */ }
+      }
+      let injected = 0;
+      for (const job of entryLevelJobs) {
+        if (!job.description && descMap.has(job.id)) {
+          job.description = descMap.get(job.id);
+          injected++;
+        }
+      }
+      console.log(`📄 Step 4c: Injected ${injected} WD/SR descriptions from enrichment sidecar (${descMap.size} available)`);
+    } else {
+      console.log('📄 Step 4c: No descriptions-enriched.jsonl — description fallback inactive');
+    }
+    console.log('');
+
     // Step 5: Apply tags
     console.log('🏷️  Step 5: Applying tags...');
     console.log('━'.repeat(60));
