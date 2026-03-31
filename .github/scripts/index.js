@@ -184,18 +184,24 @@ async function main() {
     console.log(`📋 Step 4b: Senior-filter summary → filtered_jobs.json (${seniorJobs.length} total)`);
     console.log('');
 
-    // Step 4c: Inject WD/SR descriptions from enrichment sidecar (TAG-7)
-    // Descriptions needed for tag engine's description fallback on general-tagged jobs.
-    // Sidecar populated by enrichment workflow in jobs-data-2026.
-    const enrichedDescPath = path.join(DATA_DIR, 'descriptions-enriched.jsonl');
-    if (fs.existsSync(enrichedDescPath)) {
-      const descLines = fs.readFileSync(enrichedDescPath, 'utf8').trim().split('\n').filter(Boolean);
+    // Step 4c: Inject descriptions from ALL sidecar files for tag engine's description fallback.
+    // Carried-forward jobs lose their inline descriptions in Step 9 (stripped from all_jobs.json).
+    // This re-injects them from per-source sidecar files so the description-fallback layer can classify.
+    // Guard: !job.description prevents double-injection for freshly-fetched jobs with inline descriptions.
+    // TAG-9 S237: expanded from enriched-only to ALL sidecars — 1,317 additional jobs gain descriptions.
+    const descSidecarFiles = fs.readdirSync(DATA_DIR)
+      .filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
+    if (descSidecarFiles.length > 0) {
       const descMap = new Map();
-      for (const line of descLines) {
-        try {
-          const { id, description_text } = JSON.parse(line);
-          if (id && description_text) descMap.set(id, description_text);
-        } catch { /* skip malformed */ }
+      for (const fname of descSidecarFiles) {
+        const fpath = path.join(DATA_DIR, fname);
+        const descLines = fs.readFileSync(fpath, 'utf8').trim().split('\n').filter(Boolean);
+        for (const line of descLines) {
+          try {
+            const { id, description_text } = JSON.parse(line);
+            if (id && description_text) descMap.set(id, description_text);
+          } catch { /* skip malformed */ }
+        }
       }
       let injected = 0;
       for (const job of entryLevelJobs) {
@@ -204,9 +210,9 @@ async function main() {
           injected++;
         }
       }
-      console.log(`📄 Step 4c: Injected ${injected} WD/SR descriptions from enrichment sidecar (${descMap.size} available)`);
+      console.log(`📄 Step 4c: Injected ${injected} descriptions from ${descSidecarFiles.length} sidecar files (${descMap.size} available)`);
     } else {
-      console.log('📄 Step 4c: No descriptions-enriched.jsonl — description fallback inactive');
+      console.log('📄 Step 4c: No description sidecar files found — description fallback inactive');
     }
     console.log('');
 
