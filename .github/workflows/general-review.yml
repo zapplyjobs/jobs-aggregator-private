@@ -1,0 +1,73 @@
+name: Generate General Review
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6 AM UTC (midnight US Central)
+  workflow_dispatch:
+
+jobs:
+  generate-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout aggregator (with submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install shared dependencies
+        run: cd .github/scripts/shared && npm install
+
+      - name: Download data from jobs-data-2026
+        run: |
+          mkdir -p /tmp/review-data
+          echo "Downloading all_jobs.json..."
+          curl -sf -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/all_jobs.json?t=$(date +%s)" \
+            -o /tmp/review-data/all_jobs.json
+          echo "  $(wc -l < /tmp/review-data/all_jobs.json) jobs"
+
+          echo "Downloading sidecar descriptions..."
+          for f in descriptions-enriched.jsonl descriptions-greenhouse-1.jsonl descriptions-greenhouse-2.jsonl \
+                   descriptions-ashby.jsonl descriptions-lever.jsonl descriptions-amazon.jsonl \
+                   descriptions-smartrecruiters.jsonl descriptions-eightfold.jsonl descriptions-jsearch.jsonl \
+                   descriptions-netflix.jsonl; do
+            curl -sf -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+              "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/$f?t=$(date +%s)" \
+              -o "/tmp/review-data/$f" 2>/dev/null && echo "  $f: $(wc -l < /tmp/review-data/$f) entries" || echo "  $f: not found (skipped)"
+          done
+
+      - name: Generate general-review.json
+        run: |
+          cd .github/scripts/shared
+          node tools/prepare-general-review.js --json /tmp/review-data/all_jobs.json > /tmp/review-data/general-review.json 2>/tmp/review-data/review-stderr.log
+          cat /tmp/review-data/review-stderr.log
+          echo "Generated: $(wc -c < /tmp/review-data/general-review.json) bytes"
+          # Sanity check
+          node -e "const d = JSON.parse(require('fs').readFileSync('/tmp/review-data/general-review.json','utf8')); console.log('US General:', d.summary.us_general, '/', d.summary.us_total, '=', d.summary.us_general_rate + '%')"
+
+      - name: Push to jobs-data-2026
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git clone --depth=1 "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-data-2026.git" /tmp/jobs-data-2026-push
+          cp /tmp/review-data/general-review.json /tmp/jobs-data-2026-push/.github/data/general-review.json
+
+          cd /tmp/jobs-data-2026-push
+          git config user.email "bot@zapplyjobs.com"
+          git config user.name "Aggregator Bot"
+          git add .github/data/general-review.json
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "chore: update general-review.json [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && break
+            echo "Push attempt $i failed, retrying..."
+            sleep 5
+          done
+          echo "✅ general-review.json pushed to jobs-data-2026"
