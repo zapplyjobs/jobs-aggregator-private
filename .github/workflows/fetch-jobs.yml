@@ -54,10 +54,19 @@ jobs:
         echo "📥 Seeding enriched descriptions (WD/SR) from jobs-data-2026..."
         # TAG-7: WD/SR descriptions needed before tagging (Step 5) for description fallback.
         # Enrichment workflow fetches these; aggregator seeds them for classification.
-        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-enriched.jsonl?t=$(date +%s)" \
-          -o .github/data/descriptions-enriched.jsonl && \
-          echo "✅ Seeded $(wc -l < .github/data/descriptions-enriched.jsonl) enriched descriptions" || \
-          echo "⚠️ No descriptions-enriched.jsonl yet — description fallback will be inactive"
+        # INF-7: File is chunked into -1 and -2 (each ≤85 MB). Fetch each chunk separately —
+        # the aggregator's loadDescriptionsMap() globs descriptions-*.jsonl and picks up all chunks.
+        TOTAL=0
+        for CHUNK in 1 2; do
+          curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-enriched-${CHUNK}.jsonl?t=$(date +%s)" \
+            -o ".github/data/descriptions-enriched-${CHUNK}.jsonl" && \
+            LINES=$(wc -l < ".github/data/descriptions-enriched-${CHUNK}.jsonl") && \
+            TOTAL=$((TOTAL + LINES)) && \
+            echo "  chunk ${CHUNK}: ${LINES} entries" || \
+            echo "  chunk ${CHUNK}: not found (skipped)"
+        done
+        [ $TOTAL -gt 0 ] && echo "✅ Seeded ${TOTAL} enriched descriptions total" || \
+          echo "⚠️ No descriptions-enriched chunks found — description fallback will be inactive"
 
     - name: Seed descriptions-jsearch.jsonl from jobs-data-2026
       run: |

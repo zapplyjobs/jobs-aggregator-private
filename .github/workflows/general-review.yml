@@ -34,7 +34,7 @@ jobs:
           echo "  $(wc -l < /tmp/review-data/all_jobs.json) jobs"
 
           echo "Downloading sidecar descriptions..."
-          for f in descriptions-enriched.jsonl descriptions-greenhouse-1.jsonl descriptions-greenhouse-2.jsonl \
+          for f in descriptions-enriched-1.jsonl descriptions-enriched-2.jsonl descriptions-greenhouse-1.jsonl descriptions-greenhouse-2.jsonl \
                    descriptions-ashby.jsonl descriptions-lever.jsonl descriptions-amazon.jsonl \
                    descriptions-smartrecruiters.jsonl descriptions-eightfold.jsonl descriptions-jsearch.jsonl \
                    descriptions-netflix.jsonl; do
