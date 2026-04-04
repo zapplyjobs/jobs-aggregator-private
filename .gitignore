@@ -25,3 +25,7 @@ Thumbs.db
 
 # Job archive — stored in jobs-archive-private repo, not here
 .github/data/archive/
+
+# Legacy enriched descriptions — superseded by chunked files seeded from jobs-data-2026
+# INF-7: aggregator only uses -1/-2 chunks (seed step). Legacy file must not be committed.
+.github/data/descriptions-enriched.jsonl
