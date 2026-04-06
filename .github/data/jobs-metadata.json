@@ -1,59 +1,60 @@
 {
   "version": "1.0",
-  "generated": "2026-04-06T18:46:06.805Z",
-  "duration_ms": 574344,
-  "total_jobs": 38760,
-  "unique_jobs": 35946,
-  "duplicates_removed": 17803,
+  "generated": "2026-04-06T18:59:58.400Z",
+  "duration_ms": 733891,
+  "total_jobs": 38764,
+  "unique_jobs": 35942,
+  "duplicates_removed": 17901,
   "by_source": {
-    "workday": 24925,
     "lever": 1098,
+    "workday": 24931,
     "ashby": 1713,
-    "smartrecruiters": 2064,
-    "greenhouse": 7917,
-    "eightfold": 307,
-    "jsearch": 160,
+    "smartrecruiters": 2062,
+    "greenhouse": 7914,
+    "eightfold": 306,
     "amazon": 504,
+    "jsearch": 164,
     "netflix": 72
   },
   "by_employment_type": {
     "FULLTIME": 1525,
-    "FULL-TIME": 1795,
-    "INTERNSHIP": 46,
+    "FULL-TIME": 1797,
+    "INTERNSHIP": 44,
     "PART-TIME AND INTERNSHIP": 1,
     "CONTRACT": 86,
+    "FULL-TIME AND INTERNSHIP": 11,
     "FULL-TIME AND PART-TIME": 1,
     "INTERN": 93,
     "PART-TIME": 6,
-    "FULL-TIME AND INTERNSHIP": 10,
     "PARTTIME": 12,
+    "CONTRACTOR": 1,
     "TEMPORARY": 1
   },
   "by_job_type": {
-    "internship": 2812,
-    "new-grad": 34138,
-    "mid_level": 1810
+    "internship": 2824,
+    "new-grad": 34131,
+    "mid_level": 1809
   },
   "by_location": {
-    "remote": 2319,
-    "onsite": 36441
+    "remote": 2322,
+    "onsite": 36442
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "systems engineering internship",
-        "count": 5
+        "query": "software engineering internship 2026",
+        "count": 8
       },
       {
-        "query": "finance internship technology",
+        "query": "junior software engineer",
         "count": 4
       },
       {
-        "query": "software engineer intern",
+        "query": "associate software engineer",
         "count": 7
       }
     ],
-    "total_fetched": 16
+    "total_fetched": 19
   },
   "ats_stats": {
     "companies_total": 515,
@@ -65,11 +66,11 @@
     "smartrecruiters_companies": 19
   },
   "validation_stats": {
-    "total_input": 86717,
-    "valid_jobs": 86503,
-    "invalid_jobs": 214,
+    "total_input": 86728,
+    "valid_jobs": 86501,
+    "invalid_jobs": 227,
     "invalid_reasons": {
-      "missing_title": 13,
+      "missing_title": 24,
       "missing_company": 0,
       "missing_url": 0,
       "invalid_title_length": 17,
@@ -79,83 +80,83 @@
     },
     "normalized_fields": {
       "state_extracted": 15874,
-      "city_extracted": 27604
+      "city_extracted": 27609
     }
   },
   "senior_filter_stats": {
-    "total_input": 86503,
-    "entry_level_jobs": 36001,
-    "senior_jobs": 50502,
+    "total_input": 86501,
+    "entry_level_jobs": 36000,
+    "senior_jobs": 50501,
     "senior_reasons": {
-      "senior_title": 32096,
-      "senior_experience": 4160,
-      "both": 14246
+      "senior_title": 32092,
+      "senior_experience": 4162,
+      "both": 14247
     },
     "by_source": {
-      "greenhouse": 18846,
-      "lever": 2131,
+      "greenhouse": 18847,
+      "lever": 2133,
       "ashby": 3999,
-      "workday": 22357,
+      "workday": 22352,
       "eightfold": 113,
-      "smartrecruiters": 2289,
+      "smartrecruiters": 2290,
       "amazon": 584,
       "netflix": 183
     }
   },
   "tag_stats": {
     "employment": {
-      "internship": 2583,
-      "entry_level": 31715,
-      "mid_level": 515,
-      "senior": 1133
+      "internship": 2589,
+      "entry_level": 31706,
+      "mid_level": 513,
+      "senior": 1134
     },
     "domains": {
-      "software": 6705,
-      "hardware": 5921,
-      "operations": 3772,
-      "general": 6888,
-      "sales": 3907,
-      "ai": 802,
-      "data_science": 1494,
-      "legal": 537,
+      "software": 6718,
+      "general": 6885,
+      "hardware": 5919,
+      "sales": 3910,
+      "ai": 801,
+      "data_science": 1491,
+      "legal": 536,
       "marketing": 915,
       "finance": 2276,
-      "hr": 808,
+      "hr": 807,
+      "operations": 3770,
       "product": 632,
-      "manufacturing": 2502,
+      "manufacturing": 2500,
       "retail": 580,
-      "healthcare": 1360,
-      "logistics": 404
+      "healthcare": 1359,
+      "logistics": 400
     },
     "locations": {
-      "us": 20165,
-      "on_site": 2547,
-      "remote": 2218,
+      "us": 20169,
+      "on_site": 2550,
+      "remote": 2221,
       "hybrid": 575
     },
     "experience": {
-      "entry_level": 4903,
-      "unknown": 21679,
-      "mid_level": 6082,
-      "senior_level": 3282
+      "entry_level": 4912,
+      "mid_level": 6083,
+      "unknown": 21676,
+      "senior_level": 3271
     },
     "special": {
+      "fortune500": 455,
       "unicorn": 640,
-      "faang": 637,
-      "fortune500": 454
+      "faang": 637
     },
-    "total": 35946
+    "total": 35942
   },
   "freshness": {
-    "last_1h": 239,
-    "last_6h": 1066,
-    "last_24h": 1565,
-    "last_48h": 1708
+    "last_1h": 177,
+    "last_6h": 1076,
+    "last_24h": 1605,
+    "last_48h": 1749
   },
   "top_companies": [
     {
       "company": "Lowe's",
-      "count": 1220,
+      "count": 1227,
       "domain": "retail"
     },
     {
@@ -175,7 +176,7 @@
     },
     {
       "company": "Anduril",
-      "count": 433,
+      "count": 432,
       "domain": "hardware"
     },
     {
@@ -190,22 +191,22 @@
     },
     {
       "company": "Boeing",
-      "count": 372,
+      "count": 374,
       "domain": "hardware"
     },
     {
       "company": "Intel",
-      "count": 367,
+      "count": 366,
       "domain": "hardware"
     },
     {
       "company": "Booz Allen Hamilton",
-      "count": 357,
+      "count": 356,
       "domain": "software"
     },
     {
       "company": "FLIR Systems",
-      "count": 354,
+      "count": 352,
       "domain": "manufacturing"
     },
     {
@@ -215,7 +216,7 @@
     },
     {
       "company": "CACI",
-      "count": 344,
+      "count": 346,
       "domain": "software"
     },
     {
@@ -224,14 +225,19 @@
       "domain": "healthcare"
     },
     {
+      "company": "Philips",
+      "count": 342,
+      "domain": "general"
+    },
+    {
       "company": "Hitachi",
       "count": 341,
       "domain": "general"
     },
     {
-      "company": "Philips",
-      "count": 341,
-      "domain": "general"
+      "company": "Leidos",
+      "count": 340,
+      "domain": "software"
     },
     {
       "company": "Caterpillar",
@@ -242,11 +248,6 @@
       "company": "Red Bull",
       "count": 340,
       "domain": "marketing"
-    },
-    {
-      "company": "Leidos",
-      "count": 339,
-      "domain": "software"
     },
     {
       "company": "State Street",
