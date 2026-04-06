@@ -1,60 +1,58 @@
 {
   "version": "1.0",
-  "generated": "2026-04-06T20:14:35.739Z",
-  "duration_ms": 651923,
-  "total_jobs": 38828,
-  "unique_jobs": 35924,
-  "duplicates_removed": 17906,
+  "generated": "2026-04-06T20:32:07.771Z",
+  "duration_ms": 939697,
+  "total_jobs": 15433,
+  "unique_jobs": 589,
+  "duplicates_removed": 170,
   "by_source": {
-    "workday": 24989,
-    "lever": 1099,
-    "eightfold": 301,
-    "smartrecruiters": 2068,
-    "greenhouse": 7914,
-    "ashby": 1715,
-    "jsearch": 166,
-    "amazon": 504,
+    "workday": 11008,
+    "lever": 205,
+    "eightfold": 300,
+    "smartrecruiters": 490,
+    "greenhouse": 2321,
+    "ashby": 368,
+    "jsearch": 162,
+    "amazon": 507,
     "netflix": 72
   },
   "by_employment_type": {
-    "FULL-TIME": 1800,
-    "FULLTIME": 1527,
+    "FULL-TIME": 497,
+    "FULLTIME": 316,
     "PART-TIME": 7,
     "INTERNSHIP": 45,
     "PART-TIME AND INTERNSHIP": 1,
-    "CONTRACT": 86,
-    "FULL-TIME AND INTERNSHIP": 11,
+    "CONTRACT": 17,
+    "FULL-TIME AND INTERNSHIP": 10,
     "FULL-TIME AND PART-TIME": 1,
-    "INTERN": 93,
-    "PARTTIME": 12,
-    "CONTRACTOR": 1,
-    "TEMPORARY": 1
+    "INTERN": 33,
+    "PARTTIME": 4
   },
   "by_job_type": {
-    "internship": 2833,
-    "new-grad": 34172,
-    "mid_level": 1823
+    "internship": 996,
+    "new-grad": 13657,
+    "mid_level": 780
   },
   "by_location": {
-    "remote": 2325,
-    "onsite": 36503
+    "remote": 770,
+    "onsite": 14663
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "software engineer intern",
-        "count": 6
+        "query": "associate software engineer",
+        "count": 5
       },
       {
-        "query": "software engineering internship 2026",
+        "query": "data science intern",
+        "count": 8
+      },
+      {
+        "query": "data science intern summer",
         "count": 7
-      },
-      {
-        "query": "junior software engineer",
-        "count": 4
       }
     ],
-    "total_fetched": 17
+    "total_fetched": 20
   },
   "ats_stats": {
     "companies_total": 515,
@@ -66,92 +64,79 @@
     "smartrecruiters_companies": 19
   },
   "validation_stats": {
-    "total_input": 86727,
-    "valid_jobs": 86510,
-    "invalid_jobs": 217,
+    "total_input": 1399,
+    "valid_jobs": 1399,
+    "invalid_jobs": 0,
     "invalid_reasons": {
-      "missing_title": 15,
+      "missing_title": 0,
       "missing_company": 0,
       "missing_url": 0,
-      "invalid_title_length": 17,
+      "invalid_title_length": 0,
       "invalid_company_length": 0,
-      "invalid_url_format": 0,
-      "garbage_title": null
+      "invalid_url_format": 0
     },
     "normalized_fields": {
-      "state_extracted": 15893,
-      "city_extracted": 27620
+      "state_extracted": 0,
+      "city_extracted": 20
     }
   },
   "senior_filter_stats": {
-    "total_input": 86510,
-    "entry_level_jobs": 35986,
-    "senior_jobs": 50524,
+    "total_input": 1399,
+    "entry_level_jobs": 632,
+    "senior_jobs": 767,
     "senior_reasons": {
-      "senior_title": 32117,
-      "senior_experience": 4153,
-      "both": 14254
+      "senior_title": 600,
+      "senior_experience": 38,
+      "both": 129
     },
     "by_source": {
-      "greenhouse": 18844,
-      "lever": 2129,
-      "ashby": 3996,
-      "workday": 22378,
-      "eightfold": 118,
-      "smartrecruiters": 2290,
-      "amazon": 586,
+      "amazon": 584,
       "netflix": 183
     }
   },
   "tag_stats": {
     "employment": {
-      "internship": 2597,
-      "entry_level": 31669,
-      "mid_level": 517,
-      "senior": 1141
+      "entry_level": 546,
+      "internship": 34,
+      "senior": 4,
+      "mid_level": 5
     },
     "domains": {
-      "hardware": 5926,
-      "software": 6712,
-      "general": 6898,
-      "sales": 3906,
-      "ai": 798,
-      "data_science": 1489,
-      "legal": 537,
-      "marketing": 911,
-      "finance": 2271,
-      "hr": 806,
-      "operations": 3756,
-      "product": 633,
-      "manufacturing": 2491,
-      "retail": 581,
-      "healthcare": 1355,
-      "logistics": 403
+      "software": 263,
+      "hardware": 328,
+      "data_science": 161,
+      "ai": 59,
+      "manufacturing": 2,
+      "general": 16,
+      "operations": 13,
+      "finance": 8,
+      "legal": 4,
+      "hr": 1,
+      "marketing": 5,
+      "product": 2
     },
     "locations": {
-      "us": 20200,
-      "on_site": 2558,
-      "remote": 2226,
-      "hybrid": 575
+      "us": 589,
+      "on_site": 16,
+      "remote": 3
     },
     "experience": {
-      "entry_level": 4889,
-      "unknown": 21732,
-      "mid_level": 6047,
-      "senior_level": 3256
+      "entry_level": 38,
+      "mid_level": 18,
+      "unknown": 526,
+      "senior_level": 7
     },
     "special": {
-      "unicorn": 641,
-      "faang": 636,
-      "fortune500": 454
+      "fortune500": 458,
+      "faang": 528
     },
-    "total": 35924
+    "total": 589
   },
   "freshness": {
-    "last_1h": 209,
-    "last_6h": 1155,
-    "last_24h": 1863,
-    "last_48h": 1942
+    "last_1h": 138,
+    "last_6h": 1068,
+    "last_24h": 1860,
+    "last_48h": 1939
   },
   "top_companies": [
     {
@@ -160,98 +145,98 @@
       "domain": "retail"
     },
     {
-      "company": "SpaceX",
-      "count": 942,
-      "domain": "hardware"
-    },
-    {
       "company": "Takeda",
-      "count": 660,
+      "count": 653,
       "domain": "healthcare"
     },
     {
-      "company": "PricewaterhouseCoopers",
-      "count": 480,
-      "domain": "general"
-    },
-    {
-      "company": "Anduril",
-      "count": 432,
+      "company": "Boeing",
+      "count": 385,
       "domain": "hardware"
     },
     {
       "company": "Johnson Controls",
-      "count": 398,
+      "count": 341,
       "domain": "hardware"
     },
     {
       "company": "Carrier Global",
-      "count": 396,
+      "count": 337,
       "domain": "general"
     },
     {
-      "company": "Boeing",
-      "count": 386,
-      "domain": "hardware"
-    },
-    {
-      "company": "Intel",
-      "count": 366,
-      "domain": "hardware"
-    },
-    {
-      "company": "Booz Allen Hamilton",
-      "count": 355,
-      "domain": "software"
-    },
-    {
-      "company": "FLIR Systems",
-      "count": 350,
-      "domain": "manufacturing"
-    },
-    {
-      "company": "KLA",
-      "count": 347,
-      "domain": "hardware"
+      "company": "Johnson & Johnson",
+      "count": 310,
+      "domain": "general"
     },
     {
       "company": "CACI",
-      "count": 346,
+      "count": 306,
       "domain": "software"
     },
     {
-      "company": "Leidos",
-      "count": 343,
-      "domain": "software"
-    },
-    {
-      "company": "AbbVie",
-      "count": 343,
-      "domain": "healthcare"
-    },
-    {
-      "company": "Hitachi",
-      "count": 342,
+      "company": "RTX",
+      "count": 299,
       "domain": "general"
-    },
-    {
-      "company": "Philips",
-      "count": 341,
-      "domain": "general"
-    },
-    {
-      "company": "Red Bull",
-      "count": 339,
-      "domain": "marketing"
     },
     {
       "company": "Caterpillar",
-      "count": 339,
+      "count": 285,
+      "domain": "general"
+    },
+    {
+      "company": "Abbott",
+      "count": 272,
+      "domain": "general"
+    },
+    {
+      "company": "Leidos",
+      "count": 257,
+      "domain": "software"
+    },
+    {
+      "company": "GE Vernova",
+      "count": 231,
+      "domain": "general"
+    },
+    {
+      "company": "American Express",
+      "count": 228,
+      "domain": "general"
+    },
+    {
+      "company": "Northrop Grumman",
+      "count": 223,
+      "domain": "software"
+    },
+    {
+      "company": "Thermo Fisher Scientific",
+      "count": 218,
+      "domain": "general"
+    },
+    {
+      "company": "Amazon.com Services LLC",
+      "count": 218,
+      "domain": "hardware"
+    },
+    {
+      "company": "Hitachi",
+      "count": 213,
+      "domain": "general"
+    },
+    {
+      "company": "Booz Allen Hamilton",
+      "count": 205,
+      "domain": "software"
+    },
+    {
+      "company": "Merck & Co.",
+      "count": 189,
       "domain": "general"
     },
     {
       "company": "State Street",
-      "count": 338,
+      "count": 178,
       "domain": "general"
     }
   ]
