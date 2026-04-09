@@ -596,11 +596,11 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     }
   }
 
-  // Top 20 companies by job count
+  // Top 50 companies by job count (S262: expanded from 20 for dashboard company explorer)
   // DASH-4b: includes primary domain (most common domain tag for that company)
   const top_companies = Object.entries(companyCounts)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 20)
+    .slice(0, 50)
     .map(([company, count]) => {
       const domains = companyDomains[company] || {};
       const primaryDomain = Object.entries(domains).sort((a, b) => b[1] - a[1])[0];
