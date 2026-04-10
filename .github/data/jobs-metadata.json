@@ -1,58 +1,58 @@
 {
   "version": "1.0",
-  "generated": "2026-04-10T16:20:12.966Z",
-  "duration_ms": 935199,
-  "total_jobs": 16104,
-  "unique_jobs": 512,
+  "generated": "2026-04-10T16:36:07.976Z",
+  "duration_ms": 908117,
+  "total_jobs": 16039,
+  "unique_jobs": 515,
   "duplicates_removed": 130,
   "by_source": {
-    "workday": 13495,
+    "workday": 13427,
+    "greenhouse": 802,
     "eightfold": 240,
-    "greenhouse": 800,
-    "smartrecruiters": 606,
-    "ashby": 128,
+    "smartrecruiters": 603,
+    "ashby": 127,
     "lever": 144,
-    "jsearch": 182,
-    "amazon": 438,
+    "jsearch": 184,
+    "amazon": 441,
     "netflix": 71
   },
   "by_employment_type": {
-    "FULL-TIME": 627,
-    "FULLTIME": 119,
+    "FULL-TIME": 626,
+    "FULLTIME": 118,
     "INTERNSHIP": 44,
     "PART-TIME": 10,
     "CONTRACT": 10,
-    "PART-TIME AND INTERNSHIP": 4,
+    "PART-TIME AND INTERNSHIP": 5,
     "FULL-TIME AND INTERNSHIP": 10,
     "CONTRACTOR": 3,
     "INTERN": 1,
     "FULL-TIME AND PART-TIME": 1
   },
   "by_job_type": {
-    "internship": 922,
-    "new-grad": 14465,
-    "mid_level": 717
+    "internship": 924,
+    "new-grad": 14408,
+    "mid_level": 707
   },
   "by_location": {
-    "remote": 511,
-    "onsite": 15593
+    "remote": 507,
+    "onsite": 15532
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "software engineer intern",
+        "query": "associate software engineer",
         "count": 7
       },
       {
-        "query": "software engineering internship 2026",
-        "count": 9
+        "query": "data science intern",
+        "count": 7
       },
       {
-        "query": "junior software engineer",
-        "count": 6
+        "query": "data science intern summer",
+        "count": 7
       }
     ],
-    "total_fetched": 22
+    "total_fetched": 21
   },
   "ats_stats": {
     "companies_total": 515,
@@ -64,8 +64,8 @@
     "smartrecruiters_companies": 19
   },
   "validation_stats": {
-    "total_input": 1396,
-    "valid_jobs": 1396,
+    "total_input": 1401,
+    "valid_jobs": 1401,
     "invalid_jobs": 0,
     "invalid_reasons": {
       "missing_title": 0,
@@ -77,37 +77,36 @@
     },
     "normalized_fields": {
       "state_extracted": 0,
-      "city_extracted": 22
+      "city_extracted": 20
     }
   },
   "senior_filter_stats": {
-    "total_input": 1396,
-    "entry_level_jobs": 544,
-    "senior_jobs": 852,
+    "total_input": 1401,
+    "entry_level_jobs": 547,
+    "senior_jobs": 854,
     "senior_reasons": {
       "senior_title": 305,
       "senior_experience": 110,
-      "both": 437
+      "both": 439
     },
     "by_source": {
-      "jsearch": 1,
-      "amazon": 668,
+      "amazon": 671,
       "netflix": 183
     }
   },
   "tag_stats": {
     "employment": {
-      "internship": 36,
-      "entry_level": 471,
-      "senior": 1,
+      "entry_level": 475,
+      "senior": 3,
+      "internship": 33,
       "mid_level": 4
     },
     "domains": {
-      "software": 263,
-      "hardware": 272,
+      "software": 255,
+      "hardware": 277,
+      "ai": 50,
+      "data_science": 149,
       "manufacturing": 1,
-      "data_science": 138,
-      "ai": 49,
       "operations": 7,
       "general": 9,
       "finance": 8,
@@ -116,32 +115,32 @@
       "product": 1
     },
     "locations": {
-      "us": 512,
-      "on_site": 18,
-      "remote": 3
+      "us": 515,
+      "on_site": 15,
+      "remote": 6
     },
     "experience": {
-      "entry_level": 140,
-      "unknown": 110,
-      "mid_level": 212,
+      "mid_level": 216,
+      "entry_level": 142,
+      "unknown": 107,
       "senior_level": 50
     },
     "special": {
-      "faang": 454,
-      "fortune500": 385
+      "fortune500": 390,
+      "faang": 456
     },
-    "total": 512
+    "total": 515
   },
   "freshness": {
-    "last_1h": 144,
-    "last_6h": 829,
-    "last_24h": 2609,
-    "last_48h": 4527
+    "last_1h": 105,
+    "last_6h": 867,
+    "last_24h": 2615,
+    "last_48h": 4561
   },
   "top_companies": [
     {
       "company": "Lowe's",
-      "count": 3505,
+      "count": 3512,
       "domain": "retail"
     },
     {
@@ -151,32 +150,27 @@
     },
     {
       "company": "Johnson Controls",
-      "count": 345,
+      "count": 346,
       "domain": "hardware"
     },
     {
-      "company": "Takeda",
-      "count": 342,
-      "domain": "healthcare"
-    },
-    {
       "company": "Boeing",
-      "count": 341,
+      "count": 344,
       "domain": "software"
     },
     {
       "company": "Johnson & Johnson",
-      "count": 315,
+      "count": 316,
       "domain": "general"
     },
     {
       "company": "Abbott",
-      "count": 301,
+      "count": 305,
       "domain": "general"
     },
     {
       "company": "Hitachi",
-      "count": 286,
+      "count": 287,
       "domain": "general"
     },
     {
@@ -186,7 +180,12 @@
     },
     {
       "company": "Caterpillar",
-      "count": 278,
+      "count": 280,
+      "domain": "general"
+    },
+    {
+      "company": "GE Vernova",
+      "count": 274,
       "domain": "general"
     },
     {
@@ -195,9 +194,9 @@
       "domain": "general"
     },
     {
-      "company": "GE Vernova",
-      "count": 273,
-      "domain": "general"
+      "company": "Takeda",
+      "count": 234,
+      "domain": "healthcare"
     },
     {
       "company": "Thermo Fisher Scientific",
@@ -211,12 +210,12 @@
     },
     {
       "company": "Micron",
-      "count": 227,
+      "count": 228,
       "domain": "general"
     },
     {
       "company": "Booz Allen Hamilton",
-      "count": 204,
+      "count": 206,
       "domain": "software"
     },
     {
@@ -226,7 +225,7 @@
     },
     {
       "company": "Amazon.com Services LLC",
-      "count": 191,
+      "count": 192,
       "domain": "hardware"
     },
     {
@@ -246,7 +245,7 @@
     },
     {
       "company": "Medtronic",
-      "count": 182,
+      "count": 184,
       "domain": "sales"
     },
     {
@@ -285,14 +284,14 @@
       "domain": "general"
     },
     {
+      "company": "Morgan Stanley",
+      "count": 144,
+      "domain": "finance"
+    },
+    {
       "company": "Applied Materials",
       "count": 144,
       "domain": "hardware"
-    },
-    {
-      "company": "Morgan Stanley",
-      "count": 143,
-      "domain": "finance"
     },
     {
       "company": "Salesforce",
@@ -316,7 +315,7 @@
     },
     {
       "company": "Red Bull",
-      "count": 108,
+      "count": 107,
       "domain": "sales"
     },
     {
@@ -326,7 +325,7 @@
     },
     {
       "company": "General Motors",
-      "count": 98,
+      "count": 100,
       "domain": "general"
     },
     {
@@ -335,18 +334,23 @@
       "domain": "software"
     },
     {
+      "company": "Guidehouse",
+      "count": 97,
+      "domain": "general"
+    },
+    {
       "company": "Motorola Solutions",
       "count": 97,
       "domain": "software"
     },
     {
-      "company": "Guidehouse",
-      "count": 95,
+      "company": "PricewaterhouseCoopers",
+      "count": 94,
       "domain": "general"
     },
     {
-      "company": "PricewaterhouseCoopers",
-      "count": 94,
+      "company": "Dell Technologies",
+      "count": 93,
       "domain": "general"
     },
     {
@@ -355,24 +359,19 @@
       "domain": "hardware"
     },
     {
-      "company": "Dell Technologies",
-      "count": 92,
-      "domain": "general"
-    },
-    {
       "company": "Arrow Electronics",
       "count": 90,
       "domain": "general"
     },
     {
-      "company": "Veolia Environnement SA",
-      "count": 84,
-      "domain": "operations"
-    },
-    {
       "company": "Baker Hughes",
       "count": 83,
       "domain": "general"
+    },
+    {
+      "company": "Veolia Environnement SA",
+      "count": 83,
+      "domain": "operations"
     },
     {
       "company": "BlackRock",
