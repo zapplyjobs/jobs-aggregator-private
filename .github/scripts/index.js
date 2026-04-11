@@ -506,9 +506,13 @@ async function main() {
     configuredSlugToName['amazon'] = 'Amazon';
     configuredSlugToName['netflix'] = 'netflix';
     // JSearch is query-based, not company-based — skip
-    const poolSlugs = new Set(publicJobs.map(j => j.company_slug).filter(Boolean));
+    // Compare against allJobs (raw current-run fetches, pre-filter) — not publicJobs (7-day pool).
+    // Current-run comparison detects "this company returned 0 jobs from the API" —
+    // the actual source health signal. Senior-only companies still return jobs (correctly
+    // filtered later) and won't appear here. Only truly broken/empty sources show up.
+    const fetchedSlugs = new Set(allJobs.map(j => j.company_slug).filter(Boolean));
     const zeroYieldCompanies = Object.entries(configuredSlugToName)
-      .filter(([slug]) => !poolSlugs.has(slug))
+      .filter(([slug]) => !fetchedSlugs.has(slug))
       .map(([, name]) => name)
       .sort();
     const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies);
