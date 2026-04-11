@@ -1,12 +1,12 @@
 {
   "meta": {
-    "generated_at": "2026-04-11T08:25:06.539Z",
+    "generated_at": "2026-04-11T08:35:46.223Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "24278416046",
+    "aggregator_run_id": "24278494214",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 41138,
+    "total": 41141,
     "by_source": {
       "workday": 27517,
       "eightfold": 230,
@@ -14,15 +14,15 @@
       "greenhouse": 7732,
       "smartrecruiters": 2122,
       "lever": 1104,
-      "amazon": 454,
-      "jsearch": 190,
+      "amazon": 456,
+      "jsearch": 191,
       "netflix": 74
     },
     "by_domain": {
-      "software": 6648,
-      "hardware": 5640,
+      "software": 6649,
+      "hardware": 5641,
+      "data_science": 1486,
       "ai": 820,
-      "data_science": 1485,
       "sales": 3760,
       "legal": 515,
       "finance": 2256,
@@ -36,10 +36,10 @@
       "healthcare": 1286,
       "logistics": 369
     },
-    "us_entry_level": 19633,
+    "us_entry_level": 19635,
     "us_interns": 2474,
     "g1_metric": {
-      "us_total": 24355,
+      "us_total": 24358,
       "us_general": 1855,
       "us_general_rate": 7.6
     },
@@ -54,16 +54,16 @@
     }
   },
   "enrichment": {
-    "total_enriched": 7541,
-    "total_has_description": 8578,
+    "total_enriched": 8039,
+    "total_has_description": 8582,
     "workday_waiting_for_desc": null,
-    "jsearch_sidecar_lines": 625
+    "jsearch_sidecar_lines": 626
   },
   "pipeline": {
     "submodule_head": "888474c",
     "last_run_status": "success",
-    "last_run_at": "2026-04-11T08:25:06.539Z",
-    "last_run_id": "24278416046",
+    "last_run_at": "2026-04-11T08:35:46.223Z",
+    "last_run_id": "24278494214",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -102,7 +102,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-04-11T08:10:27.271Z",
-    "total_delta": 26
+    "compared_to": "2026-04-11T08:25:06.539Z",
+    "total_delta": 3
   }
 }
