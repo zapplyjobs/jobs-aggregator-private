@@ -481,14 +481,37 @@ async function main() {
     // sortedJobs is current-run only — by_source.jsearch would show ~15 instead of ~400.
     const duration = Date.now() - startTime;
     // S268A AGG GAP-6: Detect companies configured but returning 0 jobs.
-    // All fetchers set job.company_name from config name — direct comparison works.
+    // Uses company_slug for matching (set by every fetcher from config slug).
+    // WD uses tenantKey = name.toLowerCase().replace(/\s+/g, '-') as company_slug.
     // Prevents silent source failures like LLNL (broken for weeks undetected).
     const companyListPath = path.join(__dirname, 'shared', 'lib', 'aggregator', 'fetchers', 'company-list.json');
     const companyListData = JSON.parse(fs.readFileSync(companyListPath, 'utf8'));
-    const configuredNames = Object.entries(companyListData)
-      .filter(([k]) => k !== '_meta')
-      .flatMap(([, companies]) => companies.map(c => typeof c === 'string' ? c : c.name));
-    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, configuredNames);
+    // Build slug→name map for all configured companies
+    const configuredSlugToName = {};
+    for (const [ats, companies] of Object.entries(companyListData)) {
+      if (ats === '_meta') continue;
+      for (const c of companies) {
+        const name = typeof c === 'string' ? c : c.name;
+        let slug;
+        if (ats === 'workday') {
+          // WD company_slug = name.toLowerCase().replace(/\s+/g, '-')
+          slug = name.toLowerCase().replace(/\s+/g, '-');
+        } else {
+          slug = typeof c === 'string' ? c : (c.slug || c.companyIdentifier || name);
+        }
+        configuredSlugToName[slug] = name;
+      }
+    }
+    // Amazon and Netflix are single-company custom fetchers — add them
+    configuredSlugToName['amazon'] = 'Amazon';
+    configuredSlugToName['netflix'] = 'netflix';
+    // JSearch is query-based, not company-based — skip
+    const poolSlugs = new Set(publicJobs.map(j => j.company_slug).filter(Boolean));
+    const zeroYieldCompanies = Object.entries(configuredSlugToName)
+      .filter(([slug]) => !poolSlugs.has(slug))
+      .map(([, name]) => name)
+      .sort();
+    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
