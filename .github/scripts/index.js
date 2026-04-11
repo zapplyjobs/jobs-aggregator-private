@@ -480,7 +480,15 @@ async function main() {
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
     // sortedJobs is current-run only — by_source.jsearch would show ~15 instead of ~400.
     const duration = Date.now() - startTime;
-    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs);
+    // S268A AGG GAP-6: Detect companies configured but returning 0 jobs.
+    // All fetchers set job.company_name from config name — direct comparison works.
+    // Prevents silent source failures like LLNL (broken for weeks undetected).
+    const companyListPath = path.join(__dirname, 'shared', 'lib', 'aggregator', 'fetchers', 'company-list.json');
+    const companyListData = JSON.parse(fs.readFileSync(companyListPath, 'utf8'));
+    const configuredNames = Object.entries(companyListData)
+      .filter(([k]) => k !== '_meta')
+      .flatMap(([, companies]) => companies.map(c => typeof c === 'string' ? c : c.name));
+    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, configuredNames);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
@@ -535,7 +543,7 @@ async function main() {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs) {
+function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, configuredCompanies) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -650,6 +658,11 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
 
     // Top 20 companies by job count (entry-level pool)
     top_companies,
+
+    // S268A AGG GAP-6: Companies configured in company-list.json but with 0 jobs in pool.
+    // Detects silent source failures (ATS migration, slug change, auth gate).
+    // LLNL was broken for weeks undetected — this prevents the next one.
+    zero_yield_companies: (configuredCompanies || []).filter(name => !companyCounts[name]).sort(),
   };
 }
 
