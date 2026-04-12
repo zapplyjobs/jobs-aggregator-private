@@ -1,14 +1,14 @@
 {
   "meta": {
-    "generated_at": "2026-04-12T01:25:46.096Z",
+    "generated_at": "2026-04-12T01:35:35.272Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "24295688605",
+    "aggregator_run_id": "24295799995",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 40950,
+    "total": 40868,
     "by_source": {
-      "workday": 27273,
+      "workday": 27191,
       "amazon": 457,
       "smartrecruiters": 2198,
       "greenhouse": 7735,
@@ -19,29 +19,29 @@
       "netflix": 74
     },
     "by_domain": {
-      "finance": 2252,
-      "software": 6533,
-      "sales": 3848,
-      "ai": 820,
-      "data_science": 1469,
-      "legal": 512,
-      "marketing": 888,
-      "hardware": 5297,
-      "general": 7380,
-      "operations": 3608,
-      "product": 560,
-      "hr": 507,
-      "manufacturing": 2744,
-      "retail": 522,
-      "healthcare": 1264,
-      "logistics": 421
+      "finance": 2248,
+      "software": 6515,
+      "sales": 3834,
+      "ai": 819,
+      "data_science": 1458,
+      "legal": 511,
+      "marketing": 886,
+      "hardware": 5272,
+      "general": 7352,
+      "operations": 3599,
+      "product": 558,
+      "hr": 506,
+      "manufacturing": 2729,
+      "retail": 496,
+      "healthcare": 1263,
+      "logistics": 406
     },
-    "us_entry_level": 19627,
-    "us_interns": 2446,
+    "us_entry_level": 19550,
+    "us_interns": 2441,
     "g1_metric": {
-      "us_total": 24330,
-      "us_general": 2017,
-      "us_general_rate": 8.3
+      "us_total": 24334,
+      "us_general": 2037,
+      "us_general_rate": 8.4
     },
     "ats_stats": {
       "companies_total": 512,
@@ -54,46 +54,46 @@
     }
   },
   "enrichment": {
-    "total_enriched": 8049,
-    "total_has_description": 8403,
+    "total_enriched": 7971,
+    "total_has_description": 8325,
     "workday_waiting_for_desc": null,
-    "jsearch_sidecar_lines": 647
+    "jsearch_sidecar_lines": 648
   },
   "pipeline": {
-    "submodule_head": "4d4438c",
+    "submodule_head": "ff3bfa7",
     "last_run_status": "success",
-    "last_run_at": "2026-04-12T01:25:46.096Z",
-    "last_run_id": "24295688605",
+    "last_run_at": "2026-04-12T01:35:35.272Z",
+    "last_run_id": "24295799995",
     "ttl_expiring_7d": 0
   },
   "repos": {
     "New-Grad": {
-      "submodule": "4d4438c",
+      "submodule": "ff3bfa7",
       "stars": 106,
       "workflowStatus": "success"
     },
     "Internships": {
-      "submodule": "4d4438c",
+      "submodule": "ff3bfa7",
       "stars": 44,
       "workflowStatus": "success"
     },
     "Software": {
-      "submodule": "4d4438c",
+      "submodule": "ff3bfa7",
       "stars": 24,
       "workflowStatus": "success"
     },
     "Data-Science": {
-      "submodule": "4d4438c",
+      "submodule": "ff3bfa7",
       "stars": 36,
       "workflowStatus": "success"
     },
     "Hardware": {
-      "submodule": "4d4438c",
+      "submodule": "ff3bfa7",
       "stars": 30,
       "workflowStatus": "success"
     },
     "Healthcare": {
-      "submodule": "4d4438c",
+      "submodule": "ff3bfa7",
       "stars": 13,
       "workflowStatus": "success"
     }
@@ -102,7 +102,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-04-12T01:15:54.033Z",
-    "total_delta": -334
+    "compared_to": "2026-04-12T01:25:46.096Z",
+    "total_delta": -82
   }
 }
