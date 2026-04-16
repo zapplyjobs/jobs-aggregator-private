@@ -1,6 +1,6 @@
 {
-  "generated": "2026-04-16T01:37:40.797Z",
-  "total_senior_filtered": 50674,
+  "generated": "2026-04-16T01:51:49.397Z",
+  "total_senior_filtered": 50822,
   "by_source": {
     "jsearch": 1,
     "greenhouse": 18812,
@@ -9,6 +9,6 @@
     "workday": 22586,
     "smartrecruiters": 2340,
     "amazon": 698,
-    "netflix": 25
+    "netflix": 173
   }
 }
