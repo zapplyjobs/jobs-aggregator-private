@@ -1,13 +1,14 @@
 {
-  "generated": "2026-04-16T13:27:03.183Z",
-  "total_senior_filtered": 50868,
+  "generated": "2026-04-16T13:41:18.499Z",
+  "total_senior_filtered": 50680,
   "by_source": {
-    "greenhouse": 18804,
-    "lever": 2155,
+    "jsearch": 1,
+    "greenhouse": 18798,
+    "lever": 2153,
     "ashby": 4059,
-    "workday": 22647,
+    "workday": 22466,
     "smartrecruiters": 2339,
-    "amazon": 691,
-    "netflix": 173
+    "amazon": 693,
+    "netflix": 171
   }
 }
