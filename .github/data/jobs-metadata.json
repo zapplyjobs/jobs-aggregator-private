@@ -1,18 +1,18 @@
 {
   "version": "1.0",
-  "generated": "2026-04-17T02:40:42.807Z",
-  "duration_ms": 900872,
-  "total_jobs": 14607,
-  "unique_jobs": 529,
-  "duplicates_removed": 159,
+  "generated": "2026-04-17T02:57:16.442Z",
+  "duration_ms": 949668,
+  "total_jobs": 14603,
+  "unique_jobs": 523,
+  "duplicates_removed": 151,
   "by_source": {
-    "workday": 12272,
+    "workday": 12266,
     "greenhouse": 825,
     "ashby": 195,
-    "amazon": 450,
+    "amazon": 451,
     "smartrecruiters": 530,
     "lever": 88,
-    "jsearch": 140,
+    "jsearch": 141,
     "netflix": 72,
     "eightfold": 35
   },
@@ -25,34 +25,34 @@
     "PARTTIME": 3,
     "CONTRACTOR": 4,
     "FULL-TIME AND INTERNSHIP": 6,
-    "PART-TIME": 3,
+    "PART-TIME": 4,
     "FULL-TIME AND PART-TIME": 1
   },
   "by_job_type": {
     "internship": 847,
-    "new-grad": 12957,
-    "mid_level": 803
+    "new-grad": 12952,
+    "mid_level": 804
   },
   "by_location": {
     "remote": 530,
-    "onsite": 14077
+    "onsite": 14073
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "RF engineer entry level",
-        "count": 5
+        "query": "systems engineering internship",
+        "count": 0
       },
       {
-        "query": "computer science intern",
-        "count": 6
+        "query": "finance internship technology",
+        "count": 3
       },
       {
-        "query": "AI ML internship 2026",
-        "count": 6
+        "query": "software engineer intern",
+        "count": 4
       }
     ],
-    "total_fetched": 17
+    "total_fetched": 7
   },
   "ats_stats": {
     "companies_total": 512,
@@ -64,8 +64,8 @@
     "smartrecruiters_companies": 19
   },
   "validation_stats": {
-    "total_input": 1426,
-    "valid_jobs": 1426,
+    "total_input": 1418,
+    "valid_jobs": 1418,
     "invalid_jobs": 0,
     "invalid_reasons": {
       "missing_title": 0,
@@ -77,65 +77,65 @@
     },
     "normalized_fields": {
       "state_extracted": 0,
-      "city_extracted": 17
+      "city_extracted": 7
     }
   },
   "senior_filter_stats": {
-    "total_input": 1426,
-    "entry_level_jobs": 555,
-    "senior_jobs": 871,
+    "total_input": 1418,
+    "entry_level_jobs": 548,
+    "senior_jobs": 870,
     "senior_reasons": {
-      "senior_title": 313,
-      "senior_experience": 120,
-      "both": 438
+      "senior_title": 314,
+      "senior_experience": 119,
+      "both": 437
     },
     "by_source": {
-      "jsearch": 2,
-      "amazon": 698,
+      "amazon": 699,
       "netflix": 171
     }
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 493,
-      "internship": 32,
+      "internship": 27,
+      "entry_level": 491,
+      "senior": 1,
       "mid_level": 4
     },
     "domains": {
-      "hardware": 293,
-      "software": 289,
-      "general": 9,
-      "ai": 50,
-      "data_science": 130,
+      "software": 286,
+      "operations": 15,
+      "finance": 11,
+      "hardware": 291,
       "manufacturing": 1,
-      "operations": 13,
-      "finance": 10,
+      "data_science": 127,
+      "ai": 45,
+      "general": 8,
       "marketing": 6,
       "legal": 4,
       "product": 1
     },
     "locations": {
-      "us": 529,
-      "on_site": 14,
+      "us": 523,
+      "on_site": 7,
       "remote": 3
     },
     "experience": {
-      "unknown": 106,
-      "entry_level": 152,
-      "mid_level": 227,
+      "entry_level": 147,
+      "mid_level": 228,
+      "unknown": 104,
       "senior_level": 44
     },
     "special": {
-      "faang": 474,
-      "fortune500": 403
+      "faang": 475,
+      "fortune500": 404
     },
-    "total": 529
+    "total": 523
   },
   "freshness": {
     "last_1h": 0,
-    "last_6h": 403,
-    "last_24h": 2732,
-    "last_48h": 5539
+    "last_6h": 367,
+    "last_24h": 2708,
+    "last_48h": 5530
   },
   "top_companies": [
     {
@@ -160,7 +160,7 @@
     },
     {
       "company": "Johnson & Johnson",
-      "count": 381,
+      "count": 380,
       "domain": "general"
     },
     {
@@ -209,14 +209,14 @@
       "domain": "general"
     },
     {
-      "company": "Medtronic",
-      "count": 215,
-      "domain": "general"
-    },
-    {
       "company": "CACI",
       "count": 215,
       "domain": "software"
+    },
+    {
+      "company": "Medtronic",
+      "count": 214,
+      "domain": "general"
     },
     {
       "company": "Amazon.com Services LLC",
@@ -235,7 +235,7 @@
     },
     {
       "company": "Micron",
-      "count": 195,
+      "count": 194,
       "domain": "general"
     },
     {
@@ -245,7 +245,7 @@
     },
     {
       "company": "Northrop Grumman",
-      "count": 189,
+      "count": 188,
       "domain": "hardware"
     },
     {
@@ -255,7 +255,7 @@
     },
     {
       "company": "Applied Materials",
-      "count": 156,
+      "count": 155,
       "domain": "hardware"
     },
     {
@@ -349,14 +349,14 @@
       "domain": "software"
     },
     {
-      "company": "ASML",
-      "count": 89,
-      "domain": "general"
-    },
-    {
       "company": "Red Bull",
       "count": 88,
       "domain": "sales"
+    },
+    {
+      "company": "ASML",
+      "count": 88,
+      "domain": "general"
     },
     {
       "company": "Mastercard",
