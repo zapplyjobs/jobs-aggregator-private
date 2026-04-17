@@ -1,58 +1,58 @@
 {
   "version": "1.0",
-  "generated": "2026-04-17T01:36:00.512Z",
-  "duration_ms": 918799,
+  "generated": "2026-04-17T01:52:42.082Z",
+  "duration_ms": 957880,
   "total_jobs": 14635,
-  "unique_jobs": 537,
-  "duplicates_removed": 160,
+  "unique_jobs": 530,
+  "duplicates_removed": 158,
   "by_source": {
-    "workday": 12289,
-    "greenhouse": 828,
+    "workday": 12288,
+    "greenhouse": 829,
     "ashby": 196,
-    "amazon": 449,
-    "smartrecruiters": 531,
+    "amazon": 450,
+    "smartrecruiters": 530,
     "lever": 88,
-    "jsearch": 140,
-    "netflix": 79,
+    "jsearch": 147,
+    "netflix": 72,
     "eightfold": 35
   },
   "by_employment_type": {
     "FULLTIME": 183,
-    "FULL-TIME": 558,
+    "FULL-TIME": 563,
     "CONTRACT": 9,
     "INTERN": 3,
-    "INTERNSHIP": 41,
+    "INTERNSHIP": 43,
     "PARTTIME": 3,
     "CONTRACTOR": 4,
     "FULL-TIME AND INTERNSHIP": 6,
-    "PART-TIME": 4,
+    "PART-TIME": 3,
     "FULL-TIME AND PART-TIME": 1
   },
   "by_job_type": {
-    "internship": 850,
-    "new-grad": 12981,
-    "mid_level": 804
+    "internship": 854,
+    "new-grad": 12978,
+    "mid_level": 803
   },
   "by_location": {
-    "remote": 532,
-    "onsite": 14103
+    "remote": 531,
+    "onsite": 14104
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "finance internship technology",
-        "count": 5
+        "query": "junior software engineer",
+        "count": 3
       },
       {
-        "query": "software engineer intern",
-        "count": 5
+        "query": "associate software engineer",
+        "count": 8
       },
       {
-        "query": "software engineering internship 2026",
-        "count": 7
+        "query": "data science intern",
+        "count": 5
       }
     ],
-    "total_fetched": 17
+    "total_fetched": 16
   },
   "ats_stats": {
     "companies_total": 512,
@@ -77,64 +77,65 @@
     },
     "normalized_fields": {
       "state_extracted": 0,
-      "city_extracted": 17
+      "city_extracted": 16
     }
   },
   "senior_filter_stats": {
     "total_input": 1426,
-    "entry_level_jobs": 563,
-    "senior_jobs": 863,
+    "entry_level_jobs": 555,
+    "senior_jobs": 871,
     "senior_reasons": {
-      "senior_title": 331,
-      "senior_experience": 113,
-      "both": 419
+      "senior_title": 314,
+      "senior_experience": 120,
+      "both": 437
     },
     "by_source": {
-      "amazon": 698,
-      "netflix": 165
+      "jsearch": 1,
+      "amazon": 699,
+      "netflix": 171
     }
   },
   "tag_stats": {
     "employment": {
-      "internship": 35,
-      "entry_level": 497,
-      "mid_level": 5
+      "entry_level": 501,
+      "internship": 25,
+      "mid_level": 4
     },
     "domains": {
-      "software": 295,
-      "finance": 13,
-      "operations": 15,
-      "hardware": 291,
+      "software": 292,
+      "hardware": 294,
+      "data_science": 132,
       "manufacturing": 1,
-      "data_science": 126,
+      "operations": 13,
       "ai": 45,
+      "finance": 10,
       "general": 8,
-      "marketing": 8,
-      "legal": 5,
-      "product": 2
+      "marketing": 6,
+      "legal": 4,
+      "product": 1
     },
     "locations": {
-      "us": 537,
-      "on_site": 16,
-      "remote": 4
+      "us": 530,
+      "on_site": 15,
+      "remote": 3
     },
     "experience": {
-      "entry_level": 155,
-      "unknown": 112,
-      "mid_level": 226,
+      "mid_level": 232,
+      "entry_level": 146,
+      "unknown": 108,
       "senior_level": 44
     },
     "special": {
-      "faang": 480,
-      "fortune500": 402
+      "fortune500": 406,
+      "faang": 474
     },
-    "total": 537
+    "total": 530
   },
   "freshness": {
-    "last_1h": 17,
-    "last_6h": 557,
-    "last_24h": 2762,
-    "last_48h": 5561
+    "last_1h": 19,
+    "last_6h": 524,
+    "last_24h": 2768,
+    "last_48h": 5569
   },
   "top_companies": [
     {
@@ -159,17 +160,17 @@
     },
     {
       "company": "Johnson & Johnson",
-      "count": 382,
+      "count": 383,
       "domain": "general"
     },
     {
       "company": "Boeing",
-      "count": 366,
+      "count": 367,
       "domain": "hardware"
     },
     {
       "company": "Abbott",
-      "count": 362,
+      "count": 363,
       "domain": "general"
     },
     {
@@ -189,7 +190,7 @@
     },
     {
       "company": "State Street",
-      "count": 299,
+      "count": 298,
       "domain": "general"
     },
     {
@@ -229,28 +230,33 @@
     },
     {
       "company": "KBR",
-      "count": 199,
+      "count": 198,
       "domain": "general"
     },
     {
       "company": "Micron",
-      "count": 195,
+      "count": 196,
       "domain": "general"
     },
     {
       "company": "Jabil",
-      "count": 191,
+      "count": 190,
       "domain": "general"
     },
     {
       "company": "Northrop Grumman",
-      "count": 188,
+      "count": 189,
       "domain": "hardware"
     },
     {
       "company": "Takeda",
-      "count": 170,
+      "count": 166,
       "domain": "healthcare"
+    },
+    {
+      "company": "Applied Materials",
+      "count": 156,
+      "domain": "hardware"
     },
     {
       "company": "Morgan Stanley",
@@ -258,19 +264,14 @@
       "domain": "finance"
     },
     {
-      "company": "Applied Materials",
-      "count": 155,
-      "domain": "hardware"
+      "company": "Philips",
+      "count": 154,
+      "domain": "general"
     },
     {
       "company": "SEL",
       "count": 153,
       "domain": "hardware"
-    },
-    {
-      "company": "Philips",
-      "count": 153,
-      "domain": "general"
     },
     {
       "company": "Intel",
@@ -299,7 +300,7 @@
     },
     {
       "company": "PricewaterhouseCoopers",
-      "count": 126,
+      "count": 125,
       "domain": "general"
     },
     {
