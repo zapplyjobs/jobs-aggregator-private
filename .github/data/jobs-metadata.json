@@ -1,58 +1,58 @@
 {
   "version": "1.0",
-  "generated": "2026-04-17T02:08:59.699Z",
-  "duration_ms": 934946,
-  "total_jobs": 14590,
-  "unique_jobs": 493,
-  "duplicates_removed": 159,
+  "generated": "2026-04-17T02:24:54.615Z",
+  "duration_ms": 913628,
+  "total_jobs": 14614,
+  "unique_jobs": 524,
+  "duplicates_removed": 154,
   "by_source": {
-    "workday": 12286,
+    "workday": 12277,
     "greenhouse": 827,
-    "ashby": 196,
+    "ashby": 195,
     "amazon": 449,
     "smartrecruiters": 530,
     "lever": 88,
-    "jsearch": 146,
-    "netflix": 33,
+    "jsearch": 141,
+    "netflix": 72,
     "eightfold": 35
   },
   "by_employment_type": {
-    "FULLTIME": 183,
-    "FULL-TIME": 559,
+    "FULLTIME": 182,
+    "FULL-TIME": 558,
     "CONTRACT": 9,
     "INTERN": 3,
-    "INTERNSHIP": 44,
-    "CONTRACTOR": 5,
+    "INTERNSHIP": 42,
     "PARTTIME": 3,
+    "CONTRACTOR": 4,
     "FULL-TIME AND INTERNSHIP": 6,
     "PART-TIME": 3,
     "FULL-TIME AND PART-TIME": 1
   },
   "by_job_type": {
-    "internship": 843,
-    "new-grad": 12947,
-    "mid_level": 800
+    "internship": 850,
+    "new-grad": 12961,
+    "mid_level": 803
   },
   "by_location": {
     "remote": 530,
-    "onsite": 14060
+    "onsite": 14084
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "data science intern summer",
-        "count": 5
+        "query": "hardware engineer intern",
+        "count": 3
       },
       {
-        "query": "data analyst entry level",
-        "count": 8
+        "query": "electrical engineering internship",
+        "count": 6
       },
       {
-        "query": "machine learning intern",
-        "count": 5
+        "query": "embedded systems engineer entry level",
+        "count": 2
       }
     ],
-    "total_fetched": 18
+    "total_fetched": 11
   },
   "ats_stats": {
     "companies_total": 512,
@@ -64,8 +64,8 @@
     "smartrecruiters_companies": 19
   },
   "validation_stats": {
-    "total_input": 1324,
-    "valid_jobs": 1324,
+    "total_input": 1419,
+    "valid_jobs": 1419,
     "invalid_jobs": 0,
     "invalid_reasons": {
       "missing_title": 0,
@@ -77,64 +77,65 @@
     },
     "normalized_fields": {
       "state_extracted": 0,
-      "city_extracted": 18
+      "city_extracted": 11
     }
   },
   "senior_filter_stats": {
-    "total_input": 1324,
-    "entry_level_jobs": 518,
-    "senior_jobs": 806,
+    "total_input": 1419,
+    "entry_level_jobs": 549,
+    "senior_jobs": 870,
     "senior_reasons": {
-      "senior_title": 312,
-      "senior_experience": 104,
-      "both": 390
+      "senior_title": 313,
+      "senior_experience": 120,
+      "both": 437
     },
     "by_source": {
+      "jsearch": 1,
       "amazon": 698,
-      "netflix": 108
+      "netflix": 171
     }
   },
   "tag_stats": {
     "employment": {
-      "internship": 20,
-      "entry_level": 472,
-      "mid_level": 1
+      "internship": 29,
+      "entry_level": 491,
+      "mid_level": 4
     },
     "domains": {
-      "data_science": 129,
-      "software": 261,
-      "ai": 44,
-      "hardware": 291,
+      "software": 285,
+      "hardware": 301,
       "manufacturing": 1,
-      "operations": 12,
-      "finance": 8,
-      "general": 6,
-      "marketing": 4,
-      "legal": 3,
+      "data_science": 126,
+      "operations": 13,
+      "ai": 45,
+      "finance": 10,
+      "general": 8,
+      "marketing": 6,
+      "legal": 4,
       "product": 1
     },
     "locations": {
-      "us": 493,
-      "on_site": 15,
-      "remote": 5
+      "us": 523,
+      "on_site": 10,
+      "remote": 3
     },
     "experience": {
-      "entry_level": 141,
-      "unknown": 89,
-      "mid_level": 222,
-      "senior_level": 41
+      "entry_level": 149,
+      "unknown": 105,
+      "mid_level": 226,
+      "senior_level": 44
     },
     "special": {
-      "faang": 434,
+      "faang": 473,
       "fortune500": 402
     },
-    "total": 493
+    "total": 524
   },
   "freshness": {
-    "last_1h": 6,
-    "last_6h": 477,
-    "last_24h": 2754,
-    "last_48h": 5553
+    "last_1h": 0,
+    "last_6h": 431,
+    "last_24h": 2740,
+    "last_48h": 5547
   },
   "top_companies": [
     {
@@ -169,7 +170,7 @@
     },
     {
       "company": "Abbott",
-      "count": 363,
+      "count": 362,
       "domain": "general"
     },
     {
@@ -179,7 +180,7 @@
     },
     {
       "company": "Caterpillar",
-      "count": 318,
+      "count": 317,
       "domain": "general"
     },
     {
@@ -218,14 +219,14 @@
       "domain": "software"
     },
     {
-      "company": "Merck & Co.",
-      "count": 203,
-      "domain": "general"
-    },
-    {
       "company": "Amazon.com Services LLC",
       "count": 202,
       "domain": "hardware"
+    },
+    {
+      "company": "Merck & Co.",
+      "count": 201,
+      "domain": "general"
     },
     {
       "company": "KBR",
@@ -249,7 +250,7 @@
     },
     {
       "company": "Takeda",
-      "count": 166,
+      "count": 162,
       "domain": "healthcare"
     },
     {
@@ -289,7 +290,7 @@
     },
     {
       "company": "Disney",
-      "count": 131,
+      "count": 130,
       "domain": "general"
     },
     {
