@@ -1,9 +1,8 @@
 {
-  "generated": "2026-04-17T03:13:39.321Z",
-  "total_senior_filtered": 871,
+  "generated": "2026-04-17T03:29:48.628Z",
+  "total_senior_filtered": 869,
   "by_source": {
-    "jsearch": 1,
-    "amazon": 699,
+    "amazon": 698,
     "netflix": 171
   }
 }

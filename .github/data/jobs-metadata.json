@@ -1,54 +1,54 @@
 {
   "version": "1.0",
-  "generated": "2026-04-17T03:13:41.532Z",
-  "duration_ms": 947834,
-  "total_jobs": 14601,
-  "unique_jobs": 532,
+  "generated": "2026-04-17T03:29:50.841Z",
+  "duration_ms": 929128,
+  "total_jobs": 14586,
+  "unique_jobs": 531,
   "duplicates_removed": 161,
   "by_source": {
-    "workday": 12261,
-    "greenhouse": 824,
+    "workday": 12249,
+    "greenhouse": 822,
     "ashby": 195,
     "amazon": 450,
     "smartrecruiters": 530,
     "lever": 88,
-    "jsearch": 146,
+    "jsearch": 145,
     "netflix": 72,
     "eightfold": 35
   },
   "by_employment_type": {
     "FULLTIME": 182,
-    "FULL-TIME": 563,
+    "FULL-TIME": 560,
     "CONTRACT": 9,
     "INTERN": 3,
-    "INTERNSHIP": 42,
-    "PARTTIME": 3,
+    "INTERNSHIP": 43,
     "CONTRACTOR": 4,
+    "PARTTIME": 3,
     "FULL-TIME AND INTERNSHIP": 6,
     "PART-TIME": 3,
     "FULL-TIME AND PART-TIME": 1
   },
   "by_job_type": {
-    "internship": 845,
-    "new-grad": 12953,
+    "internship": 846,
+    "new-grad": 12937,
     "mid_level": 803
   },
   "by_location": {
     "remote": 530,
-    "onsite": 14071
+    "onsite": 14056
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "software engineering internship 2026",
-        "count": 7
+        "query": "data science intern",
+        "count": 5
       },
       {
-        "query": "junior software engineer",
-        "count": 3
+        "query": "data science intern summer",
+        "count": 5
       },
       {
-        "query": "associate software engineer",
+        "query": "data analyst entry level",
         "count": 8
       }
     ],
@@ -64,8 +64,8 @@
     "smartrecruiters_companies": 19
   },
   "validation_stats": {
-    "total_input": 1428,
-    "valid_jobs": 1428,
+    "total_input": 1427,
+    "valid_jobs": 1427,
     "invalid_jobs": 0,
     "invalid_reasons": {
       "missing_title": 0,
@@ -81,61 +81,60 @@
     }
   },
   "senior_filter_stats": {
-    "total_input": 1428,
-    "entry_level_jobs": 557,
-    "senior_jobs": 871,
+    "total_input": 1427,
+    "entry_level_jobs": 558,
+    "senior_jobs": 869,
     "senior_reasons": {
-      "senior_title": 314,
-      "senior_experience": 120,
+      "senior_title": 313,
+      "senior_experience": 119,
       "both": 437
     },
     "by_source": {
-      "jsearch": 1,
-      "amazon": 699,
+      "amazon": 698,
       "netflix": 171
     }
   },
   "tag_stats": {
     "employment": {
-      "internship": 27,
-      "entry_level": 501,
+      "internship": 28,
+      "entry_level": 499,
       "mid_level": 4
     },
     "domains": {
-      "software": 298,
-      "hardware": 293,
+      "data_science": 142,
+      "software": 282,
+      "general": 9,
+      "hardware": 291,
       "manufacturing": 1,
-      "data_science": 127,
       "operations": 13,
       "ai": 45,
       "finance": 10,
-      "general": 8,
       "marketing": 6,
       "legal": 4,
       "product": 1
     },
     "locations": {
-      "us": 532,
-      "on_site": 17,
-      "remote": 3
+      "us": 531,
+      "on_site": 14,
+      "remote": 5
     },
     "experience": {
       "entry_level": 148,
-      "mid_level": 231,
-      "unknown": 109,
+      "unknown": 112,
+      "mid_level": 227,
       "senior_level": 44
     },
     "special": {
-      "fortune500": 405,
-      "faang": 474
+      "faang": 474,
+      "fortune500": 403
     },
-    "total": 532
+    "total": 531
   },
   "freshness": {
     "last_1h": 0,
-    "last_6h": 318,
-    "last_24h": 2700,
-    "last_48h": 5525
+    "last_6h": 279,
+    "last_24h": 2694,
+    "last_48h": 5511
   },
   "top_companies": [
     {
@@ -170,7 +169,7 @@
     },
     {
       "company": "Abbott",
-      "count": 361,
+      "count": 359,
       "domain": "general"
     },
     {
@@ -180,7 +179,7 @@
     },
     {
       "company": "Caterpillar",
-      "count": 317,
+      "count": 316,
       "domain": "general"
     },
     {
@@ -190,7 +189,7 @@
     },
     {
       "company": "State Street",
-      "count": 297,
+      "count": 296,
       "domain": "general"
     },
     {
@@ -230,12 +229,12 @@
     },
     {
       "company": "KBR",
-      "count": 198,
+      "count": 197,
       "domain": "general"
     },
     {
       "company": "Micron",
-      "count": 194,
+      "count": 192,
       "domain": "general"
     },
     {
@@ -300,7 +299,7 @@
     },
     {
       "company": "PricewaterhouseCoopers",
-      "count": 125,
+      "count": 124,
       "domain": "general"
     },
     {
@@ -344,14 +343,14 @@
       "domain": "software"
     },
     {
-      "company": "Motorola Solutions",
-      "count": 89,
-      "domain": "software"
-    },
-    {
       "company": "Red Bull",
       "count": 88,
       "domain": "sales"
+    },
+    {
+      "company": "Motorola Solutions",
+      "count": 88,
+      "domain": "software"
     },
     {
       "company": "ASML",
@@ -384,9 +383,9 @@
       "domain": "general"
     },
     {
-      "company": "Arrow Electronics",
+      "company": "BlackRock",
       "count": 79,
-      "domain": "sales"
+      "domain": "finance"
     }
   ],
   "zero_yield_companies": [
