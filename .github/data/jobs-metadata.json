@@ -1,58 +1,58 @@
 {
   "version": "1.0",
-  "generated": "2026-04-17T01:52:42.082Z",
-  "duration_ms": 957880,
-  "total_jobs": 14635,
-  "unique_jobs": 530,
-  "duplicates_removed": 158,
+  "generated": "2026-04-17T02:08:59.699Z",
+  "duration_ms": 934946,
+  "total_jobs": 14590,
+  "unique_jobs": 493,
+  "duplicates_removed": 159,
   "by_source": {
-    "workday": 12288,
-    "greenhouse": 829,
+    "workday": 12286,
+    "greenhouse": 827,
     "ashby": 196,
-    "amazon": 450,
+    "amazon": 449,
     "smartrecruiters": 530,
     "lever": 88,
-    "jsearch": 147,
-    "netflix": 72,
+    "jsearch": 146,
+    "netflix": 33,
     "eightfold": 35
   },
   "by_employment_type": {
     "FULLTIME": 183,
-    "FULL-TIME": 563,
+    "FULL-TIME": 559,
     "CONTRACT": 9,
     "INTERN": 3,
-    "INTERNSHIP": 43,
+    "INTERNSHIP": 44,
+    "CONTRACTOR": 5,
     "PARTTIME": 3,
-    "CONTRACTOR": 4,
     "FULL-TIME AND INTERNSHIP": 6,
     "PART-TIME": 3,
     "FULL-TIME AND PART-TIME": 1
   },
   "by_job_type": {
-    "internship": 854,
-    "new-grad": 12978,
-    "mid_level": 803
+    "internship": 843,
+    "new-grad": 12947,
+    "mid_level": 800
   },
   "by_location": {
-    "remote": 531,
-    "onsite": 14104
+    "remote": 530,
+    "onsite": 14060
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "junior software engineer",
-        "count": 3
+        "query": "data science intern summer",
+        "count": 5
       },
       {
-        "query": "associate software engineer",
+        "query": "data analyst entry level",
         "count": 8
       },
       {
-        "query": "data science intern",
+        "query": "machine learning intern",
         "count": 5
       }
     ],
-    "total_fetched": 16
+    "total_fetched": 18
   },
   "ats_stats": {
     "companies_total": 512,
@@ -64,8 +64,8 @@
     "smartrecruiters_companies": 19
   },
   "validation_stats": {
-    "total_input": 1426,
-    "valid_jobs": 1426,
+    "total_input": 1324,
+    "valid_jobs": 1324,
     "invalid_jobs": 0,
     "invalid_reasons": {
       "missing_title": 0,
@@ -77,65 +77,64 @@
     },
     "normalized_fields": {
       "state_extracted": 0,
-      "city_extracted": 16
+      "city_extracted": 18
     }
   },
   "senior_filter_stats": {
-    "total_input": 1426,
-    "entry_level_jobs": 555,
-    "senior_jobs": 871,
+    "total_input": 1324,
+    "entry_level_jobs": 518,
+    "senior_jobs": 806,
     "senior_reasons": {
-      "senior_title": 314,
-      "senior_experience": 120,
-      "both": 437
+      "senior_title": 312,
+      "senior_experience": 104,
+      "both": 390
     },
     "by_source": {
-      "jsearch": 1,
-      "amazon": 699,
-      "netflix": 171
+      "amazon": 698,
+      "netflix": 108
     }
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 501,
-      "internship": 25,
-      "mid_level": 4
+      "internship": 20,
+      "entry_level": 472,
+      "mid_level": 1
     },
     "domains": {
-      "software": 292,
-      "hardware": 294,
-      "data_science": 132,
+      "data_science": 129,
+      "software": 261,
+      "ai": 44,
+      "hardware": 291,
       "manufacturing": 1,
-      "operations": 13,
-      "ai": 45,
-      "finance": 10,
-      "general": 8,
-      "marketing": 6,
-      "legal": 4,
+      "operations": 12,
+      "finance": 8,
+      "general": 6,
+      "marketing": 4,
+      "legal": 3,
       "product": 1
     },
     "locations": {
-      "us": 530,
+      "us": 493,
       "on_site": 15,
-      "remote": 3
+      "remote": 5
     },
     "experience": {
-      "mid_level": 232,
-      "entry_level": 146,
-      "unknown": 108,
-      "senior_level": 44
+      "entry_level": 141,
+      "unknown": 89,
+      "mid_level": 222,
+      "senior_level": 41
     },
     "special": {
-      "fortune500": 406,
-      "faang": 474
+      "faang": 434,
+      "fortune500": 402
     },
-    "total": 530
+    "total": 493
   },
   "freshness": {
-    "last_1h": 19,
-    "last_6h": 524,
-    "last_24h": 2768,
-    "last_48h": 5569
+    "last_1h": 6,
+    "last_6h": 477,
+    "last_24h": 2754,
+    "last_48h": 5553
   },
   "top_companies": [
     {
@@ -160,7 +159,7 @@
     },
     {
       "company": "Johnson & Johnson",
-      "count": 383,
+      "count": 381,
       "domain": "general"
     },
     {
