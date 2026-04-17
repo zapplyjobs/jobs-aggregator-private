@@ -1,24 +1,24 @@
 {
   "version": "1.0",
-  "generated": "2026-04-17T02:24:54.615Z",
-  "duration_ms": 913628,
-  "total_jobs": 14614,
-  "unique_jobs": 524,
-  "duplicates_removed": 154,
+  "generated": "2026-04-17T02:40:42.807Z",
+  "duration_ms": 900872,
+  "total_jobs": 14607,
+  "unique_jobs": 529,
+  "duplicates_removed": 159,
   "by_source": {
-    "workday": 12277,
-    "greenhouse": 827,
+    "workday": 12272,
+    "greenhouse": 825,
     "ashby": 195,
-    "amazon": 449,
+    "amazon": 450,
     "smartrecruiters": 530,
     "lever": 88,
-    "jsearch": 141,
+    "jsearch": 140,
     "netflix": 72,
     "eightfold": 35
   },
   "by_employment_type": {
     "FULLTIME": 182,
-    "FULL-TIME": 558,
+    "FULL-TIME": 557,
     "CONTRACT": 9,
     "INTERN": 3,
     "INTERNSHIP": 42,
@@ -29,30 +29,30 @@
     "FULL-TIME AND PART-TIME": 1
   },
   "by_job_type": {
-    "internship": 850,
-    "new-grad": 12961,
+    "internship": 847,
+    "new-grad": 12957,
     "mid_level": 803
   },
   "by_location": {
     "remote": 530,
-    "onsite": 14084
+    "onsite": 14077
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "hardware engineer intern",
-        "count": 3
+        "query": "RF engineer entry level",
+        "count": 5
       },
       {
-        "query": "electrical engineering internship",
+        "query": "computer science intern",
         "count": 6
       },
       {
-        "query": "embedded systems engineer entry level",
-        "count": 2
+        "query": "AI ML internship 2026",
+        "count": 6
       }
     ],
-    "total_fetched": 11
+    "total_fetched": 17
   },
   "ats_stats": {
     "companies_total": 512,
@@ -64,8 +64,8 @@
     "smartrecruiters_companies": 19
   },
   "validation_stats": {
-    "total_input": 1419,
-    "valid_jobs": 1419,
+    "total_input": 1426,
+    "valid_jobs": 1426,
     "invalid_jobs": 0,
     "invalid_reasons": {
       "missing_title": 0,
@@ -77,65 +77,65 @@
     },
     "normalized_fields": {
       "state_extracted": 0,
-      "city_extracted": 11
+      "city_extracted": 17
     }
   },
   "senior_filter_stats": {
-    "total_input": 1419,
-    "entry_level_jobs": 549,
-    "senior_jobs": 870,
+    "total_input": 1426,
+    "entry_level_jobs": 555,
+    "senior_jobs": 871,
     "senior_reasons": {
       "senior_title": 313,
       "senior_experience": 120,
-      "both": 437
+      "both": 438
     },
     "by_source": {
-      "jsearch": 1,
+      "jsearch": 2,
       "amazon": 698,
       "netflix": 171
     }
   },
   "tag_stats": {
     "employment": {
-      "internship": 29,
-      "entry_level": 491,
+      "entry_level": 493,
+      "internship": 32,
       "mid_level": 4
     },
     "domains": {
-      "software": 285,
-      "hardware": 301,
+      "hardware": 293,
+      "software": 289,
+      "general": 9,
+      "ai": 50,
+      "data_science": 130,
       "manufacturing": 1,
-      "data_science": 126,
       "operations": 13,
-      "ai": 45,
       "finance": 10,
-      "general": 8,
       "marketing": 6,
       "legal": 4,
       "product": 1
     },
     "locations": {
-      "us": 523,
-      "on_site": 10,
+      "us": 529,
+      "on_site": 14,
       "remote": 3
     },
     "experience": {
-      "entry_level": 149,
-      "unknown": 105,
-      "mid_level": 226,
+      "unknown": 106,
+      "entry_level": 152,
+      "mid_level": 227,
       "senior_level": 44
     },
     "special": {
-      "faang": 473,
-      "fortune500": 402
+      "faang": 474,
+      "fortune500": 403
     },
-    "total": 524
+    "total": 529
   },
   "freshness": {
     "last_1h": 0,
-    "last_6h": 431,
-    "last_24h": 2740,
-    "last_48h": 5547
+    "last_6h": 403,
+    "last_24h": 2732,
+    "last_48h": 5539
   },
   "top_companies": [
     {
@@ -145,7 +145,7 @@
     },
     {
       "company": "RTX",
-      "count": 435,
+      "count": 434,
       "domain": "general"
     },
     {
@@ -185,7 +185,7 @@
     },
     {
       "company": "Thermo Fisher Scientific",
-      "count": 308,
+      "count": 307,
       "domain": "general"
     },
     {
@@ -205,7 +205,7 @@
     },
     {
       "company": "GE Vernova",
-      "count": 250,
+      "count": 249,
       "domain": "general"
     },
     {
@@ -235,7 +235,7 @@
     },
     {
       "company": "Micron",
-      "count": 196,
+      "count": 195,
       "domain": "general"
     },
     {
@@ -344,14 +344,14 @@
       "domain": "software"
     },
     {
-      "company": "ASML",
-      "count": 90,
-      "domain": "general"
-    },
-    {
       "company": "Motorola Solutions",
       "count": 89,
       "domain": "software"
+    },
+    {
+      "company": "ASML",
+      "count": 89,
+      "domain": "general"
     },
     {
       "company": "Red Bull",
