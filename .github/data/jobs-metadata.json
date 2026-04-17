@@ -1,13 +1,13 @@
 {
   "version": "1.0",
-  "generated": "2026-04-17T08:53:47.505Z",
-  "duration_ms": 506803,
-  "total_jobs": 37998,
-  "unique_jobs": 35807,
-  "duplicates_removed": 22606,
+  "generated": "2026-04-17T09:05:27.125Z",
+  "duration_ms": 543182,
+  "total_jobs": 37494,
+  "unique_jobs": 34713,
+  "duplicates_removed": 21898,
   "by_source": {
-    "workday": 24662,
-    "greenhouse": 7692,
+    "workday": 24157,
+    "greenhouse": 7693,
     "ashby": 1688,
     "lever": 1082,
     "amazon": 449,
@@ -30,13 +30,13 @@
     "TEMPORARY": 1
   },
   "by_job_type": {
-    "internship": 2590,
-    "new-grad": 33639,
-    "mid_level": 1769
+    "internship": 2552,
+    "new-grad": 33181,
+    "mid_level": 1761
   },
   "by_location": {
-    "remote": 2302,
-    "onsite": 35696
+    "remote": 2300,
+    "onsite": 35194
   },
   "jsearch_stats": {
     "queries": [
@@ -65,11 +65,11 @@
     "smartrecruiters_companies": 19
   },
   "validation_stats": {
-    "total_input": 86839,
-    "valid_jobs": 86607,
-    "invalid_jobs": 232,
+    "total_input": 84955,
+    "valid_jobs": 84733,
+    "invalid_jobs": 222,
     "invalid_reasons": {
-      "missing_title": 5,
+      "missing_title": 9,
       "missing_company": 0,
       "missing_url": 0,
       "invalid_title_length": 22,
@@ -78,25 +78,25 @@
       "garbage_title": null
     },
     "normalized_fields": {
-      "state_extracted": 15998,
-      "city_extracted": 20918
+      "state_extracted": 15304,
+      "city_extracted": 20763
     }
   },
   "senior_filter_stats": {
-    "total_input": 86607,
-    "entry_level_jobs": 35832,
-    "senior_jobs": 50775,
+    "total_input": 84733,
+    "entry_level_jobs": 34740,
+    "senior_jobs": 49993,
     "senior_reasons": {
-      "senior_title": 31848,
-      "senior_experience": 4249,
+      "senior_title": 31067,
+      "senior_experience": 4248,
       "both": 14678
     },
     "by_source": {
       "jsearch": 3,
-      "greenhouse": 18856,
+      "greenhouse": 18855,
       "lever": 2148,
       "ashby": 4038,
-      "workday": 22533,
+      "workday": 21752,
       "smartrecruiters": 2329,
       "amazon": 697,
       "netflix": 171
@@ -104,58 +104,58 @@
   },
   "tag_stats": {
     "employment": {
-      "internship": 2351,
-      "entry_level": 31775,
-      "mid_level": 491,
-      "senior": 1190
+      "internship": 2289,
+      "entry_level": 30765,
+      "mid_level": 485,
+      "senior": 1174
     },
     "domains": {
-      "hardware": 5249,
-      "software": 6516,
-      "sales": 3844,
-      "ai": 786,
-      "data_science": 1437,
-      "legal": 525,
-      "marketing": 863,
-      "finance": 2279,
-      "general": 8121,
-      "operations": 3592,
-      "product": 541,
-      "hr": 526,
-      "manufacturing": 2744,
-      "logistics": 481,
-      "retail": 610,
-      "healthcare": 1129
+      "hardware": 5072,
+      "software": 6369,
+      "sales": 3746,
+      "ai": 785,
+      "data_science": 1417,
+      "legal": 520,
+      "marketing": 856,
+      "finance": 2268,
+      "general": 7873,
+      "operations": 3505,
+      "product": 536,
+      "hr": 516,
+      "manufacturing": 2646,
+      "logistics": 419,
+      "retail": 477,
+      "healthcare": 1113
     },
     "locations": {
-      "us": 19812,
+      "us": 19066,
       "on_site": 2665,
-      "remote": 2208,
+      "remote": 2186,
       "hybrid": 584
     },
     "experience": {
-      "entry_level": 4334,
-      "unknown": 23518,
-      "mid_level": 5328,
-      "senior_level": 2627
+      "entry_level": 4262,
+      "unknown": 22629,
+      "mid_level": 5268,
+      "senior_level": 2554
     },
     "special": {
       "unicorn": 611,
-      "faang": 570,
+      "faang": 571,
       "fortune500": 402
     },
-    "total": 35807
+    "total": 34713
   },
   "freshness": {
-    "last_1h": 86,
-    "last_6h": 420,
-    "last_24h": 2684,
-    "last_48h": 3774
+    "last_1h": 93,
+    "last_6h": 438,
+    "last_24h": 2687,
+    "last_48h": 3788
   },
   "top_companies": [
     {
       "company": "Lowe's",
-      "count": 1010,
+      "count": 1005,
       "domain": "retail"
     },
     {
@@ -219,11 +219,6 @@
       "domain": "software"
     },
     {
-      "company": "Leidos",
-      "count": 348,
-      "domain": "software"
-    },
-    {
       "company": "FLIR Systems",
       "count": 347,
       "domain": "manufacturing"
@@ -245,7 +240,7 @@
     },
     {
       "company": "Carrier Global",
-      "count": 340,
+      "count": 342,
       "domain": "general"
     },
     {
@@ -260,12 +255,7 @@
     },
     {
       "company": "Philips",
-      "count": 336,
-      "domain": "general"
-    },
-    {
-      "company": "KBR",
-      "count": 332,
+      "count": 337,
       "domain": "general"
     },
     {
@@ -275,7 +265,7 @@
     },
     {
       "company": "Baker Hughes",
-      "count": 325,
+      "count": 324,
       "domain": "general"
     },
     {
@@ -304,13 +294,18 @@
       "domain": "hardware"
     },
     {
+      "company": "Leidos",
+      "count": 313,
+      "domain": "software"
+    },
+    {
       "company": "Abbott",
       "count": 305,
       "domain": "general"
     },
     {
       "company": "Thermo Fisher Scientific",
-      "count": 300,
+      "count": 301,
       "domain": "general"
     },
     {
@@ -320,7 +315,7 @@
     },
     {
       "company": "GlobalFoundries",
-      "count": 296,
+      "count": 297,
       "domain": "hardware"
     },
     {
@@ -345,7 +340,7 @@
     },
     {
       "company": "HPE (University)",
-      "count": 275,
+      "count": 276,
       "domain": "software"
     },
     {
@@ -365,7 +360,7 @@
     },
     {
       "company": "Jabil",
-      "count": 268,
+      "count": 267,
       "domain": "general"
     },
     {
@@ -379,14 +374,14 @@
       "domain": "software"
     },
     {
-      "company": "S&P Global",
-      "count": 264,
-      "domain": "general"
-    },
-    {
       "company": "Applied Materials",
       "count": 264,
       "domain": "hardware"
+    },
+    {
+      "company": "S&P Global",
+      "count": 263,
+      "domain": "general"
     },
     {
       "company": "Micron",
@@ -394,14 +389,19 @@
       "domain": "general"
     },
     {
-      "company": "GE Aerospace",
-      "count": 263,
-      "domain": "general"
-    },
-    {
       "company": "HPE",
       "count": 263,
       "domain": "software"
+    },
+    {
+      "company": "GE Aerospace",
+      "count": 262,
+      "domain": "general"
+    },
+    {
+      "company": "GE Vernova",
+      "count": 256,
+      "domain": "general"
     }
   ],
   "zero_yield_companies": [
