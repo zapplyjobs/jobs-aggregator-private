@@ -1,58 +1,57 @@
 {
   "version": "1.0",
-  "generated": "2026-04-18T07:40:58.265Z",
-  "duration_ms": 406275,
-  "total_jobs": 26131,
-  "unique_jobs": 13702,
-  "duplicates_removed": 11436,
+  "generated": "2026-04-18T08:02:22.741Z",
+  "duration_ms": 945800,
+  "total_jobs": 14715,
+  "unique_jobs": 523,
+  "duplicates_removed": 163,
   "by_source": {
-    "workday": 12814,
-    "greenhouse": 7702,
-    "smartrecruiters": 2151,
-    "ashby": 1690,
-    "lever": 1096,
+    "workday": 12385,
+    "greenhouse": 860,
+    "smartrecruiters": 509,
+    "ashby": 189,
+    "lever": 94,
     "amazon": 446,
     "jsearch": 159,
     "netflix": 73
   },
   "by_employment_type": {
-    "FULL-TIME": 1870,
-    "FULLTIME": 1513,
-    "INTERN": 70,
-    "CONTRACT": 101,
+    "FULL-TIME": 538,
+    "FULLTIME": 174,
+    "INTERN": 4,
+    "CONTRACT": 10,
     "INTERNSHIP": 48,
     "FULL-TIME AND INTERNSHIP": 11,
     "CONTRACTOR": 5,
-    "PARTTIME": 12,
+    "PARTTIME": 3,
     "PART-TIME": 2,
-    "FULL-TIME AND PART-TIME": 1,
-    "TEMPORARY": 1
+    "FULL-TIME AND PART-TIME": 1
   },
   "by_job_type": {
-    "internship": 1698,
-    "new-grad": 23111,
-    "mid_level": 1322
+    "internship": 899,
+    "new-grad": 12990,
+    "mid_level": 826
   },
   "by_location": {
-    "remote": 2127,
-    "onsite": 24004
+    "remote": 546,
+    "onsite": 14169
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "embedded systems engineer entry level",
-        "count": 2
+        "query": "AI ML internship 2026",
+        "count": 7
       },
       {
-        "query": "RF engineer entry level",
-        "count": 6
+        "query": "systems engineering internship",
+        "count": 0
       },
       {
-        "query": "computer science intern",
+        "query": "finance internship technology",
         "count": 6
       }
     ],
-    "total_fetched": 14
+    "total_fetched": 13
   },
   "ats_stats": {
     "companies_total": 509,
@@ -64,108 +63,83 @@
     "smartrecruiters_companies": 19
   },
   "validation_stats": {
-    "total_input": 43153,
-    "valid_jobs": 43089,
-    "invalid_jobs": 64,
+    "total_input": 1430,
+    "valid_jobs": 1430,
+    "invalid_jobs": 0,
     "invalid_reasons": {
-      "missing_title": 2,
+      "missing_title": 0,
       "missing_company": 0,
       "missing_url": 0,
-      "invalid_title_length": 8,
+      "invalid_title_length": 0,
       "invalid_company_length": 0,
-      "invalid_url_format": 0,
-      "garbage_title": null
+      "invalid_url_format": 0
     },
     "normalized_fields": {
-      "state_extracted": 8184,
-      "city_extracted": 12982
+      "state_extracted": 0,
+      "city_extracted": 13
     }
   },
   "senior_filter_stats": {
-    "total_input": 43089,
-    "entry_level_jobs": 13731,
-    "senior_jobs": 29358,
+    "total_input": 1430,
+    "entry_level_jobs": 552,
+    "senior_jobs": 878,
     "senior_reasons": {
-      "senior_title": 10460,
-      "senior_experience": 4208,
-      "both": 14690
+      "senior_title": 319,
+      "senior_experience": 126,
+      "both": 433
     },
     "by_source": {
-      "jsearch": 3,
-      "greenhouse": 18937,
-      "lever": 2176,
-      "ashby": 4025,
-      "workday": 1000,
-      "smartrecruiters": 2339,
       "amazon": 709,
       "netflix": 169
     }
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 12122,
-      "internship": 935,
-      "mid_level": 226,
-      "senior": 419
+      "internship": 33,
+      "entry_level": 486,
+      "mid_level": 4
     },
     "domains": {
-      "software": 3503,
-      "hardware": 1886,
-      "general": 1249,
-      "data_science": 848,
-      "sales": 2402,
-      "ai": 605,
-      "legal": 279,
-      "marketing": 655,
-      "finance": 622,
-      "operations": 1987,
-      "product": 334,
-      "hr": 283,
-      "manufacturing": 826,
-      "logistics": 168,
-      "retail": 288,
-      "healthcare": 259
+      "software": 283,
+      "ai": 54,
+      "data_science": 128,
+      "general": 9,
+      "finance": 14,
+      "operations": 10,
+      "hardware": 292,
+      "manufacturing": 1,
+      "marketing": 6,
+      "legal": 4,
+      "product": 1
     },
     "locations": {
-      "us": 9690,
-      "on_site": 2638,
-      "remote": 1816,
-      "hybrid": 586
+      "us": 523,
+      "on_site": 12,
+      "remote": 4
     },
     "experience": {
-      "unknown": 6537,
-      "entry_level": 2451,
-      "mid_level": 3791,
-      "senior_level": 923
+      "entry_level": 153,
+      "mid_level": 226,
+      "unknown": 101,
+      "senior_level": 43
     },
     "special": {
-      "unicorn": 609,
-      "faang": 472,
-      "fortune500": 399
+      "fortune500": 400,
+      "faang": 470
     },
-    "total": 13702
+    "total": 523
   },
   "freshness": {
     "last_1h": 0,
-    "last_6h": 49,
-    "last_24h": 2366,
-    "last_48h": 5004
+    "last_6h": 47,
+    "last_24h": 2343,
+    "last_48h": 4983
   },
   "top_companies": [
     {
       "company": "Lowe's",
       "count": 1139,
       "domain": "retail"
-    },
-    {
-      "company": "SpaceX",
-      "count": 928,
-      "domain": "hardware"
-    },
-    {
-      "company": "Anduril",
-      "count": 445,
-      "domain": "hardware"
     },
     {
       "company": "RTX",
@@ -183,11 +157,6 @@
       "domain": "general"
     },
     {
-      "company": "Red Bull",
-      "count": 375,
-      "domain": "marketing"
-    },
-    {
       "company": "Johnson & Johnson",
       "count": 374,
       "domain": "general"
@@ -203,11 +172,6 @@
       "domain": "software"
     },
     {
-      "company": "AbbVie",
-      "count": 364,
-      "domain": "healthcare"
-    },
-    {
       "company": "Abbott",
       "count": 342,
       "domain": "general"
@@ -216,16 +180,6 @@
       "company": "Caterpillar",
       "count": 330,
       "domain": "general"
-    },
-    {
-      "company": "Copart",
-      "count": 327,
-      "domain": "operations"
-    },
-    {
-      "company": "Veolia Environnement SA",
-      "count": 325,
-      "domain": "operations"
     },
     {
       "company": "Thermo Fisher Scientific",
@@ -263,34 +217,14 @@
       "domain": "general"
     },
     {
-      "company": "Salesforce",
-      "count": 230,
-      "domain": "sales"
-    },
-    {
       "company": "Micron",
       "count": 214,
       "domain": "general"
     },
     {
-      "company": "Bosch Group",
-      "count": 207,
-      "domain": "manufacturing"
-    },
-    {
       "company": "Jabil",
       "count": 205,
       "domain": "general"
-    },
-    {
-      "company": "Palantir",
-      "count": 200,
-      "domain": "software"
-    },
-    {
-      "company": "OpenAI",
-      "count": 199,
-      "domain": "software"
     },
     {
       "company": "Amazon.com Services LLC",
@@ -318,29 +252,9 @@
       "domain": "hardware"
     },
     {
-      "company": "NBCUniversal",
-      "count": 183,
-      "domain": "marketing"
-    },
-    {
       "company": "Philips",
       "count": 175,
       "domain": "general"
-    },
-    {
-      "company": "Cloudflare",
-      "count": 174,
-      "domain": "software"
-    },
-    {
-      "company": "Point72",
-      "count": 159,
-      "domain": "finance"
-    },
-    {
-      "company": "DoorDash",
-      "count": 155,
-      "domain": "operations"
     },
     {
       "company": "Takeda",
@@ -358,14 +272,14 @@
       "domain": "hardware"
     },
     {
-      "company": "Jane Street",
-      "count": 149,
-      "domain": "software"
-    },
-    {
       "company": "Guidehouse",
       "count": 147,
       "domain": "general"
+    },
+    {
+      "company": "Salesforce",
+      "count": 145,
+      "domain": "sales"
     },
     {
       "company": "SEL",
@@ -378,38 +292,256 @@
       "domain": "general"
     },
     {
-      "company": "Capital One",
-      "count": 138,
-      "domain": "general"
-    },
-    {
-      "company": "Toast",
-      "count": 136,
-      "domain": "sales"
-    },
-    {
       "company": "Baker Hughes",
       "count": 134,
-      "domain": "general"
-    },
-    {
-      "company": "Coupang",
-      "count": 133,
       "domain": "general"
     },
     {
       "company": "HPE (University)",
       "count": 132,
       "domain": "general"
+    },
+    {
+      "company": "General Motors",
+      "count": 127,
+      "domain": "general"
+    },
+    {
+      "company": "Disney",
+      "count": 126,
+      "domain": "general"
+    },
+    {
+      "company": "Cisco",
+      "count": 115,
+      "domain": "software"
+    },
+    {
+      "company": "GE Aerospace",
+      "count": 112,
+      "domain": "general"
+    },
+    {
+      "company": "AbbVie",
+      "count": 111,
+      "domain": "general"
+    },
+    {
+      "company": "HPE",
+      "count": 108,
+      "domain": "software"
+    },
+    {
+      "company": "ASML",
+      "count": 107,
+      "domain": "general"
+    },
+    {
+      "company": "Motorola Solutions",
+      "count": 101,
+      "domain": "software"
+    },
+    {
+      "company": "NVIDIA",
+      "count": 98,
+      "domain": "software"
+    },
+    {
+      "company": "Analog Devices",
+      "count": 95,
+      "domain": "general"
+    },
+    {
+      "company": "S&P Global",
+      "count": 87,
+      "domain": "general"
+    },
+    {
+      "company": "Mastercard",
+      "count": 86,
+      "domain": "general"
+    },
+    {
+      "company": "BlackRock",
+      "count": 82,
+      "domain": "finance"
+    },
+    {
+      "company": "Copart",
+      "count": 81,
+      "domain": "logistics"
+    },
+    {
+      "company": "Capital One",
+      "count": 80,
+      "domain": "general"
+    },
+    {
+      "company": "Arrow Electronics",
+      "count": 77,
+      "domain": "sales"
+    },
+    {
+      "company": "HP Inc",
+      "count": 77,
+      "domain": "general"
     }
   ],
   "zero_yield_companies": [
+    "Abridge",
+    "Ada",
+    "Affirm",
+    "Alchemy",
+    "Allen Control Systems",
     "Allison Transmission",
+    "Allium",
     "American Express",
+    "Amplitude",
+    "Anima",
+    "Anyscale",
+    "Apptronik",
+    "Arc Institute",
+    "Asana",
+    "Atomic Semi",
+    "Audax Group",
+    "Aurora Innovation",
+    "BHG Financial",
+    "Babel Street",
+    "Baseten",
+    "Baton Corporation",
+    "Bracebridge Capital",
+    "Candid Health",
+    "Cape",
+    "CarGurus",
+    "Casca",
+    "Cluely",
+    "CoBot",
+    "CockroachLabs",
+    "Cognitiv",
+    "Coinbase",
+    "Confluent",
+    "Contoro Robotics",
+    "Convergent Research",
+    "Credit Genie",
+    "Cresta",
+    "Cribl",
+    "Dashlane",
+    "DataCamp",
+    "Decagon",
+    "Deep Genomics",
+    "Demiurge Studios",
+    "Dexterity",
+    "Discord",
+    "Duolingo",
+    "Eight Sleep",
     "Entrust",
+    "Epic Games",
+    "Eventual",
+    "Exegy",
+    "ExtraHop",
+    "Fable",
+    "Figure",
+    "Findhelp",
+    "Five Rings",
+    "Flow Traders",
+    "GPTZero",
+    "GardaWorld",
+    "Gecko Robotics",
+    "Gimlet Labs",
+    "Glide",
+    "HighLevel",
+    "Ideogram",
+    "Immuta",
+    "Inflection AI",
+    "Instabase",
     "InterDigital",
+    "Intuitive Surgical",
+    "Ivo",
+    "Kabam",
+    "Kitware",
     "LPL Financial",
+    "LaunchDarkly",
+    "Lawrence Livermore National Laboratory",
+    "LeanTaaS",
+    "Life.Church (YouVersion)",
+    "Lightspark",
+    "Loop",
     "Manhattan Associates",
-    "Zebra Technologies"
+    "Marqeta",
+    "Match Group",
+    "Mechanize",
+    "Mercedes-Benz R&D North America",
+    "Merge",
+    "Metalenz",
+    "Method",
+    "Moloco",
+    "Mozilla",
+    "Multiply Labs",
+    "Neon",
+    "Nerdwallet",
+    "NewsBreak",
+    "Nextdoor",
+    "NimbleRx",
+    "Odin Dynamics",
+    "Oklo",
+    "OpenEye Scientific",
+    "OpenTable",
+    "PDT Partners",
+    "Parafin",
+    "Patreon",
+    "Pendo",
+    "Perr & Knight",
+    "Persona",
+    "Pulse",
+    "Qrypt",
+    "Quora",
+    "RESPEC",
+    "Radiant Industries",
+    "Ranger",
+    "Raytheon Technologies",
+    "Reach Financial",
+    "Reality Defender",
+    "Render",
+    "Replicant",
+    "Replit",
+    "Ro",
+    "Rover",
+    "Safari AI",
+    "Samsung Research America",
+    "SanDisk",
+    "Semgrep",
+    "Sentra",
+    "Showpad",
+    "Sierra",
+    "Sift",
+    "Sigma Computing",
+    "Starburst",
+    "Stevens Capital Management",
+    "Sunwater Capital",
+    "Symmetry Systems",
+    "Tailscale",
+    "TeleTracking Technologies",
+    "The Athletic",
+    "TransMarket Group",
+    "Tudor Investment Corporation",
+    "Udemy",
+    "Uncountable",
+    "Underdog Fantasy",
+    "Valkyrie Trading",
+    "Veolia",
+    "Vercel",
+    "Viking Global Investors",
+    "Visier",
+    "Voyant Photonics",
+    "Vultr",
+    "Waabi",
+    "Warp",
+    "WeRide",
+    "Wellmark",
+    "Whatnot",
+    "Witness AI",
+    "YugabyteDB",
+    "Zebra Technologies",
+    "interface.ai"
   ]
 }
