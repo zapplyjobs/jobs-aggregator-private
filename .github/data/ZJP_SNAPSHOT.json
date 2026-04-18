@@ -1,30 +1,30 @@
 {
   "meta": {
-    "generated_at": "2026-04-18T08:13:26.403Z",
+    "generated_at": "2026-04-18T08:28:33.128Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "24600353560",
+    "aggregator_run_id": "24600595848",
     "stale_if_older_than_hours": 2
   },
   "pool": {
     "total": 26134,
     "by_source": {
-      "workday": 12815,
+      "workday": 12814,
       "greenhouse": 7702,
       "smartrecruiters": 2151,
       "ashby": 1690,
       "lever": 1096,
       "amazon": 447,
-      "jsearch": 160,
+      "jsearch": 161,
       "netflix": 73
     },
     "by_domain": {
-      "software": 3516,
+      "software": 3505,
+      "hardware": 1882,
+      "data_science": 850,
       "sales": 2402,
       "ai": 605,
-      "data_science": 845,
       "legal": 279,
       "marketing": 655,
-      "hardware": 1881,
       "finance": 622,
       "general": 1248,
       "operations": 1987,
@@ -35,8 +35,8 @@
       "retail": 288,
       "healthcare": 259
     },
-    "us_entry_level": 9697,
-    "us_interns": 942,
+    "us_entry_level": 9690,
+    "us_interns": 933,
     "g1_metric": {
       "us_total": 16155,
       "us_general": 1901,
@@ -53,16 +53,16 @@
     }
   },
   "enrichment": {
-    "total_enriched": 5838,
-    "total_has_description": 6144,
+    "total_enriched": 5840,
+    "total_has_description": 6146,
     "workday_waiting_for_desc": null,
-    "jsearch_sidecar_lines": 144
+    "jsearch_sidecar_lines": 146
   },
   "pipeline": {
     "submodule_head": "8437f1d",
     "last_run_status": "success",
-    "last_run_at": "2026-04-18T08:13:26.403Z",
-    "last_run_id": "24600353560",
+    "last_run_at": "2026-04-18T08:28:33.128Z",
+    "last_run_id": "24600595848",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -101,7 +101,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-04-18T07:42:14.130Z",
-    "total_delta": 3
+    "compared_to": "2026-04-18T08:13:26.403Z",
+    "total_delta": 0
   }
 }
