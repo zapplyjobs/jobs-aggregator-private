@@ -1,7 +1,8 @@
 {
-  "generated": "2026-04-18T09:53:50.057Z",
-  "total_senior_filtered": 38786,
+  "generated": "2026-04-18T10:08:52.240Z",
+  "total_senior_filtered": 38787,
   "by_source": {
+    "jsearch": 1,
     "greenhouse": 18936,
     "lever": 2176,
     "ashby": 4025,
