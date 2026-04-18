@@ -419,6 +419,11 @@ async function main() {
       }
       let datePreservedCount = 0;
       for (const job of publicJobs) {
+        // AGG-6: Only preserve earlier dates for Workday. WD returns "Posted 30+ Days Ago"
+        // which refreshes each run, preventing natural aging. Other sources (GH/Ashby/Lever)
+        // use FRESHNESS-2 date-reset — preserving their old dates would overwrite Date.now()
+        // and create an infinite refresh loop (S281 bug).
+        if (job.source !== 'workday') continue;
         const prior = priorDates.get(job.id);
         if (prior && new Date(prior) < new Date(job.posted_at)) {
           job.posted_at = prior;
