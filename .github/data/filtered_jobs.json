@@ -1,12 +1,12 @@
 {
-  "generated": "2026-04-19T22:09:45.818Z",
-  "total_senior_filtered": 52238,
+  "generated": "2026-04-19T22:23:36.184Z",
+  "total_senior_filtered": 52846,
   "by_source": {
-    "jsearch": 1,
+    "jsearch": 2,
     "greenhouse": 20740,
     "lever": 2178,
     "ashby": 4025,
-    "workday": 22077,
+    "workday": 22684,
     "eightfold": 1,
     "smartrecruiters": 2340,
     "amazon": 707,
