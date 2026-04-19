@@ -1,16 +1,16 @@
 {
   "meta": {
-    "generated_at": "2026-04-19T12:11:00.604Z",
+    "generated_at": "2026-04-19T12:26:08.101Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "24628586966",
+    "aggregator_run_id": "24628858197",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 26442,
+    "total": 26443,
     "by_source": {
       "lever": 1097,
-      "workday": 14079,
       "ashby": 1688,
+      "workday": 14080,
       "greenhouse": 8789,
       "jsearch": 158,
       "smartrecruiters": 532,
@@ -18,8 +18,10 @@
       "netflix": 4
     },
     "by_domain": {
-      "software": 4672,
-      "general": 5348,
+      "software": 4665,
+      "hardware": 3021,
+      "data_science": 1004,
+      "general": 5347,
       "marketing": 561,
       "manufacturing": 1492,
       "product": 387,
@@ -29,14 +31,12 @@
       "healthcare": 538,
       "legal": 344,
       "ai": 624,
-      "data_science": 997,
       "hr": 400,
-      "hardware": 3020,
       "retail": 682,
       "logistics": 333
     },
-    "us_entry_level": 13382,
-    "us_interns": 1344,
+    "us_entry_level": 13379,
+    "us_interns": 1338,
     "g1_metric": {
       "us_total": 15158,
       "us_general": 1916,
@@ -53,16 +53,16 @@
     }
   },
   "enrichment": {
-    "total_enriched": 5537,
-    "total_has_description": 5835,
+    "total_enriched": 5536,
+    "total_has_description": 5834,
     "workday_waiting_for_desc": null,
     "jsearch_sidecar_lines": 176
   },
   "pipeline": {
     "submodule_head": "63ab692",
     "last_run_status": "success",
-    "last_run_at": "2026-04-19T12:11:00.604Z",
-    "last_run_id": "24628586966",
+    "last_run_at": "2026-04-19T12:26:08.101Z",
+    "last_run_id": "24628858197",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -101,7 +101,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-04-19T11:59:26.164Z",
-    "total_delta": 7
+    "compared_to": "2026-04-19T12:11:00.604Z",
+    "total_delta": 1
   }
 }
