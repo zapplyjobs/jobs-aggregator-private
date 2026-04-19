@@ -1,8 +1,8 @@
 {
   "meta": {
-    "generated_at": "2026-04-19T20:59:50.614Z",
+    "generated_at": "2026-04-19T21:11:18.836Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "24638741814",
+    "aggregator_run_id": "24639022700",
     "stale_if_older_than_hours": 2
   },
   "pool": {
@@ -19,28 +19,28 @@
       "netflix": 4
     },
     "by_domain": {
-      "hardware": 3014,
-      "operations": 2372,
-      "software": 4655,
-      "general": 5374,
-      "marketing": 560,
-      "manufacturing": 1497,
+      "general": 5375,
+      "software": 4658,
+      "ai": 631,
+      "data_science": 1002,
+      "marketing": 559,
+      "manufacturing": 1498,
       "product": 389,
       "finance": 1406,
       "sales": 2973,
+      "operations": 2371,
       "healthcare": 539,
       "legal": 344,
-      "ai": 626,
-      "data_science": 1000,
       "hr": 401,
+      "hardware": 3000,
       "retail": 683,
       "logistics": 335
     },
-    "us_entry_level": 13379,
-    "us_interns": 1352,
+    "us_entry_level": 13377,
+    "us_interns": 1351,
     "g1_metric": {
       "us_total": 15170,
-      "us_general": 1917,
+      "us_general": 1918,
       "us_general_rate": 12.6
     },
     "ats_stats": {
@@ -55,15 +55,15 @@
   },
   "enrichment": {
     "total_enriched": 5543,
-    "total_has_description": 5786,
+    "total_has_description": 5787,
     "workday_waiting_for_desc": null,
     "jsearch_sidecar_lines": 81
   },
   "pipeline": {
     "submodule_head": "8dae0aa",
     "last_run_status": "success",
-    "last_run_at": "2026-04-19T20:59:50.614Z",
-    "last_run_id": "24638741814",
+    "last_run_at": "2026-04-19T21:11:18.836Z",
+    "last_run_id": "24639022700",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -102,7 +102,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-04-19T20:48:37.901Z",
-    "total_delta": 1
+    "compared_to": "2026-04-19T20:59:50.614Z",
+    "total_delta": 0
   }
 }
