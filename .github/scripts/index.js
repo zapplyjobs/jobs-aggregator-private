@@ -732,7 +732,7 @@ async function gitCommit(jobCount) {
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
 
-    const commitMessage = `Update jobs - ${dateStr} ${timeStr}\n\n${jobCount} jobs in shared database`;
+    const commitMessage = `Update jobs - ${dateStr} ${timeStr}\n\n${jobCount} jobs fetched this run`;
 
     // Commit
     execSync(`git commit -m "${commitMessage}"`);
