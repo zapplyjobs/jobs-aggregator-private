@@ -105,6 +105,19 @@ async function main() {
     console.log(`   - Netflix: ${netflixJobs.length} jobs`);
     console.log('');
 
+    // Q6 (S273): Capture live fetch yield — jobs actually fetched this run, per source.
+    // Pool-level by_source uses 7-day rolling window and masks live-fetch failures (S269 Eightfold outage).
+    // live_fetch_yield distinguishes "fetched N this run" from "pool has N from prior runs".
+    // Netflix fetcher outputs source='eightfold' (SUP-NETFLIX-EF-MERGE) — merge into EF count.
+    const atsYield = atsResult.stats?.by_source || {};
+    const liveFetchYield = {
+      jsearch: jsearchJobs.length,
+      amazon: amazonJobs.length,
+      ...atsYield,
+      eightfold: (atsYield.eightfold || 0) + netflixJobs.length,
+    };
+    console.log(`📡 Live fetch yield: ${JSON.stringify(liveFetchYield)}`);
+
     // Steps 1b/1c REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment
     // workflow in jobs-data-2026 (targeted: only tech+US jobs, no waste on senior/non-US).
     console.log('📄 Steps 1b/1c: WD/SR descriptions → handled by enrichment workflow');
@@ -419,11 +432,6 @@ async function main() {
       }
       let datePreservedCount = 0;
       for (const job of publicJobs) {
-        // AGG-6: Only preserve earlier dates for Workday. WD returns "Posted 30+ Days Ago"
-        // which refreshes each run, preventing natural aging. Other sources (GH/Ashby/Lever)
-        // use FRESHNESS-2 date-reset — preserving their old dates would overwrite Date.now()
-        // and create an infinite refresh loop (S281 bug).
-        if (job.source !== 'workday') continue;
         const prior = priorDates.get(job.id);
         if (prior && new Date(prior) < new Date(job.posted_at)) {
           job.posted_at = prior;
@@ -485,42 +493,7 @@ async function main() {
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
     // sortedJobs is current-run only — by_source.jsearch would show ~15 instead of ~400.
     const duration = Date.now() - startTime;
-    // S268A AGG GAP-6: Detect companies configured but returning 0 jobs.
-    // Uses company_slug for matching (set by every fetcher from config slug).
-    // WD uses tenantKey = name.toLowerCase().replace(/\s+/g, '-') as company_slug.
-    // Prevents silent source failures like LLNL (broken for weeks undetected).
-    const companyListPath = path.join(__dirname, 'shared', 'lib', 'aggregator', 'fetchers', 'company-list.json');
-    const companyListData = JSON.parse(fs.readFileSync(companyListPath, 'utf8'));
-    // Build slug→name map for all configured companies
-    const configuredSlugToName = {};
-    for (const [ats, companies] of Object.entries(companyListData)) {
-      if (ats === '_meta') continue;
-      for (const c of companies) {
-        const name = typeof c === 'string' ? c : c.name;
-        let slug;
-        if (ats === 'workday') {
-          // WD company_slug = name.toLowerCase().replace(/\s+/g, '-')
-          slug = name.toLowerCase().replace(/\s+/g, '-');
-        } else {
-          slug = typeof c === 'string' ? c : (c.slug || c.companyIdentifier || name);
-        }
-        configuredSlugToName[slug] = name;
-      }
-    }
-    // Amazon and Netflix are single-company custom fetchers — add them
-    configuredSlugToName['amazon'] = 'Amazon';
-    configuredSlugToName['netflix'] = 'netflix';
-    // JSearch is query-based, not company-based — skip
-    // Compare against allJobs (raw current-run fetches, pre-filter) — not publicJobs (7-day pool).
-    // Current-run comparison detects "this company returned 0 jobs from the API" —
-    // the actual source health signal. Senior-only companies still return jobs (correctly
-    // filtered later) and won't appear here. Only truly broken/empty sources show up.
-    const fetchedSlugs = new Set(allJobs.map(j => j.company_slug).filter(Boolean));
-    const zeroYieldCompanies = Object.entries(configuredSlugToName)
-      .filter(([slug]) => !fetchedSlugs.has(slug))
-      .map(([, name]) => name)
-      .sort();
-    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies);
+    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, liveFetchYield);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
@@ -575,7 +548,7 @@ async function main() {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, configuredCompanies) {
+function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, liveFetchYield) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -690,11 +663,6 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
 
     // Top 20 companies by job count (entry-level pool)
     top_companies,
-
-    // S268A AGG GAP-6: Companies configured in company-list.json but with 0 jobs in pool.
-    // Detects silent source failures (ATS migration, slug change, auth gate).
-    // LLNL was broken for weeks undetected — this prevents the next one.
-    zero_yield_companies: (configuredCompanies || []).filter(name => !companyCounts[name]).sort(),
   };
 }
 
