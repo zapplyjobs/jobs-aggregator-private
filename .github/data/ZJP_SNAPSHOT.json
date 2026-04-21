@@ -1,15 +1,15 @@
 {
   "meta": {
-    "generated_at": "2026-04-21T10:42:16.181Z",
+    "generated_at": "2026-04-21T10:53:52.910Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "24717520131",
+    "aggregator_run_id": "24717810515",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 26258,
+    "total": 26263,
     "by_source": {
-      "workday": 13573,
-      "greenhouse": 8990,
+      "workday": 13575,
+      "greenhouse": 8993,
       "ashby": 1707,
       "eightfold": 53,
       "lever": 1121,
@@ -19,27 +19,27 @@
       "netflix": 1
     },
     "by_domain": {
-      "software": 4712,
+      "software": 4713,
       "finance": 1432,
-      "operations": 2347,
-      "general": 5371,
+      "operations": 2345,
+      "general": 5368,
       "marketing": 551,
       "manufacturing": 1520,
       "product": 382,
-      "sales": 2979,
-      "legal": 345,
+      "sales": 2980,
+      "legal": 346,
       "ai": 625,
       "data_science": 1018,
-      "hr": 391,
-      "hardware": 3023,
+      "hr": 392,
+      "hardware": 3024,
       "retail": 771,
       "logistics": 304,
-      "healthcare": 544
+      "healthcare": 543
     },
     "us_entry_level": 13408,
-    "us_interns": 1363,
+    "us_interns": 1364,
     "g1_metric": {
-      "us_total": 14900,
+      "us_total": 14901,
       "us_general": 1991,
       "us_general_rate": 13.4
     },
@@ -54,16 +54,16 @@
     }
   },
   "enrichment": {
-    "total_enriched": 5465,
-    "total_has_description": 5677,
+    "total_enriched": 5474,
+    "total_has_description": 5686,
     "workday_waiting_for_desc": null,
     "jsearch_sidecar_lines": 85
   },
   "pipeline": {
     "submodule_head": "9d23efa",
     "last_run_status": "success",
-    "last_run_at": "2026-04-21T10:42:16.181Z",
-    "last_run_id": "24717520131",
+    "last_run_at": "2026-04-21T10:53:52.910Z",
+    "last_run_id": "24717810515",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -102,7 +102,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-04-21T10:27:15.069Z",
-    "total_delta": 44
+    "compared_to": "2026-04-21T10:42:16.181Z",
+    "total_delta": 5
   }
 }
