@@ -1,9 +1,9 @@
 {
-  "generated": "2026-04-21T14:17:15.803Z",
-  "total_senior_filtered": 891,
+  "generated": "2026-04-21T14:37:34.197Z",
+  "total_senior_filtered": 887,
   "by_source": {
     "jsearch": 1,
-    "amazon": 718,
-    "eightfold": 172
+    "amazon": 716,
+    "eightfold": 170
   }
 }
