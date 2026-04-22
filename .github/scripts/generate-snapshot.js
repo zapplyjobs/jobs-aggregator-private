@@ -136,33 +136,41 @@ function readDescriptionSidecarLines(source) {
 
 // ─── Computation helpers ───────────────────────────────────────────────────
 
+const TECH_DOMAINS = new Set(['software', 'data_science', 'hardware', 'ai']);
+
 /**
  * Compute G1 metric: general-tag rate among US jobs from all_jobs.json JSONL.
- * This is the canonical measurement for PRODUCT_GOALS.md G1.
- * Returns { us_total, us_general, us_general_rate } or null if file unreadable.
+ * Returns both all-US and tech-US rates.
+ * - all-US: generals / all US jobs (stable, tracks pool composition)
+ * - tech-US: generals / (tech-US + general-US) (user-connected, measures tech noise)
  */
 function computeG1Metric() {
   const p = path.join(JOBS_DATA_DIR, 'all_jobs.json');
   if (!fs.existsSync(p)) return null;
   try {
     const lines = fs.readFileSync(p, 'utf8').split('\n').filter(l => l.trim());
-    let usTotal = 0;
-    let usGeneral = 0;
+    let usTotal = 0, usGeneral = 0, usTech = 0;
     for (const line of lines) {
       try {
         const job = JSON.parse(line);
         const locations = job.tags?.locations || [];
         if (!locations.includes('us')) continue;
-        usTotal++;
         const domains = job.tags?.domains || [];
-        if (domains.includes('general')) usGeneral++;
+        const isGeneral = domains.length === 1 && domains[0] === 'general';
+        const hasTech = domains.some(d => TECH_DOMAINS.has(d));
+        usTotal++;
+        if (isGeneral) usGeneral++;
+        if (hasTech) usTech++;
       } catch { /* skip malformed */ }
     }
     if (usTotal === 0) return null;
+    const techPool = usTech + usGeneral; // tech-eligible denominator
     return {
       us_total: usTotal,
       us_general: usGeneral,
-      us_general_rate: Math.round((usGeneral / usTotal) * 1000) / 10, // one decimal %
+      us_general_rate: Math.round((usGeneral / usTotal) * 1000) / 10,
+      tech_us_total: usTech,
+      tech_us_general_rate: techPool > 0 ? Math.round((usGeneral / techPool) * 1000) / 10 : null,
     };
   } catch { return null; }
 }
@@ -338,7 +346,7 @@ function generateContextMd(snapshot) {
 | Pool total | ${formatNumber(pool.total)} jobs |
 | US entry-level | ${formatNumber(pool.us_entry_level)} |
 | Interns (US) | ${formatNumber(pool.us_interns)} |
-| G1 general rate | ${pool.g1_metric ? `${pool.g1_metric.us_general_rate}% (${formatNumber(pool.g1_metric.us_general)}/${formatNumber(pool.g1_metric.us_total)} US jobs) — target: <40%` : 'n/a'} |
+| G1 general rate | ${pool.g1_metric ? `${pool.g1_metric.us_general_rate}% all-US (${formatNumber(pool.g1_metric.us_general)}/${formatNumber(pool.g1_metric.us_total)}) / ${pool.g1_metric.tech_us_general_rate ?? '?'}% tech-US (${formatNumber(pool.g1_metric.us_general)}/${formatNumber(pool.g1_metric.tech_us_total + pool.g1_metric.us_general)})` : 'n/a'} |
 | Submodule | \`${pipeline.submodule_head || '?'}\` |
 ${deltaLine}
 ---
