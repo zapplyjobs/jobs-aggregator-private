@@ -1,23 +1,23 @@
 {
   "version": "1.0",
-  "generated": "2026-04-22T18:52:43.871Z",
-  "duration_ms": 539207,
-  "total_jobs": 27087,
-  "unique_jobs": 23734,
-  "duplicates_removed": 23680,
+  "generated": "2026-04-22T19:05:11.813Z",
+  "duration_ms": 548726,
+  "total_jobs": 27073,
+  "unique_jobs": 23629,
+  "duplicates_removed": 23575,
   "by_source": {
-    "workday": 14056,
-    "greenhouse": 9252,
-    "smartrecruiters": 606,
+    "workday": 14042,
+    "greenhouse": 9254,
+    "smartrecruiters": 605,
     "ashby": 1740,
     "lever": 1151,
     "eightfold": 56,
-    "jsearch": 143,
+    "jsearch": 142,
     "amazon": 82,
     "netflix": 1
   },
   "by_employment_type": {
-    "FULL-TIME": 551,
+    "FULL-TIME": 549,
     "FULLTIME": 1561,
     "INTERN": 74,
     "CONTRACT": 94,
@@ -29,30 +29,30 @@
     "CONTRACTOR": 1
   },
   "by_job_type": {
-    "internship": 1672,
-    "new-grad": 24149,
-    "mid_level": 1266
+    "internship": 1671,
+    "new-grad": 24138,
+    "mid_level": 1264
   },
   "by_location": {
-    "remote": 2056,
-    "onsite": 25031
+    "remote": 2058,
+    "onsite": 25015
   },
   "jsearch_stats": {
     "queries": [
       {
-        "query": "systems engineering internship",
-        "count": 6
+        "query": "software engineering internship 2026",
+        "count": 5
       },
       {
-        "query": "finance internship technology",
-        "count": 0
+        "query": "junior software engineer",
+        "count": 5
       },
       {
-        "query": "software engineer intern",
-        "count": 7
+        "query": "associate software engineer",
+        "count": 5
       }
     ],
-    "total_fetched": 13
+    "total_fetched": 15
   },
   "ats_stats": {
     "companies_total": 527,
@@ -64,11 +64,11 @@
     "smartrecruiters_companies": 19
   },
   "validation_stats": {
-    "total_input": 90835,
-    "valid_jobs": 90559,
-    "invalid_jobs": 276,
+    "total_input": 90290,
+    "valid_jobs": 90033,
+    "invalid_jobs": 257,
     "invalid_reasons": {
-      "missing_title": 31,
+      "missing_title": 21,
       "missing_company": 0,
       "missing_url": 0,
       "invalid_title_length": 26,
@@ -77,83 +77,84 @@
       "garbage_title": null
     },
     "normalized_fields": {
-      "state_extracted": 16170,
-      "city_extracted": 21025
+      "state_extracted": 15953,
+      "city_extracted": 21001
     }
   },
   "senior_filter_stats": {
-    "total_input": 90559,
-    "entry_level_jobs": 37865,
-    "senior_jobs": 52694,
+    "total_input": 90033,
+    "entry_level_jobs": 37543,
+    "senior_jobs": 52490,
     "senior_reasons": {
-      "senior_title": 32930,
-      "senior_experience": 4485,
+      "senior_title": 32725,
+      "senior_experience": 4486,
       "both": 15279
     },
     "by_source": {
+      "jsearch": 1,
       "greenhouse": 20676,
       "lever": 2128,
-      "ashby": 4016,
-      "workday": 22706,
-      "smartrecruiters": 2273,
+      "ashby": 4018,
+      "workday": 22503,
+      "smartrecruiters": 2269,
       "amazon": 722,
       "eightfold": 173
     }
   },
   "tag_stats": {
     "employment": {
-      "internship": 1351,
-      "entry_level": 21300,
-      "mid_level": 360,
-      "senior": 723
+      "internship": 1341,
+      "entry_level": 21214,
+      "mid_level": 353,
+      "senior": 721
     },
     "domains": {
-      "software": 4721,
-      "general": 5164,
-      "marketing": 554,
-      "manufacturing": 1479,
-      "product": 376,
-      "sales": 3040,
-      "finance": 1469,
-      "operations": 2396,
-      "legal": 342,
-      "data_science": 1028,
-      "ai": 630,
-      "hr": 404,
-      "hardware": 3041,
-      "retail": 863,
+      "general": 5155,
+      "software": 4676,
+      "marketing": 552,
+      "manufacturing": 1476,
+      "product": 374,
+      "sales": 3041,
+      "finance": 1462,
+      "operations": 2383,
+      "legal": 344,
+      "data_science": 1007,
+      "ai": 627,
+      "hr": 403,
+      "hardware": 3029,
+      "retail": 860,
       "logistics": 301,
       "healthcare": 568
     },
     "locations": {
-      "us": 13585,
+      "us": 13483,
       "on_site": 1292,
-      "remote": 1904,
+      "remote": 1906,
       "hybrid": 589
     },
     "experience": {
-      "entry_level": 2920,
-      "mid_level": 4033,
-      "unknown": 15578,
-      "senior_level": 1203
+      "entry_level": 2911,
+      "senior_level": 1196,
+      "unknown": 15491,
+      "mid_level": 4031
     },
     "special": {
-      "unicorn": 608,
+      "unicorn": 607,
       "faang": 151,
       "fortune500": 73
     },
-    "total": 23734
+    "total": 23629
   },
   "freshness": {
-    "last_1h": 221,
-    "last_6h": 1287,
-    "last_24h": 2992,
-    "last_48h": 5643
+    "last_1h": 213,
+    "last_6h": 1313,
+    "last_24h": 3005,
+    "last_48h": 5676
   },
   "top_companies": [
     {
       "company": "Lowe's",
-      "count": 1232,
+      "count": 1241,
       "domain": "retail"
     },
     {
@@ -178,7 +179,7 @@
     },
     {
       "company": "RTX",
-      "count": 409,
+      "count": 412,
       "domain": "general"
     },
     {
@@ -188,7 +189,7 @@
     },
     {
       "company": "Johnson & Johnson",
-      "count": 389,
+      "count": 388,
       "domain": "general"
     },
     {
@@ -198,32 +199,27 @@
     },
     {
       "company": "Caterpillar",
-      "count": 358,
+      "count": 359,
       "domain": "general"
     },
     {
       "company": "Boeing",
-      "count": 355,
+      "count": 356,
       "domain": "software"
     },
     {
       "company": "Carrier Global",
-      "count": 340,
+      "count": 341,
       "domain": "general"
     },
     {
       "company": "Capco",
-      "count": 322,
+      "count": 323,
       "domain": "general"
     },
     {
       "company": "Thermo Fisher Scientific",
       "count": 314,
-      "domain": "general"
-    },
-    {
-      "company": "Abbott",
-      "count": 309,
       "domain": "general"
     },
     {
@@ -237,9 +233,9 @@
       "domain": "software"
     },
     {
-      "company": "Booz Allen Hamilton",
-      "count": 302,
-      "domain": "software"
+      "company": "Abbott",
+      "count": 307,
+      "domain": "general"
     },
     {
       "company": "Hitachi",
@@ -247,18 +243,23 @@
       "domain": "general"
     },
     {
+      "company": "Booz Allen Hamilton",
+      "count": 268,
+      "domain": "software"
+    },
+    {
       "company": "Comcast",
-      "count": 266,
+      "count": 267,
       "domain": "sales"
     },
     {
       "company": "Micron",
-      "count": 254,
+      "count": 253,
       "domain": "general"
     },
     {
       "company": "GE Vernova",
-      "count": 247,
+      "count": 248,
       "domain": "general"
     },
     {
@@ -268,7 +269,7 @@
     },
     {
       "company": "KBR",
-      "count": 229,
+      "count": 232,
       "domain": "general"
     },
     {
@@ -278,7 +279,7 @@
     },
     {
       "company": "CACI",
-      "count": 214,
+      "count": 213,
       "domain": "software"
     },
     {
@@ -308,7 +309,7 @@
     },
     {
       "company": "Morgan Stanley",
-      "count": 183,
+      "count": 182,
       "domain": "finance"
     },
     {
@@ -318,7 +319,7 @@
     },
     {
       "company": "Philips",
-      "count": 177,
+      "count": 178,
       "domain": "general"
     },
     {
@@ -342,18 +343,18 @@
       "domain": "finance"
     },
     {
-      "company": "DoorDash",
-      "count": 164,
-      "domain": "operations"
-    },
-    {
       "company": "Salesforce",
       "count": 164,
       "domain": "sales"
     },
     {
+      "company": "DoorDash",
+      "count": 163,
+      "domain": "operations"
+    },
+    {
       "company": "Applied Materials",
-      "count": 159,
+      "count": 160,
       "domain": "hardware"
     },
     {
@@ -373,7 +374,7 @@
     },
     {
       "company": "Baker Hughes",
-      "count": 146,
+      "count": 147,
       "domain": "general"
     },
     {
@@ -383,7 +384,7 @@
     },
     {
       "company": "Cisco",
-      "count": 141,
+      "count": 142,
       "domain": "software"
     },
     {
@@ -393,7 +394,7 @@
     },
     {
       "company": "GE Aerospace",
-      "count": 138,
+      "count": 139,
       "domain": "general"
     },
     {
