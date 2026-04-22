@@ -155,6 +155,7 @@ function computeG1Metric() {
         const job = JSON.parse(line);
         const locations = job.tags?.locations || [];
         if (!locations.includes('us')) continue;
+        if (job.tags?.employment === 'senior') continue; // G1 measures entry-level audience only
         const domains = job.tags?.domains || [];
         const isGeneral = domains.length === 1 && domains[0] === 'general';
         const hasTech = domains.some(d => TECH_DOMAINS.has(d));
