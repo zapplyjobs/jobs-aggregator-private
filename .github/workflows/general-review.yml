@@ -35,14 +35,21 @@ jobs:
             -o /tmp/review-data/all_jobs.json
           echo "  $(wc -l < /tmp/review-data/all_jobs.json) jobs"
 
+          echo "Discovering sidecar description files..."
+          # Use Contents API to list all descriptions-*.jsonl files dynamically.
+          # This auto-discovers new enriched chunks (was hardcoded to 2 of 16, missing WD descriptions).
+          SIDECAR_FILES=$(curl -sf -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/zapplyjobs/jobs-data-2026/contents/.github/data" \
+            | jq -r '.[] | select(.name | startswith("descriptions-") and endswith(".jsonl")) | .name')
+          echo "Found sidecar files:"
+          echo "$SIDECAR_FILES"
+
           echo "Downloading sidecar descriptions..."
-          for f in descriptions-enriched-1.jsonl descriptions-enriched-2.jsonl descriptions-greenhouse-1.jsonl descriptions-greenhouse-2.jsonl \
-                   descriptions-ashby.jsonl descriptions-lever.jsonl descriptions-amazon.jsonl \
-                   descriptions-smartrecruiters.jsonl descriptions-eightfold.jsonl descriptions-jsearch.jsonl \
-                   descriptions-netflix.jsonl; do
+          for f in $SIDECAR_FILES; do
             curl -sf -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
               "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/$f?t=$(date +%s)" \
-              -o "/tmp/review-data/$f" 2>/dev/null && echo "  $f: $(wc -l < /tmp/review-data/$f) entries" || echo "  $f: not found (skipped)"
+              -o "/tmp/review-data/$f" 2>/dev/null && echo "  $f: $(wc -l < /tmp/review-data/$f) entries" || echo "  $f: download failed (skipped)"
           done
 
       - name: Generate general-review.json
