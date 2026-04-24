@@ -1,15 +1,15 @@
 {
   "meta": {
-    "generated_at": "2026-04-24T02:19:55.012Z",
+    "generated_at": "2026-04-24T02:32:00.636Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "24868384336",
+    "aggregator_run_id": "24868795075",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 28308,
+    "total": 28315,
     "by_source": {
-      "workday": 14791,
-      "smartrecruiters": 624,
+      "workday": 14797,
+      "smartrecruiters": 625,
       "ashby": 1774,
       "greenhouse": 9704,
       "lever": 1179,
@@ -18,30 +18,30 @@
       "eightfold": 54
     },
     "by_domain": {
-      "hardware": 2990,
+      "hardware": 2980,
       "software": 4863,
-      "general": 5345,
-      "marketing": 568,
-      "manufacturing": 1521,
+      "manufacturing": 1524,
+      "data_science": 1057,
+      "operations": 2443,
+      "general": 5349,
+      "ai": 650,
+      "marketing": 566,
       "product": 380,
-      "sales": 3090,
+      "sales": 3092,
       "finance": 1483,
-      "operations": 2441,
       "legal": 356,
-      "data_science": 1051,
-      "ai": 643,
       "hr": 402,
-      "retail": 945,
-      "logistics": 356,
+      "retail": 946,
+      "logistics": 355,
       "healthcare": 562
     },
-    "us_entry_level": 13996,
-    "us_interns": 1252,
+    "us_entry_level": 14005,
+    "us_interns": 1253,
     "g1_metric": {
-      "us_total": 16025,
-      "us_general": 1998,
+      "us_total": 16029,
+      "us_general": 2000,
       "us_general_rate": 12.5,
-      "tech_us_total": 6024,
+      "tech_us_total": 6023,
       "tech_us_general_rate": 24.9
     },
     "ats_stats": {
@@ -54,16 +54,16 @@
     }
   },
   "enrichment": {
-    "total_enriched": 5722,
-    "total_has_description": 5867,
+    "total_enriched": 5733,
+    "total_has_description": 5878,
     "workday_waiting_for_desc": null,
     "jsearch_sidecar_lines": 184
   },
   "pipeline": {
     "submodule_head": "09e9245",
     "last_run_status": "success",
-    "last_run_at": "2026-04-24T02:19:55.012Z",
-    "last_run_id": "24868384336",
+    "last_run_at": "2026-04-24T02:32:00.636Z",
+    "last_run_id": "24868795075",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -102,7 +102,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-04-24T02:08:13.363Z",
-    "total_delta": 20
+    "compared_to": "2026-04-24T02:19:55.012Z",
+    "total_delta": 7
   }
 }
