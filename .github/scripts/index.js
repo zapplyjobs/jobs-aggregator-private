@@ -493,7 +493,8 @@ async function main() {
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
     // sortedJobs is current-run only — by_source.jsearch would show ~15 instead of ~400.
     const duration = Date.now() - startTime;
-    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, liveFetchYield);
+    const atsFetchStats = atsResult.stats || {};
+    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, liveFetchYield, atsFetchStats);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
@@ -548,7 +549,7 @@ async function main() {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, liveFetchYield) {
+function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, liveFetchYield, atsFetchStats) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -661,8 +662,22 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     // Freshness — jobs posted within last N hours (entry-level pool)
     freshness,
 
-    // Top 20 companies by job count (entry-level pool)
+    // Top companies by job count (entry-level pool)
     top_companies,
+
+    // AGG-24: Per-company fetch yield + per-source company health.
+    // ATS fetcher computes by_company at fetch time — persist for zero-yield detection.
+    fetched_by_company: atsFetchStats.by_company || {},
+    companies_by_source: (() => {
+      const ats = getATSUsageStats();
+      return {
+        greenhouse: ats.greenhouse_companies,
+        lever: ats.lever_companies,
+        ashby: ats.ashby_companies,
+        workday: ats.workday_tenants,
+        smartrecruiters: ats.smartrecruiters_companies,
+      };
+    })(),
   };
 }
 
