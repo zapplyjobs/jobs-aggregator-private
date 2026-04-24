@@ -494,6 +494,21 @@ async function main() {
     // sortedJobs is current-run only — by_source.jsearch would show ~15 instead of ~400.
     const duration = Date.now() - startTime;
     const atsFetchStats = atsResult.stats || {};
+    // AGG-24 supplement: derive companies_with_jobs_by_source from the actual jobs.
+    // atsFetchStats.by_company has counts but no source attribution.
+    // atsResult.jobs has source + company_name on each job — use that.
+    const srcCompanySet = {};
+    for (const job of atsResult.jobs || []) {
+      const src = job.source;
+      const co = job.company_name || job.company_slug;
+      if (!src || !co) continue;
+      if (!srcCompanySet[src]) srcCompanySet[src] = new Set();
+      srcCompanySet[src].add(co);
+    }
+    atsFetchStats._companies_with_jobs_by_source = {};
+    for (const [src, companies] of Object.entries(srcCompanySet)) {
+      atsFetchStats._companies_with_jobs_by_source[src] = companies.size;
+    }
     const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, liveFetchYield, atsFetchStats);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
@@ -678,6 +693,7 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
         smartrecruiters: ats.smartrecruiters_companies,
       };
     })(),
+    companies_with_jobs_by_source: atsFetchStats._companies_with_jobs_by_source || {},
   };
 }
 
