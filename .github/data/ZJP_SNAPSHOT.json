@@ -1,15 +1,15 @@
 {
   "meta": {
-    "generated_at": "2026-04-25T22:47:21.319Z",
+    "generated_at": "2026-04-25T22:59:00.818Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "24942220230",
+    "aggregator_run_id": "24942476724",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 28679,
+    "total": 28677,
     "by_source": {
       "greenhouse": 10237,
-      "workday": 14577,
+      "workday": 14575,
       "ashby": 1794,
       "lever": 1201,
       "smartrecruiters": 596,
@@ -18,11 +18,11 @@
       "eightfold": 60
     },
     "by_domain": {
+      "sales": 3661,
       "software": 5715,
-      "general": 6311,
+      "general": 6309,
       "logistics": 668,
       "retail": 1487,
-      "sales": 3661,
       "manufacturing": 1669,
       "finance": 1679,
       "healthcare": 631,
@@ -54,16 +54,16 @@
     }
   },
   "enrichment": {
-    "total_enriched": 5788,
-    "total_has_description": 5900,
+    "total_enriched": 5819,
+    "total_has_description": 5931,
     "workday_waiting_for_desc": null,
     "jsearch_sidecar_lines": 225
   },
   "pipeline": {
     "submodule_head": "1d2dc11",
     "last_run_status": "success",
-    "last_run_at": "2026-04-25T22:47:21.319Z",
-    "last_run_id": "24942220230",
+    "last_run_at": "2026-04-25T22:59:00.818Z",
+    "last_run_id": "24942476724",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -102,7 +102,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-04-25T22:35:30.876Z",
-    "total_delta": 9
+    "compared_to": "2026-04-25T22:47:21.319Z",
+    "total_delta": -2
   }
 }
