@@ -29,7 +29,7 @@ const { loadDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob } = require(`${SHARED}/processors/senior-filter`);
 const { deduplicateJobs } = require(`${SHARED}/processors/deduplicator`);
-const { tagJobs, generateTagStats } = require(`${SHARED}/processors/tag-engine`);
+const { tagJobs, generateTagStats, tagEmployment } = require(`${SHARED}/processors/tag-engine`);
 const { printTagDistribution } = require(`${SHARED}/processors/tag-monitor`);
 
 // Import utils
@@ -469,7 +469,19 @@ async function main() {
       if (mergedCount > 0) {
         // Re-sort after merge (newest first)
         publicJobs.sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0));
-        console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length})`);
+        // Re-tag employment on carry-forward jobs with current tag-engine rules.
+        // Only re-tags employment — domain tags preserved (may be from description-fallback).
+        let retagged = 0;
+        for (const job of publicJobs) {
+          if (currentIds.has(job.id)) continue;
+          const newEmp = tagEmployment(job);
+          if (job.tags?.employment !== newEmp) {
+            job.tags.employment = newEmp;
+            retagged++;
+          }
+        }
+        console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${retagged > 0 ? `, ${retagged} employment re-tagged` : ''})`);
+
       } else {
         console.log('🔄 No prior-run jobs to merge');
       }
