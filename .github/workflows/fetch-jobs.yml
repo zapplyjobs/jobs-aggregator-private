@@ -1,0 +1,369 @@
+name: Fetch All Jobs
+
+on:
+  workflow_dispatch:  # Triggered by job-board-cron-worker (Cloudflare) every 15 min
+  schedule:
+    - cron: '0 * * * *'  # Hourly fallback if CF worker stops firing. Concurrency guard prevents overlap.
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/scripts/**'
+
+# Prevent concurrent runs
+concurrency:
+  group: job-fetch
+  cancel-in-progress: false
+
+jobs:
+  fetch-all:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+      with:
+        ref: ${{ github.ref_name }}
+        fetch-depth: 1  # Shallow clone — rebase fetches missing objects on demand
+        submodules: recursive
+        token: ${{ secrets.GH_PAT }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '22'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Create logs directory
+      run: mkdir -p .github/logs .github/data
+
+    - name: Seed all_jobs.json from jobs-data-2026
+      run: |
+        echo "📥 Seeding previous all_jobs.json from jobs-data-2026..."
+        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/all_jobs.json?t=$(date +%s)" \
+          -o .github/data/all_jobs.json && \
+          echo "✅ Seeded $(wc -l < .github/data/all_jobs.json) jobs from jobs-data-2026" || \
+          echo "⚠️ Could not seed all_jobs.json — starting fresh"
+
+    - name: Seed descriptions-enriched.jsonl from jobs-data-2026
+      run: |
+        echo "📥 Seeding enriched descriptions (WD/SR) from jobs-data-2026..."
+        # TAG-7: WD/SR descriptions needed before tagging (Step 5) for description fallback.
+        # Enrichment workflow fetches these; aggregator seeds them for classification.
+        # INF-7: File is chunked into -1 and -2 (each ≤85 MB). Fetch each chunk separately —
+        # the aggregator's loadDescriptionsMap() globs descriptions-*.jsonl and picks up all chunks.
+        TOTAL=0
+        for CHUNK in 1 2; do
+          curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-enriched-${CHUNK}.jsonl?t=$(date +%s)" \
+            -o ".github/data/descriptions-enriched-${CHUNK}.jsonl" && \
+            LINES=$(wc -l < ".github/data/descriptions-enriched-${CHUNK}.jsonl") && \
+            TOTAL=$((TOTAL + LINES)) && \
+            echo "  chunk ${CHUNK}: ${LINES} entries" || \
+            echo "  chunk ${CHUNK}: not found (skipped)"
+        done
+        [ $TOTAL -gt 0 ] && echo "✅ Seeded ${TOTAL} enriched descriptions total" || \
+          echo "⚠️ No descriptions-enriched chunks found — description fallback will be inactive"
+
+    - name: Seed descriptions-jsearch.jsonl from jobs-data-2026
+      run: |
+        echo "📥 Seeding JSearch description cache from jobs-data-2026..."
+        # Seed prior descriptions-jsearch.jsonl so the accumulator in Step 8b can merge
+        # existing-pool descriptions. Without this, descriptions-jsearch.jsonl doesn't exist
+        # on the runner at start of each run and the legacy map is always empty.
+        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-jsearch.jsonl?t=$(date +%s)" \
+          -o .github/data/descriptions-jsearch.jsonl && \
+          echo "✅ Seeded $(wc -l < .github/data/descriptions-jsearch.jsonl) JSearch descriptions from cache" || \
+          echo "⚠️ No descriptions-jsearch.jsonl yet — starting fresh"
+
+    - name: Fetch jobs from all sources
+      run: node .github/scripts/index.js 2>&1 | tee .github/logs/fetch.log
+      env:
+        JSEARCH_API_KEY: ${{ secrets.JSEARCH_API_KEY }}
+
+    - name: Post-deploy invariant checks
+      run: |
+        echo "🔍 Running post-deploy invariant checks..."
+        PASS=true
+
+        # 1. all_jobs.json exists and has >20,000 lines
+        if [ ! -f ".github/data/all_jobs.json" ]; then
+          echo "❌ all_jobs.json missing"
+          PASS=false
+        else
+          LINE_COUNT=$(wc -l < .github/data/all_jobs.json)
+          if [ "$LINE_COUNT" -lt 20000 ]; then
+            echo "❌ all_jobs.json: $LINE_COUNT lines (expected >20000)"
+            PASS=false
+          else
+            echo "✅ all_jobs.json: $LINE_COUNT lines"
+          fi
+        fi
+
+        # 2. tags object present on a sample of records
+        TAGGED=$(head -5 .github/data/all_jobs.json | python3 -c "
+        import sys, json
+        ok = sum(1 for l in sys.stdin if l.strip() and 'tags' in json.loads(l))
+        print(ok)
+        " 2>/dev/null || echo 0)
+        if [ "$TAGGED" -lt 5 ]; then
+          echo "❌ tags field missing on sampled records ($TAGGED/5 have it)"
+          PASS=false
+        else
+          echo "✅ tags field present on sampled records"
+        fi
+
+        # 3. source field present on records
+        SOURCED=$(head -5 .github/data/all_jobs.json | python3 -c "
+        import sys, json
+        ok = sum(1 for l in sys.stdin if l.strip() and json.loads(l).get('source'))
+        print(ok)
+        " 2>/dev/null || echo 0)
+        if [ "$SOURCED" -lt 5 ]; then
+          echo "❌ source field missing on sampled records ($SOURCED/5 have it)"
+          PASS=false
+        else
+          echo "✅ source field present on sampled records"
+        fi
+
+        # 4. is_direct_apply field present on at least one JSearch record
+        JSEARCH_WITH_FLAG=$(python3 -c "
+        import json
+        count = 0
+        with open('.github/data/all_jobs.json') as f:
+          for line in f:
+            line = line.strip()
+            if not line: continue
+            j = json.loads(line)
+            if j.get('source') == 'jsearch' and 'is_direct_apply' in j:
+              count += 1
+              if count >= 1: break
+        print(count)
+        " 2>/dev/null || echo 0)
+        if [ "$JSEARCH_WITH_FLAG" -lt 1 ]; then
+          echo "⚠️  is_direct_apply field not yet on JSearch records (may appear after TTL refresh)"
+        else
+          echo "✅ is_direct_apply present on JSearch records"
+        fi
+
+        # 5. jobs-metadata.json has freshness and top_companies (new fields from df7e6a4)
+        if [ -f ".github/data/jobs-metadata.json" ]; then
+          HAS_FRESHNESS=$(python3 -c "
+        import json
+        m = json.load(open('.github/data/jobs-metadata.json'))
+        print(1 if 'freshness' in m and 'top_companies' in m else 0)
+        " 2>/dev/null || echo 0)
+          if [ "$HAS_FRESHNESS" -eq 1 ]; then
+            echo "✅ jobs-metadata.json has freshness + top_companies fields"
+          else
+            echo "❌ jobs-metadata.json missing freshness or top_companies fields"
+            PASS=false
+          fi
+        fi
+
+        if [ "$PASS" = "true" ]; then
+          echo "✅ All invariant checks passed"
+        else
+          echo "❌ One or more invariant checks failed — see above"
+          exit 1
+        fi
+
+    - name: Display logs (always run)
+      if: always()
+      run: |
+        echo "📋 Fetch Output (last 50 lines):"
+        tail -50 .github/logs/fetch.log || echo "Log file not found"
+
+    - name: Verify output files
+      if: always()
+      run: |
+        echo "📊 Output Files:"
+        ls -lh .github/data/all_jobs.json || echo "all_jobs.json not found"
+        ls -lh .github/data/jobs-metadata.json || echo "jobs-metadata.json not found"
+        ls -lh .github/data/dedupe-store.json || echo "dedupe-store.json not found"
+
+    - name: Display job counts
+      if: always()
+      run: |
+        if [ -f ".github/data/jobs-metadata.json" ]; then
+          echo "📊 Job Statistics:"
+          cat .github/data/jobs-metadata.json | jq '{
+            total_jobs,
+            unique_jobs,
+            duplicates_removed,
+            by_job_type,
+            jsearch_stats
+          }'
+        fi
+
+    - name: Show git status
+      if: always()
+      run: |
+        echo "📝 Git Status:"
+        git status
+
+    - name: Show git diff (if changes)
+      if: always()
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "📝 Git Diff:"
+          git diff --stat
+        fi
+
+    - name: 🔄 Pull latest changes (before push)
+      if: always()
+      run: |
+        echo "📥 Pulling latest changes..."
+        # descriptions.jsonl is Workday fetch cache — modified each run but not staged.
+        # Discard unstaged changes so git pull --rebase can proceed.
+        # descriptions.jsonl restore removed — WD desc fetch moved to enrichment workflow
+        git fetch origin ${{ github.ref_name }}
+        # Use rebase instead of reset to preserve local commits
+        if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/${{ github.ref_name }})" ]; then
+          git pull origin ${{ github.ref_name }} --rebase || echo "No divergent commits to rebase"
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push changes
+      if: always()
+      run: |
+        if [ -n "$(git status --porcelain)" ] || [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/${{ github.ref_name }})" ]; then
+          echo "📤 Pushing changes to origin..."
+          git push origin ${{ github.ref_name }}
+        else
+          echo "ℹ️ No changes to push"
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push all_jobs.json to jobs-data-2026
+      if: success()
+      run: |
+        echo "📤 Pushing all_jobs.json to jobs-data-2026..."
+
+        # Clone jobs-data-2026 into a temp directory (shallow — working tree only, no history)
+        git clone --depth=1 "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-data-2026.git" /tmp/jobs-data-2026
+
+        # Copy all_jobs.json, jobs-metadata.json, descriptions.jsonl, and per-source sidecars.
+        # Remove existing sidecar files in the clone first so stale chunks don't persist
+        # (e.g. descriptions-workday.jsonl orphaned when descriptions-workday-1.jsonl takes over).
+        cp .github/data/all_jobs.json /tmp/jobs-data-2026/.github/data/all_jobs.json
+        # Strip sensitive fields before copying to public repo (ATS counts, top companies, per-source filter rates)
+        jq 'del(.ats_stats) | .senior_filter_stats = (.senior_filter_stats | del(.by_source))' \
+          .github/data/jobs-metadata.json > /tmp/jobs-metadata-public.json \
+          && cp /tmp/jobs-metadata-public.json /tmp/jobs-data-2026/.github/data/jobs-metadata.json \
+          || cp .github/data/jobs-metadata.json /tmp/jobs-data-2026/.github/data/jobs-metadata.json
+        if [ -f ".github/data/descriptions.jsonl" ]; then
+          cp .github/data/descriptions.jsonl /tmp/jobs-data-2026/.github/data/descriptions.jsonl
+        fi
+        # Delete aggregator-owned sidecars in the clone, then copy the current set.
+        # Preserve enrichment-owned files (WD/SR descriptions + enriched sidecar).
+        # Only delete inline-source sidecars that the aggregator will re-create.
+        find /tmp/jobs-data-2026/.github/data/ -name 'descriptions-*.jsonl' \
+          ! -name 'descriptions-enriched*' \
+          ! -name 'descriptions-workday*' \
+          ! -name 'descriptions-smartrecruiters*' \
+          -delete 2>/dev/null || true
+        for f in .github/data/descriptions-*.jsonl; do
+          [ -f "$f" ] && cp "$f" /tmp/jobs-data-2026/.github/data/
+        done
+
+        # Generate ZJP_SNAPSHOT.json + ZJP_CONTEXT.md and write directly into the clone.
+        # Non-fatal: if this fails, job data still pushes normally.
+        echo "📊 Generating ZJP snapshot..."
+        node .github/scripts/generate-snapshot.js || echo "⚠️ Snapshot generation failed — continuing without it"
+
+        # Persist ZJP_SNAPSHOT.json to aggregator repo for delta tracking across runs.
+        # ZJP_CONTEXT.md is not committed — generated locally for Claude session context only.
+        if [ -f "/tmp/jobs-data-2026/.github/data/ZJP_SNAPSHOT.json" ]; then
+          cp /tmp/jobs-data-2026/.github/data/ZJP_SNAPSHOT.json "$GITHUB_WORKSPACE/.github/data/ZJP_SNAPSHOT.json"
+          cd "$GITHUB_WORKSPACE"
+          git config user.email "bot@zapplyjobs.com"
+          git config user.name "Data Bot"
+          git add .github/data/ZJP_SNAPSHOT.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update ZJP snapshot [skip ci]"
+            for i in 1 2 3; do
+              git pull --rebase origin ${{ github.ref_name }} && git push origin ${{ github.ref_name }} && break
+              echo "Snapshot push attempt $i failed, retrying in 5s..."
+              sleep 5
+            done || echo "⚠️ Snapshot push failed — delta tracking will lag one run"
+          fi
+          cd /tmp/jobs-data-2026
+        fi
+
+        # Commit and push
+        cd /tmp/jobs-data-2026
+        git config user.email "bot@zapplyjobs.com"
+        git config user.name "Data Bot"
+        git add .github/data/all_jobs.json .github/data/jobs-metadata.json
+        git add .github/data/descriptions.jsonl 2>/dev/null || true
+        # Stage per-source sidecars: -u picks up deletions of tracked files (stale chunks),
+        # then the glob add picks up any new files not yet tracked.
+        git add -u .github/data/ 2>/dev/null || true
+        git add .github/data/descriptions-*.jsonl 2>/dev/null || true
+        # ZJP_CONTEXT.md + ZJP_SNAPSHOT.json intentionally NOT staged — private ops data.
+        # zjp-public-snapshot.json IS staged — stripped version safe for public consumption (no run IDs, no decisions, no enrichment internals).
+        git add .github/data/zjp-public-snapshot.json 2>/dev/null || true
+
+        if [ -n "$(git status --porcelain)" ]; then
+          JOB_COUNT=$(wc -l < .github/data/all_jobs.json)
+          git commit -m "Update jobs - $(date -u +%Y-%m-%d %H:%M UTC) - ${JOB_COUNT} jobs"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin main && break
+            echo "Push attempt $i failed, retrying in 5s..."
+            sleep 5
+          done
+          echo "✅ Pushed ${JOB_COUNT} jobs to jobs-data-2026"
+        else
+          echo "ℹ️ No changes to push (all_jobs.json unchanged)"
+        fi
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+
+    - name: Push archive to jobs-archive-private
+      if: success()
+      run: |
+        ARCHIVE_DIR=".github/data/archive"
+        if [ ! -d "$ARCHIVE_DIR" ] || [ -z "$(ls -A $ARCHIVE_DIR 2>/dev/null)" ]; then
+          echo "ℹ️ No archive files to push"
+          exit 0
+        fi
+
+        echo "📤 Pushing archive files to jobs-archive-private..."
+        git clone --depth=1 "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-archive-private.git" /tmp/jobs-archive-private
+
+        # Copy all weekly archive files
+        mkdir -p /tmp/jobs-archive-private/data
+        cp $ARCHIVE_DIR/*.jsonl /tmp/jobs-archive-private/data/ 2>/dev/null || true
+
+        cd /tmp/jobs-archive-private
+        git config user.email "bot@zapplyjobs.com"
+        git config user.name "Data Bot"
+        git add data/
+
+        if [ -n "$(git status --porcelain)" ]; then
+          WEEK=$(ls data/*.jsonl 2>/dev/null | tail -1 | xargs basename 2>/dev/null || echo "unknown")
+          git commit -m "archive: update ${WEEK} - $(date -u +%Y-%m-%d)"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin main && break
+            echo "Archive push attempt $i failed, retrying in 5s..."
+            sleep 5
+          done
+          echo "✅ Archive pushed to jobs-archive-private"
+        else
+          echo "ℹ️ No new archive data to push"
+        fi
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "❌ Workflow failed - check logs above"
+        echo "Last 30 lines of fetch log:"
+        tail -30 .github/logs/fetch.log || echo "No log file"
