@@ -252,9 +252,10 @@ async function main() {
     console.log('📊 Step 7: Generating tag statistics...');
     console.log('━'.repeat(60));
 
-    const tagStats = generateTagStats(dedupedJobs);
+    // Tag stats moved to post-merge (after Step 9) for full-pool accuracy.
+    // Previously computed from dedupedJobs (current-run only), missing ~4K carry-forward jobs.
 
-    console.log(`✅ Step 7 complete: Tag statistics generated`);
+    console.log(`✅ Step 7 complete: Tag statistics deferred to post-merge`);
     console.log('');
 
     // Step 8: Sort by date (newest first)
@@ -500,6 +501,11 @@ async function main() {
         console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >7d) from post-merge pool`);
       }
     }
+
+    // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
+    // Previously computed from dedupedJobs (current-run only), missing carry-forward jobs.
+    const tagStats = generateTagStats(publicJobs);
+    console.log(`📊 Tag stats: ${tagStats.total} jobs (full pool)`);
 
     // Archive expiring jobs BEFORE overwriting all_jobs.json
     const { getExpiringJobs, appendToWeeklyArchive } = require(`${SHARED}/utils/archiver`);
