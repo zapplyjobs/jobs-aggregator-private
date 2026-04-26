@@ -1,20 +1,20 @@
 {
   "meta": {
-    "generated_at": "2026-04-26T10:38:11.753Z",
+    "generated_at": "2026-04-26T10:49:32.585Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "24954258740",
+    "aggregator_run_id": "24954450035",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 28611,
+    "total": 28609,
     "by_source": {
-      "workday": 14512,
+      "workday": 14510,
       "lever": 1202,
       "greenhouse": 10238,
       "ashby": 1794,
       "smartrecruiters": 596,
-      "amazon": 73,
       "jsearch": 136,
+      "amazon": 73,
       "eightfold": 60
     },
     "by_domain": {
@@ -25,9 +25,9 @@
       "hardware": 3028,
       "manufacturing": 1666,
       "data_science": 1232,
-      "retail": 1491,
+      "retail": 1490,
       "ai": 709,
-      "finance": 1674,
+      "finance": 1673,
       "sales": 3650,
       "hr": 471,
       "marketing": 609,
@@ -35,10 +35,10 @@
       "product": 370,
       "legal": 388
     },
-    "us_entry_level": 16667,
+    "us_entry_level": 16665,
     "us_interns": 1573,
     "g1_metric": {
-      "us_total": 16459,
+      "us_total": 16457,
       "us_general": 2142,
       "us_general_rate": 13,
       "tech_us_total": 6146,
@@ -54,16 +54,16 @@
     }
   },
   "enrichment": {
-    "total_enriched": 5816,
-    "total_has_description": 5940,
+    "total_enriched": 5815,
+    "total_has_description": 5939,
     "workday_waiting_for_desc": null,
     "jsearch_sidecar_lines": 236
   },
   "pipeline": {
     "submodule_head": "e067816",
     "last_run_status": "success",
-    "last_run_at": "2026-04-26T10:38:11.753Z",
-    "last_run_id": "24954258740",
+    "last_run_at": "2026-04-26T10:49:32.585Z",
+    "last_run_id": "24954450035",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -102,7 +102,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-04-26T10:26:37.755Z",
-    "total_delta": -7
+    "compared_to": "2026-04-26T10:38:11.753Z",
+    "total_delta": -2
   }
 }
