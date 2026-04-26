@@ -27,26 +27,13 @@ const { loadDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
-const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
+const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob } = require(`${SHARED}/processors/senior-filter`);
 const { deduplicateJobs } = require(`${SHARED}/processors/deduplicator`);
-const { tagJobs, generateTagStats, tagEmployment, setCompanyOverrideMap } = require(`${SHARED}/processors/tag-engine`);
+const { tagJobs, generateTagStats, tagEmployment } = require(`${SHARED}/processors/tag-engine`);
 const { printTagDistribution } = require(`${SHARED}/processors/tag-monitor`);
 
 // Import utils
 const { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);
-
-// AGG-36: Load per-company title overrides from company-list.json
-const COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');
-let companyOverrideMap = new Map();
-try {
-  const companyList = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));
-  companyOverrideMap = buildCompanyOverrideMap(companyList);
-  if (companyOverrideMap.size > 0) {
-    console.log(`📋 AGG-36: Loaded ${companyOverrideMap.size} company title overrides`);
-  }
-} catch (e) {
-  console.warn(`⚠️ AGG-36: Could not load company overrides: ${e.message}`);
-}
 
 // Paths
 const DATA_DIR = path.join(process.cwd(), '.github', 'data');
@@ -118,19 +105,6 @@ async function main() {
     console.log(`   - Netflix: ${netflixJobs.length} jobs`);
     console.log('');
 
-    // Q6 (S273): Capture live fetch yield — jobs actually fetched this run, per source.
-    // Pool-level by_source uses 7-day rolling window and masks live-fetch failures (S269 Eightfold outage).
-    // live_fetch_yield distinguishes "fetched N this run" from "pool has N from prior runs".
-    // Netflix fetcher outputs source='eightfold' (SUP-NETFLIX-EF-MERGE) — merge into EF count.
-    const atsYield = atsResult.stats?.by_source || {};
-    const liveFetchYield = {
-      jsearch: jsearchJobs.length,
-      amazon: amazonJobs.length,
-      ...atsYield,
-      eightfold: (atsYield.eightfold || 0) + netflixJobs.length,
-    };
-    console.log(`📡 Live fetch yield: ${JSON.stringify(liveFetchYield)}`);
-
     // Steps 1b/1c REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment
     // workflow in jobs-data-2026 (targeted: only tech+US jobs, no waste on senior/non-US).
     console.log('📄 Steps 1b/1c: WD/SR descriptions → handled by enrichment workflow');
@@ -185,13 +159,12 @@ async function main() {
     console.log('🎓 Step 4: Filtering senior-level jobs...');
     console.log('━'.repeat(60));
 
-    const { entryLevelJobs, seniorJobs, metrics: seniorFilterMetrics } = filterSeniorJobs(validJobs, companyOverrideMap);
+    const { entryLevelJobs, seniorJobs, metrics: seniorFilterMetrics } = filterSeniorJobs(validJobs);
 
     console.log('');
     printSeniorFilterSummary(seniorFilterMetrics);
     console.log('');
-    const overrideCount = seniorFilterMetrics.override_applied || 0;
-    console.log(`✅ Step 4 complete: ${entryLevelJobs.length} entry-level jobs (${seniorJobs.length} senior filtered${overrideCount > 0 ? `, ${overrideCount} overrides applied` : ''})`);
+    console.log(`✅ Step 4 complete: ${entryLevelJobs.length} entry-level jobs (${seniorJobs.length} senior filtered)`);
     console.log('');
 
     // Step 4b: Write senior-filter analytics summary (PIPELINE-1)
@@ -209,6 +182,53 @@ async function main() {
     };
     fs.writeFileSync(FILTERED_OUTPUT_FILE, JSON.stringify(filteredSummary, null, 2), 'utf8');
     console.log(`📋 Step 4b: Senior-filter summary → filtered_jobs.json (${seniorJobs.length} total)`);
+
+    // AGG-DATA-8: Sample 50 filtered jobs for false-positive spot-check.
+    // Enables measuring FP rate without storing all ~53K filtered jobs.
+    // File is append-only JSONL, rotated weekly by the pipeline (keep last 7 days).
+    {
+      const SAMPLE_SIZE = 50;
+      const SAMPLES_FILE = path.join(DATA_DIR, 'filtered-samples.jsonl');
+      const now = new Date();
+
+      // Rotate: remove entries older than 7 days
+      let existingLines = [];
+      if (fs.existsSync(SAMPLES_FILE)) {
+        const cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        existingLines = fs.readFileSync(SAMPLES_FILE, 'utf8').trim().split('\n')
+          .filter(line => { try { return JSON.parse(line).sampled_at >= cutoff; } catch { return false; } });
+      }
+
+      // Random sample without bias (Fisher-Yates partial shuffle)
+      const sampleIndices = [];
+      if (seniorJobs.length <= SAMPLE_SIZE) {
+        sampleIndices.push(...Array.from({ length: seniorJobs.length }, (_, i) => i));
+      } else {
+        const pool = Array.from({ length: seniorJobs.length }, (_, i) => i);
+        for (let i = 0; i < SAMPLE_SIZE; i++) {
+          const j = i + Math.floor(Math.random() * (pool.length - i));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+          sampleIndices.push(pool[i]);
+        }
+      }
+
+      const newSamples = sampleIndices.map(idx => {
+        const job = seniorJobs[idx];
+        return {
+          sampled_at: now.toISOString(),
+          id: job.id,
+          title: job.title,
+          company_name: job.company_name,
+          source: job.source,
+          location: job.location || null,
+          filter_reason: job._filter_reason || 'unknown',
+        };
+      });
+
+      const allLines = [...existingLines, ...newSamples.map(s => JSON.stringify(s))];
+      fs.writeFileSync(SAMPLES_FILE, allLines.join('\n') + '\n', 'utf8');
+      console.log(`📋 Step 4b-2: Filtered samples → filtered-samples.jsonl (${newSamples.length} sampled, ${allLines.length} total)`);
+    }
     console.log('');
 
     // Step 4c: Inject descriptions from ALL sidecar files for tag engine's description fallback.
@@ -243,9 +263,6 @@ async function main() {
     }
     console.log('');
 
-    // AGG-36: Set company overrides for tag-engine's tagEmployment
-    setCompanyOverrideMap(companyOverrideMap);
-
     // Step 5: Apply tags
     console.log('🏷️  Step 5: Applying tags...');
     console.log('━'.repeat(60));
@@ -269,10 +286,9 @@ async function main() {
     console.log('📊 Step 7: Generating tag statistics...');
     console.log('━'.repeat(60));
 
-    // Tag stats moved to post-merge (after Step 9) for full-pool accuracy.
-    // Previously computed from dedupedJobs (current-run only), missing ~4K carry-forward jobs.
+    const tagStats = generateTagStats(dedupedJobs);
 
-    console.log(`✅ Step 7 complete: Tag statistics deferred to post-merge`);
+    console.log(`✅ Step 7 complete: Tag statistics generated`);
     console.log('');
 
     // Step 8: Sort by date (newest first)
@@ -420,7 +436,7 @@ async function main() {
     // (source_url, source_id, _raw are internal — not needed downstream)
     // Note: 'source' is kept for downstream observability (which ATS produced each job)
     const STRIP_FIELDS = ['source_url', 'source_id', '_raw', 'description', 'enriched', 'enriched_at', 'is_internship', 'is_new_grad', 'is_us_only', 'remote'];
-    let publicJobs = sortedJobs.map(job => {
+    const publicJobs = sortedJobs.map(job => {
       const stripped = { ...job };
       for (const field of STRIP_FIELDS) {
         delete stripped[field];
@@ -499,30 +515,10 @@ async function main() {
           }
         }
         console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${retagged > 0 ? `, ${retagged} employment re-tagged` : ''})`);
-
       } else {
         console.log('🔄 No prior-run jobs to merge');
       }
-
-      // AGG-32: Post-merge TTL safety net. AGG-6 may overwrite posted_at to an earlier
-      // date from the prior run, making current-run jobs stale. Carry-forward TTL check
-      // (line 455) only applies to prior-run jobs — current-run jobs in currentIds are
-      // skipped. This filter catches ALL stale jobs regardless of origin.
-      const preFilterCount = publicJobs.length;
-      publicJobs = publicJobs.filter(j => {
-        if (!j.posted_at) return false;
-        return new Date(j.posted_at).getTime() >= cutoffMs;
-      });
-      const staleRemoved = preFilterCount - publicJobs.length;
-      if (staleRemoved > 0) {
-        console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >7d) from post-merge pool`);
-      }
     }
-
-    // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
-    // Previously computed from dedupedJobs (current-run only), missing carry-forward jobs.
-    const tagStats = generateTagStats(publicJobs);
-    console.log(`📊 Tag stats: ${tagStats.total} jobs (full pool)`);
 
     // Archive expiring jobs BEFORE overwriting all_jobs.json
     const { getExpiringJobs, appendToWeeklyArchive } = require(`${SHARED}/utils/archiver`);
@@ -542,23 +538,7 @@ async function main() {
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
     // sortedJobs is current-run only — by_source.jsearch would show ~15 instead of ~400.
     const duration = Date.now() - startTime;
-    const atsFetchStats = atsResult.stats || {};
-    // AGG-24 supplement: derive companies_with_jobs_by_source from the actual jobs.
-    // atsFetchStats.by_company has counts but no source attribution.
-    // atsResult.jobs has source + company_name on each job — use that.
-    const srcCompanySet = {};
-    for (const job of atsResult.jobs || []) {
-      const src = job.source;
-      const co = job.company_name || job.company_slug;
-      if (!src || !co) continue;
-      if (!srcCompanySet[src]) srcCompanySet[src] = new Set();
-      srcCompanySet[src].add(co);
-    }
-    atsFetchStats._companies_with_jobs_by_source = {};
-    for (const [src, companies] of Object.entries(srcCompanySet)) {
-      atsFetchStats._companies_with_jobs_by_source[src] = companies.size;
-    }
-    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, liveFetchYield, atsFetchStats);
+    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
@@ -613,7 +593,7 @@ async function main() {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, liveFetchYield, atsFetchStats) {
+function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -674,11 +654,11 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     }
   }
 
-  // Top 50 companies by job count (S262: expanded from 20 for dashboard company explorer)
+  // Top 20 companies by job count
   // DASH-4b: includes primary domain (most common domain tag for that company)
   const top_companies = Object.entries(companyCounts)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 50)
+    .slice(0, 20)
     .map(([company, count]) => {
       const domains = companyDomains[company] || {};
       const primaryDomain = Object.entries(domains).sort((a, b) => b[1] - a[1])[0];
@@ -726,23 +706,8 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     // Freshness — jobs posted within last N hours (entry-level pool)
     freshness,
 
-    // Top companies by job count (entry-level pool)
+    // Top 20 companies by job count (entry-level pool)
     top_companies,
-
-    // AGG-24: Per-company fetch yield + per-source company health.
-    // ATS fetcher computes by_company at fetch time — persist for zero-yield detection.
-    fetched_by_company: atsFetchStats.by_company || {},
-    companies_by_source: (() => {
-      const ats = getATSUsageStats();
-      return {
-        greenhouse: ats.greenhouse_companies,
-        lever: ats.lever_companies,
-        ashby: ats.ashby_companies,
-        workday: ats.workday_tenants,
-        smartrecruiters: ats.smartrecruiters_companies,
-      };
-    })(),
-    companies_with_jobs_by_source: atsFetchStats._companies_with_jobs_by_source || {},
   };
 }
 
@@ -795,6 +760,7 @@ async function gitCommit(jobCount) {
     execSync('git add .github/data/jobs-metadata.json');
     execSync('git add .github/data/dedupe-store.json');
     execSync('git add .github/data/filtered_jobs.json 2>/dev/null || true'); // senior-filter summary for analytics (PIPELINE-1)
+    execSync('git add .github/data/filtered-samples.jsonl 2>/dev/null || true'); // AGG-DATA-8: sampled filtered jobs for FP spot-check
     // archive/ is NOT staged here — pushed separately to jobs-archive-private repo via workflow
     execSync('git add .github/data/descriptions-*.jsonl 2>/dev/null || true'); // per-source description sidecars (published)
     // descriptions.jsonl is Workday fetch cache — NOT staged (local state only, managed by Step 1b)
@@ -812,7 +778,7 @@ async function gitCommit(jobCount) {
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
 
-    const commitMessage = `Update jobs - ${dateStr} ${timeStr}\n\n${jobCount} jobs fetched this run`;
+    const commitMessage = `Update jobs - ${dateStr} ${timeStr}\n\n${jobCount} jobs in shared database`;
 
     // Commit
     execSync(`git commit -m "${commitMessage}"`);
