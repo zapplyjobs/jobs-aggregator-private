@@ -1,30 +1,30 @@
 {
   "meta": {
-    "generated_at": "2026-04-26T03:15:46.593Z",
+    "generated_at": "2026-04-26T03:26:55.355Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "24946810846",
+    "aggregator_run_id": "24947061891",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 28694,
+    "total": 28692,
     "by_source": {
-      "workday": 14603,
+      "workday": 14601,
       "greenhouse": 10240,
       "lever": 1201,
       "ashby": 1794,
       "smartrecruiters": 596,
-      "jsearch": 127,
       "amazon": 73,
+      "jsearch": 127,
       "eightfold": 60
     },
     "by_domain": {
       "retail": 1491,
       "sales": 3665,
       "general": 6317,
-      "finance": 1681,
+      "finance": 1680,
       "manufacturing": 1673,
       "logistics": 675,
-      "software": 5709,
+      "software": 5708,
       "hr": 472,
       "hardware": 3037,
       "healthcare": 631,
@@ -54,55 +54,55 @@
     }
   },
   "enrichment": {
-    "total_enriched": 5815,
-    "total_has_description": 5929,
+    "total_enriched": 5819,
+    "total_has_description": 5933,
     "workday_waiting_for_desc": null,
     "jsearch_sidecar_lines": 229
   },
   "pipeline": {
     "submodule_head": "78fae3d",
     "last_run_status": "success",
-    "last_run_at": "2026-04-26T03:15:46.593Z",
-    "last_run_id": "24946810846",
+    "last_run_at": "2026-04-26T03:26:55.355Z",
+    "last_run_id": "24947061891",
     "ttl_expiring_7d": 0
   },
   "repos": {
     "New-Grad": {
       "submodule": "78fae3d",
       "stars": 106,
-      "workflowStatus": null
+      "workflowStatus": "success"
     },
     "Internships": {
       "submodule": "78fae3d",
       "stars": 47,
-      "workflowStatus": null
+      "workflowStatus": "success"
     },
     "Software": {
       "submodule": "78fae3d",
       "stars": 25,
-      "workflowStatus": null
+      "workflowStatus": "success"
     },
     "Data-Science": {
       "submodule": "78fae3d",
       "stars": 37,
-      "workflowStatus": null
+      "workflowStatus": "success"
     },
     "Hardware": {
       "submodule": "78fae3d",
       "stars": 31,
-      "workflowStatus": null
+      "workflowStatus": "success"
     },
     "Healthcare": {
       "submodule": "78fae3d",
       "stars": 13,
-      "workflowStatus": null
+      "workflowStatus": "success"
     }
   },
   "open_decisions": [
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-04-26T03:04:22.144Z",
-    "total_delta": -1
+    "compared_to": "2026-04-26T03:15:46.593Z",
+    "total_delta": -2
   }
 }
