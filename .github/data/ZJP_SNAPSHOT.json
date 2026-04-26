@@ -1,8 +1,8 @@
 {
   "meta": {
-    "generated_at": "2026-04-26T05:12:14.449Z",
+    "generated_at": "2026-04-26T05:23:47.208Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "24948723018",
+    "aggregator_run_id": "24948806692",
     "stale_if_older_than_hours": 2
   },
   "pool": {
@@ -62,8 +62,8 @@
   "pipeline": {
     "submodule_head": "78fae3d",
     "last_run_status": "success",
-    "last_run_at": "2026-04-26T05:12:14.449Z",
-    "last_run_id": "24948723018",
+    "last_run_at": "2026-04-26T05:23:47.208Z",
+    "last_run_id": "24948806692",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -102,7 +102,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-04-26T04:56:41.701Z",
-    "total_delta": 3
+    "compared_to": "2026-04-26T05:12:14.449Z",
+    "total_delta": 0
   }
 }
