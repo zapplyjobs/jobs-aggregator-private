@@ -1,12 +1,12 @@
 {
   "meta": {
-    "generated_at": "2026-04-26T06:11:47.374Z",
+    "generated_at": "2026-04-26T06:26:11.360Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "24949676575",
+    "aggregator_run_id": "24949931479",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 28708,
+    "total": 28709,
     "by_source": {
       "workday": 14614,
       "greenhouse": 10240,
@@ -14,7 +14,7 @@
       "ashby": 1794,
       "smartrecruiters": 596,
       "amazon": 73,
-      "jsearch": 130,
+      "jsearch": 131,
       "eightfold": 60
     },
     "by_domain": {
@@ -30,18 +30,18 @@
       "healthcare": 631,
       "marketing": 610,
       "operations": 2759,
-      "ai": 709,
-      "data_science": 1231,
+      "ai": 710,
+      "data_science": 1232,
       "product": 447,
       "legal": 388
     },
-    "us_entry_level": 16706,
-    "us_interns": 1572,
+    "us_entry_level": 16707,
+    "us_interns": 1573,
     "g1_metric": {
-      "us_total": 16497,
+      "us_total": 16498,
       "us_general": 2151,
       "us_general_rate": 13,
-      "tech_us_total": 6141,
+      "tech_us_total": 6142,
       "tech_us_general_rate": 25.9
     },
     "ats_stats": {
@@ -57,13 +57,13 @@
     "total_enriched": 5820,
     "total_has_description": 5934,
     "workday_waiting_for_desc": null,
-    "jsearch_sidecar_lines": 230
+    "jsearch_sidecar_lines": 231
   },
   "pipeline": {
     "submodule_head": "78fae3d",
     "last_run_status": "success",
-    "last_run_at": "2026-04-26T06:11:47.374Z",
-    "last_run_id": "24949676575",
+    "last_run_at": "2026-04-26T06:26:11.360Z",
+    "last_run_id": "24949931479",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -102,7 +102,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-04-26T05:58:57.192Z",
-    "total_delta": 5
+    "compared_to": "2026-04-26T06:11:47.374Z",
+    "total_delta": 1
   }
 }
