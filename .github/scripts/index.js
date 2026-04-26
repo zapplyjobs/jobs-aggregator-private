@@ -27,13 +27,27 @@ const { loadDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
-const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob } = require(`${SHARED}/processors/senior-filter`);
+const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
 const { deduplicateJobs } = require(`${SHARED}/processors/deduplicator`);
-const { tagJobs, generateTagStats, tagEmployment } = require(`${SHARED}/processors/tag-engine`);
+const { tagJobs, generateTagStats, tagEmployment, setCompanyOverrideMap } = require(`${SHARED}/processors/tag-engine`);
 const { printTagDistribution } = require(`${SHARED}/processors/tag-monitor`);
 
 // Import utils
 const { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);
+
+// AGG-36: Load per-company title overrides from company-list.json
+const COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');
+let companyOverrideMap = new Map();
+try {
+  const companyList = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));
+  companyOverrideMap = buildCompanyOverrideMap(companyList);
+  if (companyOverrideMap.size > 0) {
+    console.log(`📋 AGG-36: Loaded ${companyOverrideMap.size} company title overrides`);
+    setCompanyOverrideMap(companyOverrideMap);
+  }
+} catch (e) {
+  console.warn(`⚠️ AGG-36: Could not load company overrides: ${e.message}`);
+}
 
 // Paths
 const DATA_DIR = path.join(process.cwd(), '.github', 'data');
@@ -159,12 +173,13 @@ async function main() {
     console.log('🎓 Step 4: Filtering senior-level jobs...');
     console.log('━'.repeat(60));
 
-    const { entryLevelJobs, seniorJobs, metrics: seniorFilterMetrics } = filterSeniorJobs(validJobs);
+    const { entryLevelJobs, seniorJobs, metrics: seniorFilterMetrics } = filterSeniorJobs(validJobs, companyOverrideMap);
 
     console.log('');
     printSeniorFilterSummary(seniorFilterMetrics);
     console.log('');
-    console.log(`✅ Step 4 complete: ${entryLevelJobs.length} entry-level jobs (${seniorJobs.length} senior filtered)`);
+    const overrideCount = seniorFilterMetrics.override_applied || 0;
+    console.log(`✅ Step 4 complete: ${entryLevelJobs.length} entry-level jobs (${seniorJobs.length} senior filtered${overrideCount > 0 ? `, ${overrideCount} overrides applied` : ''})`);
     console.log('');
 
     // Step 4b: Write senior-filter analytics summary (PIPELINE-1)
