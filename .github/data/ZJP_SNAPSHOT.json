@@ -1,15 +1,15 @@
 {
   "meta": {
-    "generated_at": "2026-04-26T06:41:27.029Z",
+    "generated_at": "2026-04-26T06:53:04.976Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "24950177878",
+    "aggregator_run_id": "24950376610",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 28709,
+    "total": 28708,
     "by_source": {
       "workday": 14614,
-      "greenhouse": 10240,
+      "greenhouse": 10239,
       "lever": 1201,
       "ashby": 1794,
       "smartrecruiters": 596,
@@ -19,7 +19,7 @@
     },
     "by_domain": {
       "general": 6324,
-      "logistics": 676,
+      "logistics": 675,
       "finance": 1681,
       "hardware": 3037,
       "sales": 3665,
@@ -62,8 +62,8 @@
   "pipeline": {
     "submodule_head": "78fae3d",
     "last_run_status": "success",
-    "last_run_at": "2026-04-26T06:41:27.029Z",
-    "last_run_id": "24950177878",
+    "last_run_at": "2026-04-26T06:53:04.976Z",
+    "last_run_id": "24950376610",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -102,7 +102,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-04-26T06:26:11.360Z",
-    "total_delta": 0
+    "compared_to": "2026-04-26T06:41:27.029Z",
+    "total_delta": -1
   }
 }
