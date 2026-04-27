@@ -450,7 +450,7 @@ async function main() {
     // (source_url, source_id, _raw are internal — not needed downstream)
     // Note: 'source' is kept for downstream observability (which ATS produced each job)
     const STRIP_FIELDS = ['source_url', 'source_id', '_raw', 'description', 'enriched', 'enriched_at', 'is_internship', 'is_new_grad', 'is_us_only', 'remote'];
-    const publicJobs = sortedJobs.map(job => {
+    let publicJobs = sortedJobs.map(job => {
       const stripped = { ...job };
       for (const field of STRIP_FIELDS) {
         delete stripped[field];
@@ -532,6 +532,21 @@ async function main() {
       } else {
         console.log('🔄 No prior-run jobs to merge');
       }
+    }
+
+    // AGG-32: Post-merge TTL safety net. AGG-6 may overwrite posted_at to an earlier
+    // date from the prior run, making current-run jobs stale. Carry-forward TTL check
+    // only applies to prior-run jobs — current-run jobs are skipped. This filter catches
+    // ALL stale jobs regardless of origin.
+    const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const preFilterCount = publicJobs.length;
+    publicJobs = publicJobs.filter(j => {
+      if (!j.posted_at) return false;
+      return new Date(j.posted_at).getTime() >= cutoffMs;
+    });
+    const staleRemoved = preFilterCount - publicJobs.length;
+    if (staleRemoved > 0) {
+      console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >7d) from post-merge pool`);
     }
 
     // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
