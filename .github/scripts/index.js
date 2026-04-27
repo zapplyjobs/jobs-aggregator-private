@@ -113,8 +113,19 @@ async function main() {
     const netflixJobs = await withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix');
     allJobs.push(...netflixJobs);
 
-    // Fetch from Apple Jobs (252 pages x 300ms = ~75s, timeout: 180s)
-    const appleJobs = await withTimeout(fetchAllAppleJobs(), 180_000, 'Apple');
+    // Count Apple jobs from previous run for first-run detection (SUP-FETCHER-6)
+    // First run (0 previous): fetches all ~251 pages. Routine: caps at 50 pages.
+    // all_jobs.json is JSONL — count lines with source=apple without full parse.
+    let prevAppleCount = 0;
+    try {
+      if (fs.existsSync(JOBS_OUTPUT_FILE)) {
+        const content = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
+        prevAppleCount = (content.match(/"source":"apple"/g) || []).length;
+        if (prevAppleCount > 0) console.log(`  Previous Apple count: ${prevAppleCount}`);
+      }
+    } catch (e) { /* first run or corrupt file — treat as first run */ }
+    const appleTimeout = prevAppleCount === 0 ? 300_000 : 180_000;
+    const appleJobs = await withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount }), appleTimeout, 'Apple');
     allJobs.push(...appleJobs);
 
     // Fetch from Two Sigma Jobs (single RSS request, timeout: 30s)
