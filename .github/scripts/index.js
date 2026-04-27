@@ -24,6 +24,8 @@ const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/
 const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
 const { fetchAllNetflixJobs } = require(`${SHARED}/fetchers/netflix`);
 const { loadDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
+const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
+const { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
@@ -111,12 +113,22 @@ async function main() {
     const netflixJobs = await withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix');
     allJobs.push(...netflixJobs);
 
+    // Fetch from Apple Jobs (252 pages x 300ms = ~75s, timeout: 180s)
+    const appleJobs = await withTimeout(fetchAllAppleJobs(), 180_000, 'Apple');
+    allJobs.push(...appleJobs);
+
+    // Fetch from Two Sigma Jobs (single RSS request, timeout: 30s)
+    const twoSigmaJobs = await withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma');
+    allJobs.push(...twoSigmaJobs);
+
     console.log('');
     console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
     console.log(`   - JSearch: ${jsearchJobs.length} jobs`);
     console.log(`   - ATS: ${atsResult.jobs.length} jobs`);
     console.log(`   - Amazon: ${amazonJobs.length} jobs`);
     console.log(`   - Netflix: ${netflixJobs.length} jobs`);
+    console.log(`   - Apple: ${appleJobs.length} jobs`);
+    console.log(`   - Two Sigma: ${twoSigmaJobs.length} jobs`);
     console.log('');
 
     // Steps 1b/1c REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment
