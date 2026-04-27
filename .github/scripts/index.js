@@ -113,8 +113,9 @@ async function main() {
     const netflixJobs = await withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix');
     allJobs.push(...netflixJobs);
 
-    // Count Apple jobs from previous run for first-run detection (SUP-FETCHER-6)
-    // First run (0 previous): fetches all ~251 pages. Routine: caps at 50 pages.
+    // Count Apple jobs from previous run for initial population detection (SUP-FETCHER-6)
+    // Threshold: if <2000 previous Apple jobs, the pool was seeded from capped runs —
+    // do a full fetch of all ~251 pages. Routine: caps at 50 pages.
     // all_jobs.json is JSONL — count lines with source=apple without full parse.
     let prevAppleCount = 0;
     try {
