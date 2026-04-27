@@ -553,6 +553,76 @@ async function main() {
     tagStats = generateTagStats(publicJobs);
     console.log(`📊 Tag stats: ${tagStats.total} jobs (full pool)`);
 
+    // AGG-COMPANY-2: Discovery diagnostic — auto-detect companies needing overrides.
+    // Compares senior-filter decisions vs tag-engine employment classification per company.
+    // Flags companies where the filter rate is high AND most filtering is title-based (not experience).
+    // Non-blocking: errors logged but never stop the pipeline.
+    try {
+      const OVERRIDE_CANDIDATES_FILE = path.join(DATA_DIR, 'override-candidates.json');
+      const MIN_JOBS_THRESHOLD = 10;
+      const HIGH_FILTER_RATE = 0.80;
+      const TITLE_FILTER_SHARE = 0.70;
+
+      const companyFiltered = {};
+      for (const job of seniorJobs) {
+        const c = job.company_name || 'unknown';
+        if (!companyFiltered[c]) companyFiltered[c] = { total: 0, senior_title: 0, senior_experience: 0, both: 0 };
+        companyFiltered[c].total++;
+        const reason = job._filter_reason || 'unknown';
+        if (reason === 'senior_title' || reason === 'both') companyFiltered[c].senior_title++;
+        if (reason === 'senior_experience' || reason === 'both') companyFiltered[c].senior_experience++;
+        if (reason === 'both') companyFiltered[c].both++;
+      }
+
+      const companyPool = {};
+      for (const job of publicJobs) {
+        const c = job.company_name || 'unknown';
+        if (!companyPool[c]) companyPool[c] = { total: 0, senior_tagged: 0, mid_tagged: 0, entry_tagged: 0 };
+        companyPool[c].total++;
+        const emp = job.tags?.employment;
+        if (emp === 'senior') companyPool[c].senior_tagged++;
+        else if (emp === 'mid_level') companyPool[c].mid_tagged++;
+        else if (emp === 'entry_level') companyPool[c].entry_tagged++;
+      }
+
+      const candidates = [];
+      for (const [company, filtered] of Object.entries(companyFiltered)) {
+        const pool = companyPool[company] || { total: 0 };
+        const totalForCompany = filtered.total + pool.total;
+        if (totalForCompany < MIN_JOBS_THRESHOLD) continue;
+
+        const filterRate = filtered.total / totalForCompany;
+        if (filterRate < HIGH_FILTER_RATE) continue;
+
+        const titleShare = filtered.senior_title / (filtered.total || 1);
+        if (titleShare < TITLE_FILTER_SHARE) continue;
+
+        const hasOverride = companyOverrideMap.has(company);
+        candidates.push({
+          company,
+          total_fetched: totalForCompany,
+          senior_filtered: filtered.total,
+          in_pool: pool.total,
+          filter_rate: +(filterRate * 100).toFixed(1),
+          title_filter_pct: +(titleShare * 100).toFixed(1),
+          senior_tagged_in_pool: pool.senior_tagged || 0,
+          has_override: hasOverride,
+          recommendation: hasOverride ? 'existing_override_check_accuracy' : 'add_override',
+        });
+      }
+
+      candidates.sort((a, b) => b.senior_filtered - a.senior_filtered);
+      fs.writeFileSync(OVERRIDE_CANDIDATES_FILE, JSON.stringify({ generated: new Date().toISOString(), candidates, threshold: { min_jobs: MIN_JOBS_THRESHOLD, filter_rate: HIGH_FILTER_RATE, title_share: TITLE_FILTER_SHARE } }, null, 2), 'utf8');
+      console.log(`🔍 AGG-COMPANY-2: ${candidates.length} override candidates → override-candidates.json`);
+      if (candidates.length > 0 && candidates.length <= 10) {
+        for (const c of candidates) {
+          console.log(`   ${c.has_override ? '🔄' : '🆕'} ${c.company}: ${c.senior_filtered}/${c.total_fetched} filtered (${c.filter_rate}%)`);
+        }
+      }
+    } catch (e) {
+      console.warn(`⚠️ AGG-COMPANY-2: Diagnostic failed (non-critical): ${e.message}`);
+    }
+
     // Archive expiring jobs BEFORE overwriting all_jobs.json
     const { getExpiringJobs, appendToWeeklyArchive } = require(`${SHARED}/utils/archiver`);
     const ARCHIVE_DIR = path.join(DATA_DIR, 'archive');
