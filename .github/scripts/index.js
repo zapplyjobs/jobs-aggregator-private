@@ -28,6 +28,7 @@ const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
 const { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);
 const { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);
 const { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);
+const { fetchAllSimplifyJobs } = require(`${SHARED}/fetchers/simplify`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
@@ -152,6 +153,11 @@ async function main() {
     const googleJobs = await withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), googleTimeout, 'Google');
     allJobs.push(...googleJobs);
 
+    // Fetch from SimplifyJobs (public GitHub data, ~5s, timeout: 30s)
+    // SUP-FETCHER-3: Fallback for companies on unfetchable ATS (iCIMS, Oracle HCM, etc.)
+    const simplifyJobs = await withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs');
+    allJobs.push(...simplifyJobs);
+
     console.log('');
     console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
     console.log(`   - JSearch: ${jsearchJobs.length} jobs`);
@@ -162,6 +168,7 @@ async function main() {
     console.log(`   - Two Sigma: ${twoSigmaJobs.length} jobs`);
     console.log(`   - Uber: ${uberJobs.length} jobs`);
     console.log(`   - Google: ${googleJobs.length} jobs`);
+    console.log(`   - SimplifyJobs: ${simplifyJobs.length} jobs`);
     console.log('');
 
     // Steps 1b/1c REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment
