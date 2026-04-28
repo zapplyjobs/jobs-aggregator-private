@@ -1,1 +1,947 @@
-"#!/usr/bin/env node\n\n/**\n * Main Orchestrator - Jobs Data Fetcher\n *\n * Coordinates all fetchers, normalizes jobs, deduplicates,\n * and writes the shared output file.\n *\n * Usage:\n *   node index.js                    # Normal run\n *   node index.js --dry-run          # Dry run (no git commit)\n *   node index.js --verbose          # Verbose logging\n */\n\nconst fs = require('fs');\nconst path = require('path');\n\n// Import from shared submodule (job-board-scripts/lib/aggregator/)\nconst SHARED = path.join(__dirname, 'shared', 'lib', 'aggregator');\n\n// Import fetchers\nconst { fetchFromJSearch, getUsageStats } = require(`${SHARED}/fetchers/jsearch-fetcher`);\nconst { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);\nconst { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);\nconst { fetchAllNetflixJobs } = require(`${SHARED}/fetchers/netflix`);\nconst { loadDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);\nconst { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);\nconst { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);\nconst { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);\nconst { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);\n\n// Import processors\nconst { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);\nconst { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);\nconst { deduplicateJobs } = require(`${SHARED}/processors/deduplicator`);\nconst { tagJobs, generateTagStats, tagEmployment, setCompanyOverrideMap } = require(`${SHARED}/processors/tag-engine`);\nconst { printTagDistribution } = require(`${SHARED}/processors/tag-monitor`);\n\n// Import utils\nconst { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);\n\n// AGG-36: Load per-company title overrides from company-list.json\nconst COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');\nlet companyOverrideMap = new Map();\ntry {\n  const companyList = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));\n  companyOverrideMap = buildCompanyOverrideMap(companyList);\n  if (companyOverrideMap.size > 0) {\n    console.log(`\ud83d\udccb AGG-36: Loaded ${companyOverrideMap.size} company title overrides`);\n    setCompanyOverrideMap(companyOverrideMap);\n  }\n} catch (e) {\n  console.warn(`\u26a0\ufe0f AGG-36: Could not load company overrides: ${e.message}`);\n}\n\n// Paths\nconst DATA_DIR = path.join(process.cwd(), '.github', 'data');\nconst JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'all_jobs.json');\nconst METADATA_OUTPUT_FILE = path.join(DATA_DIR, 'jobs-metadata.json');\n\n// Command line args\nconst args = process.argv.slice(2);\nconst isDryRun = args.includes('--dry-run');\nconst isVerbose = args.includes('--verbose');\n\n/**\n * Main execution function\n */\nasync function main() {\n  const startTime = Date.now();\n\n  console.log('\ud83d\ude80 Jobs Data Fetcher - Starting...');\n  console.log('\u2550'.repeat(60));\n  console.log(`Mode: ${isDryRun ? 'DRY RUN (no commits)' : 'NORMAL'}`);\n  console.log('');\n\n  try {\n    // Ensure data directory exists\n    if (!fs.existsSync(DATA_DIR)) {\n      fs.mkdirSync(DATA_DIR, { recursive: true });\n    }\n\n    // Step 1: Fetch from all sources\n    console.log('\ud83d\udce1 Step 1: Fetching jobs from all sources...');\n    console.log('\u2501'.repeat(60));\n\n    // AGG-5 (S229): Overall timeout per fetcher. Prevents one hung API from blocking\n    // the entire pipeline (Amazon API hung for 23 min on 2026-03-26T00:15 run).\n    // Rolling window merge preserves prior-run jobs \u2014 skipping a source is safe.\n    function withTimeout(promise, ms, label) {\n      return Promise.race([\n        promise,\n        new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms/1000}s`)), ms))\n      ]).catch(err => {\n        console.error(`\u26a0\ufe0f ${label}: ${err.message} \u2014 continuing with 0 jobs`);\n        return label.includes('ATS') ? { jobs: [] } : [];\n      });\n    }\n\n    let allJobs = [];\n\n    // Fetch from JSearch (normal: ~12s, timeout: 60s)\n    const jsearchJobs = await withTimeout(fetchFromJSearch(), 60_000, 'JSearch');\n    allJobs.push(...jsearchJobs);\n\n    // Fetch from ATS sources (normal: ~9.5 min, timeout: 12 min)\n    const atsResult = await withTimeout(fetchFromAllATS(), 720_000, 'ATS');\n    allJobs.push(...atsResult.jobs);\n\n    // Fetch from Amazon Jobs (normal: ~23s, timeout: 120s)\n    const amazonJobs = await withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon');\n    allJobs.push(...amazonJobs);\n\n    // Fetch from Netflix Jobs (normal: ~2.5 min, timeout: 5 min)\n    const netflixJobs = await withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix');\n    allJobs.push(...netflixJobs);\n\n    // Count Apple jobs from previous run for initial population detection (SUP-FETCHER-6)\n    // Threshold: if <2000 previous Apple jobs, the pool was seeded from capped runs \u2014\n    // do a full fetch of all ~251 pages. Routine: caps at 50 pages.\n    // all_jobs.json is JSONL \u2014 count lines with source=apple without full parse.\n    let prevAppleCount = 0;\n    try {\n      if (fs.existsSync(JOBS_OUTPUT_FILE)) {\n        const content = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');\n        prevAppleCount = (content.match(/\"source\":\"apple\"/g) || []).length;\n        if (prevAppleCount > 0) console.log(`  Previous Apple count: ${prevAppleCount}`);\n      }\n    } catch (e) { /* first run or corrupt file \u2014 treat as first run */ }\n    const appleTimeout = prevAppleCount === 0 ? 300_000 : 180_000;\n    const appleJobs = await withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount }), appleTimeout, 'Apple');\n    allJobs.push(...appleJobs);\n\n    // Fetch from Two Sigma Jobs (single RSS request, timeout: 30s)\n    const twoSigmaJobs = await withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma');\n    allJobs.push(...twoSigmaJobs);\n\n    // Fetch from Uber Jobs (POST API, ~12s, timeout: 60s)\n    const uberJobs = await withTimeout(fetchAllUberJobs(), 60_000, 'Uber');\n    allJobs.push(...uberJobs);\n\n    // Count Google jobs from previous run for initial population detection (SUP-FETCHER-7)\n    let prevGoogleCount = 0;\n    try {\n      if (fs.existsSync(JOBS_OUTPUT_FILE)) {\n        const gContent = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');\n        prevGoogleCount = (gContent.match(/\"source\":\"google\"/g) || []).length;\n        if (prevGoogleCount > 0) console.log(`  Previous Google count: ${prevGoogleCount}`);\n      }\n    } catch (e) { /* first run */ }\n    const googleTimeout = prevGoogleCount === 0 ? 300_000 : 180_000;\n    const googleJobs = await withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), googleTimeout, 'Google');\n    allJobs.push(...googleJobs);\n\n    console.log('');\n    console.log(`\ud83d\udcca Step 1 complete: ${allJobs.length} jobs fetched`);\n    console.log(`   - JSearch: ${jsearchJobs.length} jobs`);\n    console.log(`   - ATS: ${atsResult.jobs.length} jobs`);\n    console.log(`   - Amazon: ${amazonJobs.length} jobs`);\n    console.log(`   - Netflix: ${netflixJobs.length} jobs`);\n    console.log(`   - Apple: ${appleJobs.length} jobs`);\n    console.log(`   - Two Sigma: ${twoSigmaJobs.length} jobs`);\n    console.log(`   - Uber: ${uberJobs.length} jobs`);\n    console.log(`   - Google: ${googleJobs.length} jobs`);\n    console.log('');\n\n    // Steps 1b/1c REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment\n    // workflow in jobs-data-2026 (targeted: only tech+US jobs, no waste on senior/non-US).\n    console.log('\ud83d\udcc4 Steps 1b/1c: WD/SR descriptions \u2192 handled by enrichment workflow');\n    console.log('');\n\n    // Step 2: Enhance jobs (add fingerprints, employment_types arrays, etc.)\n    console.log('\ud83d\udd04 Step 2: Enhancing jobs with required fields...');\n    console.log('\u2501'.repeat(60));\n\n    // Add missing fields (fingerprints, normalize employment_types to arrays)\n    const helpers = require(`${SHARED}/utils/helpers`);\n    const enhancedJobs = allJobs.map(job => {\n      // Add fingerprint if missing\n      if (!job.fingerprint) {\n        job.fingerprint = helpers.generateFingerprint(job);\n      }\n\n      // Normalize employment_type/employment_types to array\n      if (!job.employment_types) {\n        const types = job.employment_type || job.employment_types || [];\n        if (Array.isArray(types)) {\n          job.employment_types = types.map(t => String(t).toUpperCase());\n        } else if (typeof types === 'string') {\n          job.employment_types = types.split(',').map(t => t.trim().toUpperCase());\n        } else if (types === null || types === undefined) {\n          job.employment_types = [];\n        } else {\n          job.employment_types = [String(types).toUpperCase()];\n        }\n      }\n\n      return job;\n    });\n\n    console.log('');\n    console.log(`\u2705 Step 2 complete: ${enhancedJobs.length} jobs enhanced`);\n    console.log('');\n\n    // Step 3: Validate and fix malformed fields\n    console.log('\ud83d\udcdd Step 3: Validating and fixing malformed fields...');\n    console.log('\u2501'.repeat(60));\n\n    const { validJobs, invalidJobs, metrics: validationMetrics } = validateAndNormalizeJobs(enhancedJobs);\n\n    console.log('');\n    printValidationSummary(validationMetrics);\n    console.log('');\n    console.log(`\u2705 Step 3 complete: ${validJobs.length} valid jobs (${invalidJobs.length} filtered)`);\n    console.log('');\n\n    // Step 4: Filter senior jobs\n    console.log('\ud83c\udf93 Step 4: Filtering senior-level jobs...');\n    console.log('\u2501'.repeat(60));\n\n    const { entryLevelJobs, seniorJobs, metrics: seniorFilterMetrics } = filterSeniorJobs(validJobs, companyOverrideMap);\n\n    console.log('');\n    printSeniorFilterSummary(seniorFilterMetrics);\n    console.log('');\n    const overrideCount = seniorFilterMetrics.override_applied || 0;\n    console.log(`\u2705 Step 4 complete: ${entryLevelJobs.length} entry-level jobs (${seniorJobs.length} senior filtered${overrideCount > 0 ? `, ${overrideCount} overrides applied` : ''})`);\n    console.log('');\n\n    // Step 4b: Write senior-filter analytics summary (PIPELINE-1)\n    // Summary counts only \u2014 full job objects are ~180 MB and exceed GitHub's 100 MB limit.\n    // Tags not yet available (Step 5), so breakdown is by source only.\n    const FILTERED_OUTPUT_FILE = path.join(DATA_DIR, 'filtered_jobs.json');\n    const seniorBySource = {};\n    for (const job of seniorJobs) {\n      seniorBySource[job.source || 'unknown'] = (seniorBySource[job.source || 'unknown'] || 0) + 1;\n    }\n    const filteredSummary = {\n      generated: new Date().toISOString(),\n      total_senior_filtered: seniorJobs.length,\n      by_source: seniorBySource,\n    };\n    fs.writeFileSync(FILTERED_OUTPUT_FILE, JSON.stringify(filteredSummary, null, 2), 'utf8');\n    console.log(`\ud83d\udccb Step 4b: Senior-filter summary \u2192 filtered_jobs.json (${seniorJobs.length} total)`);\n\n    // AGG-DATA-8: Sample 50 filtered jobs for false-positive spot-check.\n    // Enables measuring FP rate without storing all ~53K filtered jobs.\n    // File is append-only JSONL, rotated weekly by the pipeline (keep last 7 days).\n    {\n      const SAMPLE_SIZE = 50;\n      const SAMPLES_FILE = path.join(DATA_DIR, 'filtered-samples.jsonl');\n      const now = new Date();\n\n      // Rotate: remove entries older than 7 days\n      let existingLines = [];\n      if (fs.existsSync(SAMPLES_FILE)) {\n        const cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();\n        existingLines = fs.readFileSync(SAMPLES_FILE, 'utf8').trim().split('\\n')\n          .filter(line => { try { return JSON.parse(line).sampled_at >= cutoff; } catch { return false; } });\n      }\n\n      // Random sample without bias (Fisher-Yates partial shuffle)\n      const sampleIndices = [];\n      if (seniorJobs.length <= SAMPLE_SIZE) {\n        sampleIndices.push(...Array.from({ length: seniorJobs.length }, (_, i) => i));\n      } else {\n        const pool = Array.from({ length: seniorJobs.length }, (_, i) => i);\n        for (let i = 0; i < SAMPLE_SIZE; i++) {\n          const j = i + Math.floor(Math.random() * (pool.length - i));\n          [pool[i], pool[j]] = [pool[j], pool[i]];\n          sampleIndices.push(pool[i]);\n        }\n      }\n\n      const newSamples = sampleIndices.map(idx => {\n        const job = seniorJobs[idx];\n        return {\n          sampled_at: now.toISOString(),\n          id: job.id,\n          title: job.title,\n          company_name: job.company_name,\n          source: job.source,\n          location: job.location || null,\n          filter_reason: job._filter_reason || 'unknown',\n        };\n      });\n\n      const allLines = [...existingLines, ...newSamples.map(s => JSON.stringify(s))];\n      fs.writeFileSync(SAMPLES_FILE, allLines.join('\\n') + '\\n', 'utf8');\n      console.log(`\ud83d\udccb Step 4b-2: Filtered samples \u2192 filtered-samples.jsonl (${newSamples.length} sampled, ${allLines.length} total)`);\n    }\n    console.log('');\n\n    // Step 4c: Inject descriptions from ALL sidecar files for tag engine's description fallback.\n    // Carried-forward jobs lose their inline descriptions in Step 9 (stripped from all_jobs.json).\n    // This re-injects them from per-source sidecar files so the description-fallback layer can classify.\n    // Guard: !job.description prevents double-injection for freshly-fetched jobs with inline descriptions.\n    // TAG-9 S237: expanded from enriched-only to ALL sidecars \u2014 1,317 additional jobs gain descriptions.\n    const descSidecarFiles = fs.readdirSync(DATA_DIR)\n      .filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));\n    if (descSidecarFiles.length > 0) {\n      const descMap = new Map();\n      for (const fname of descSidecarFiles) {\n        const fpath = path.join(DATA_DIR, fname);\n        const descLines = fs.readFileSync(fpath, 'utf8').trim().split('\\n').filter(Boolean);\n        for (const line of descLines) {\n          try {\n            const { id, description_text } = JSON.parse(line);\n            if (id && description_text) descMap.set(id, description_text);\n          } catch { /* skip malformed */ }\n        }\n      }\n      let injected = 0;\n      for (const job of entryLevelJobs) {\n        if (!job.description && descMap.has(job.id)) {\n          job.description = descMap.get(job.id);\n          injected++;\n        }\n      }\n      console.log(`\ud83d\udcc4 Step 4c: Injected ${injected} descriptions from ${descSidecarFiles.length} sidecar files (${descMap.size} available)`);\n    } else {\n      console.log('\ud83d\udcc4 Step 4c: No description sidecar files found \u2014 description fallback inactive');\n    }\n    console.log('');\n\n    // Step 5: Apply tags\n    console.log('\ud83c\udff7\ufe0f  Step 5: Applying tags...');\n    console.log('\u2501'.repeat(60));\n\n    const taggedJobs = tagJobs(entryLevelJobs);\n\n    console.log(`\u2705 Step 5 complete: ${taggedJobs.length} jobs tagged`);\n    console.log('');\n\n    // Step 6: Deduplicate\n    console.log('\ud83d\udd0d Step 6: Deduplicating jobs...');\n    console.log('\u2501'.repeat(60));\n\n    const { unique: dedupedJobs, duplicates, stats: dedupeStats } = deduplicateJobs(taggedJobs);\n\n    console.log('');\n    console.log(`\u2705 Step 6 complete: ${dedupedJobs.length} unique jobs (${duplicates} duplicates removed)`);\n    console.log('');\n\n    // Step 7: Tag statistics deferred to post-merge (after Step 9).\n    // Previously computed from dedupedJobs (current-run only), missing ~4K carry-forward jobs.\n    // Now computed after carry-forward merge + AGG-32 stale filter for full-pool accuracy.\n    console.log('\ud83d\udcca Step 7: Tag statistics deferred to post-merge');\n\n    let tagStats = null;\n    console.log('');\n\n    // Step 8: Sort by date (newest first)\n    console.log('\ud83d\udcca Step 8: Sorting jobs by date...');\n    console.log('\u2501'.repeat(60));\n\n    const sortedJobs = dedupedJobs.sort((a, b) => {\n      const dateA = new Date(a.posted_at || 0);\n      const dateB = new Date(b.posted_at || 0);\n      return dateB - dateA; // Newest first\n    });\n\n    console.log(`\u2705 Step 8 complete: Jobs sorted`);\n    console.log('');\n\n    // Step 8b: Write per-source description sidecars\n    //\n    // One file per source: descriptions-{source}.jsonl\n    // Each file is rewritten atomically each run.\n    // Non-Workday sources: pruned to liveJobIds (entry-level survivors).\n    // Workday: pruned to allWorkdayIds (full pre-filter pool, all seniorities) \u2014 see PIPELINE-3-FIX.\n    //\n    // Chunking: if a source exceeds SIDECAR_CHUNK_LIMIT_BYTES, split into\n    //   descriptions-{source}-1.jsonl, descriptions-{source}-2.jsonl, etc.\n    // This keeps every file well under GitHub's 100 MB hard limit.\n    //\n    // Stale file cleanup: when chunk count changes (1\u21922 or 2\u21921), old filenames are orphaned.\n    // After writing, we scan DATA_DIR for any descriptions-{src}*.jsonl files not written\n    // this run and delete them from disk + unstage from git. This handles both directions.\n    //\n    // Workday: descriptions were fetched live in Step 1b and injected as job.description.\n    // All other sources: descriptions are inline on job objects from their respective fetchers.\n    // After this step, all descriptions are in sidecar files. Step 9 strips description from publicJobs.\n    //\n    // enrich-jobs.js reads all files matching descriptions-*.jsonl \u2014 auto-picks up new chunks.\n\n    const SIDECAR_CHUNK_LIMIT_BYTES = 40 * 1024 * 1024; // 40 MB per file\n    const { execSync } = require('child_process');\n\n    // Group jobs by source, collect id + description for each\n    const bySource = {};\n    for (const job of sortedJobs) {\n      const src = job.source;\n      if (!src) continue;\n      if (!bySource[src]) bySource[src] = [];\n      if (job.description) {\n        bySource[src].push({ id: job.id, description_text: job.description });\n      }\n    }\n\n    // WD sidecar REMOVED (DESC-MIGRATE-1): WD descriptions now owned by enrichment workflow.\n    delete bySource['workday'];\n    // SR sidecar REMOVED (DESC-MIGRATE-1): SR descriptions now owned by enrichment workflow.\n    delete bySource['smartrecruiters'];\n\n    // ENR-2 description accumulation fix (S229): accumulate descriptions across runs for ALL sources.\n    // Without this, sidecars are rewritten from scratch each run \u2014 carried-forward jobs in the\n    // rolling window lose their descriptions. GH lost 713, Ashby 194, Lever 174 per run.\n    // Fix: load prior sidecar entries, overlay current-run data, write merged result.\n    // Size is bounded by the 7-day pool TTL \u2014 old jobs expire from all_jobs.json and their\n    // descriptions are no longer needed. Chunking (40MB limit) handles large sources.\n    // Pattern originally applied to JSearch only \u2014 now generalized to all sources.\n    for (const src of Object.keys(bySource)) {\n      // Load ALL prior sidecar files for this source (handles chunked files too)\n      const priorMap = new Map();\n      const priorFiles = fs.readdirSync(DATA_DIR)\n        .filter(f => f.startsWith(`descriptions-${src}`) && f.endsWith('.jsonl'));\n      for (const fname of priorFiles) {\n        const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\\n').filter(Boolean);\n        for (const line of lines) {\n          try {\n            const { id, description_text } = JSON.parse(line);\n            if (id && description_text) priorMap.set(id, description_text);\n          } catch (_) {}\n        }\n      }\n\n      // Merge: prior entries as base, current-run entries win on conflict\n      const merged = new Map(priorMap);\n      for (const entry of bySource[src]) {\n        if (entry.description_text) merged.set(entry.id, entry.description_text);\n      }\n\n      const priorCount = priorMap.size;\n      const newCount = merged.size - priorCount;\n      if (priorCount > 0 && newCount !== 0) {\n        console.log(`   \ud83d\udcce ${src}: accumulated ${priorCount} prior + ${bySource[src].length} current \u2192 ${merged.size} total`);\n      }\n\n      bySource[src] = Array.from(merged, ([id, description_text]) => ({ id, description_text }));\n    }\n\n    // Write per-source files (chunked if needed)\n    const writtenFiles = new Set(); // track filenames written this run for stale-file cleanup\n    for (const [src, entries] of Object.entries(bySource)) {\n      if (entries.length === 0) continue;\n\n      // Estimate total bytes for this source\n      const totalBytes = entries.reduce((sum, e) => sum + Buffer.byteLength(JSON.stringify(e), 'utf8') + 1, 0);\n      const numChunks = Math.ceil(totalBytes / SIDECAR_CHUNK_LIMIT_BYTES);\n\n      if (numChunks === 1) {\n        const fname = `descriptions-${src}.jsonl`;\n        fs.writeFileSync(path.join(DATA_DIR, fname), entries.map(e => JSON.stringify(e)).join('\\n') + '\\n', 'utf8');\n        writtenFiles.add(fname);\n        console.log(`\ud83d\udcc4 ${fname}: ${entries.length} entries (${(totalBytes / 1024 / 1024).toFixed(1)} MB)`);\n      } else {\n        const perChunk = Math.ceil(entries.length / numChunks);\n        for (let i = 0; i < numChunks; i++) {\n          const chunk = entries.slice(i * perChunk, (i + 1) * perChunk);\n          const fname = `descriptions-${src}-${i + 1}.jsonl`;\n          const chunkBytes = chunk.reduce((sum, e) => sum + Buffer.byteLength(JSON.stringify(e), 'utf8') + 1, 0);\n          fs.writeFileSync(path.join(DATA_DIR, fname), chunk.map(e => JSON.stringify(e)).join('\\n') + '\\n', 'utf8');\n          writtenFiles.add(fname);\n          console.log(`\ud83d\udcc4 ${fname}: ${chunk.length} entries (${(chunkBytes / 1024 / 1024).toFixed(1)} MB)`);\n        }\n      }\n    }\n\n    // Stale file cleanup: remove any descriptions-*.jsonl files on disk (and in git) that\n    // were not written this run. Covers both chunk-count transitions (1\u21922 and 2\u21921).\n    // descriptions.jsonl (no dash-source suffix) is the Workday fetch cache \u2014 never touched here.\n    const existingSidecarFiles = fs.readdirSync(DATA_DIR)\n      .filter(f => /^descriptions-.+\\.jsonl$/.test(f) && !f.startsWith('descriptions-enriched') && !f.startsWith('descriptions-workday') && !f.startsWith('descriptions-smartrecruiters')); // skip enrichment-owned + legacy WD/SR files (incl. chunks)\n    for (const fname of existingSidecarFiles) {\n      if (!writtenFiles.has(fname)) {\n        fs.unlinkSync(path.join(DATA_DIR, fname));\n        execSync(`git rm --cached \".github/data/${fname}\" 2>/dev/null || true`);\n        console.log(`\ud83d\uddd1\ufe0f  Removed stale sidecar: ${fname}`);\n      }\n    }\n\n    // NOTE: do NOT delete descriptions.jsonl \u2014 it is the Workday incremental fetch cache.\n    // Step 1b reads it to know which Workday IDs are already fetched, avoiding redundant HTTP calls.\n    // descriptions-workday.jsonl (written above) is the published sidecar for enrich-jobs.js.\n    // descriptions.jsonl remains local state only \u2014 it is NOT staged for git push.\n\n    console.log('');\n\n    // Step 9: Write output files\n    console.log('\ud83d\udcbe Step 9: Writing output files...');\n    console.log('\u2501'.repeat(60));\n\n    // Strip pipeline internals before writing public output file\n    // (source_url, source_id, _raw are internal \u2014 not needed downstream)\n    // Note: 'source' is kept for downstream observability (which ATS produced each job)\n    const STRIP_FIELDS = ['source_url', 'source_id', '_raw', 'description', 'enriched', 'enriched_at', 'is_internship', 'is_new_grad', 'is_us_only', 'remote'];\n    let publicJobs = sortedJobs.map(job => {\n      const stripped = { ...job };\n      for (const field of STRIP_FIELDS) {\n        delete stripped[field];\n      }\n      return stripped;\n    });\n\n    // Merge previous all_jobs.json into current run (rolling 7-day window)\n    // Jobs from prior runs that weren't re-fetched this run are preserved until their TTL expires.\n    if (fs.existsSync(JOBS_OUTPUT_FILE)) {\n      const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;\n      const currentIds = new Set(publicJobs.map(j => j.id));\n      // Fingerprint guard: prevents re-injection of jobs that changed ID (e.g. WD-ID-BUG fix)\n      const currentFingerprints = new Set(publicJobs.map(j => j.fingerprint).filter(Boolean));\n      const prevLines = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8').trim().split('\\n').filter(Boolean);\n\n      // AGG-6: Preserve earliest posted_at for re-fetched jobs.\n      // Workday returns \"Posted 30+ Days Ago\" which parsePostedOn converts to today-30d\n      // each run, preventing these jobs from ever aging past 31 days. By keeping the\n      // earlier date from the prior run, jobs age naturally and eventually expire via TTL.\n      const priorDates = new Map();\n      for (const line of prevLines) {\n        try {\n          const job = JSON.parse(line);\n          if (job.id && job.posted_at) priorDates.set(job.id, job.posted_at);\n        } catch { /* skip malformed */ }\n      }\n      let datePreservedCount = 0;\n      for (const job of publicJobs) {\n        const prior = priorDates.get(job.id);\n        if (prior && new Date(prior) < new Date(job.posted_at)) {\n          job.posted_at = prior;\n          datePreservedCount++;\n        }\n      }\n      if (datePreservedCount > 0) {\n        console.log(`\ud83d\udcc5 Preserved earlier posted_at for ${datePreservedCount} re-fetched jobs`);\n      }\n\n      let mergedCount = 0;\n      let nullDateCount = 0;\n      let fpSkipCount = 0;\n      for (const line of prevLines) {\n        try {\n          const job = JSON.parse(line);\n          if (currentIds.has(job.id)) continue; // current run already has this job\n          if (job.fingerprint && currentFingerprints.has(job.fingerprint)) { fpSkipCount++; continue; } // same job, new ID \u2014 current version wins\n          if (!job.posted_at) { nullDateCount++; continue; } // null date \u2014 cannot verify TTL, drop\n          const postedTs = new Date(job.posted_at).getTime();\n          if (postedTs < cutoffMs) continue; // expired\n          if (isSeniorJob(job)) continue; // re-apply senior filter (WD-F5: bypass fix)\n          const strippedJob = { ...job };\n          for (const field of STRIP_FIELDS) delete strippedJob[field];\n          publicJobs.push(strippedJob);\n          mergedCount++;\n        } catch { /* skip malformed lines */ }\n      }\n      if (nullDateCount > 0) {\n        console.log(`\u26a0\ufe0f Rolling window: dropped ${nullDateCount} prior-run jobs with null posted_at (cannot verify TTL)`);\n      }\n      if (fpSkipCount > 0) {\n        console.log(`\ud83d\udd04 Rolling window: skipped ${fpSkipCount} prior-run jobs with matching fingerprint (ID changed, current version wins)`);\n      }\n      if (mergedCount > 0) {\n        // Re-sort after merge (newest first)\n        publicJobs.sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0));\n        // Re-tag employment on carry-forward jobs with current tag-engine rules.\n        // Only re-tags employment \u2014 domain tags preserved (may be from description-fallback).\n        let retagged = 0;\n        for (const job of publicJobs) {\n          if (currentIds.has(job.id)) continue;\n          const newEmp = tagEmployment(job);\n          if (job.tags?.employment !== newEmp) {\n            job.tags.employment = newEmp;\n            retagged++;\n          }\n        }\n        console.log(`\ud83d\udd04 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${retagged > 0 ? `, ${retagged} employment re-tagged` : ''})`);\n      } else {\n        console.log('\ud83d\udd04 No prior-run jobs to merge');\n      }\n    }\n\n    // AGG-32: Post-merge TTL safety net. AGG-6 may overwrite posted_at to an earlier\n    // date from the prior run, making current-run jobs stale. Carry-forward TTL check\n    // only applies to prior-run jobs \u2014 current-run jobs are skipped. This filter catches\n    // ALL stale jobs regardless of origin.\n    const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;\n    const preFilterCount = publicJobs.length;\n    publicJobs = publicJobs.filter(j => {\n      if (!j.posted_at) return false;\n      return new Date(j.posted_at).getTime() >= cutoffMs;\n    });\n    const staleRemoved = preFilterCount - publicJobs.length;\n    if (staleRemoved > 0) {\n      console.log(`\ud83e\uddf9 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >7d) from post-merge pool`);\n    }\n\n    // Generate tag stats from full pool (post-merge + post-AGG-32 filter).\n    tagStats = generateTagStats(publicJobs);\n    console.log(`\ud83d\udcca Tag stats: ${tagStats.total} jobs (full pool)`);\n\n    // AGG-COMPANY-2: Discovery diagnostic \u2014 auto-detect companies needing overrides.\n    // Compares senior-filter decisions vs tag-engine employment classification per company.\n    // Flags companies where the filter rate is high AND most filtering is title-based (not experience).\n    // Non-blocking: errors logged but never stop the pipeline.\n    try {\n      const OVERRIDE_CANDIDATES_FILE = path.join(DATA_DIR, 'override-candidates.json');\n      const MIN_JOBS_THRESHOLD = 10;\n      const HIGH_FILTER_RATE = 0.80;\n      const TITLE_FILTER_SHARE = 0.70;\n\n      const companyFiltered = {};\n      for (const job of seniorJobs) {\n        const c = job.company_name || 'unknown';\n        if (!companyFiltered[c]) companyFiltered[c] = { total: 0, senior_title: 0, senior_experience: 0, both: 0 };\n        companyFiltered[c].total++;\n        const reason = job._filter_reason || 'unknown';\n        if (reason === 'senior_title' || reason === 'both') companyFiltered[c].senior_title++;\n        if (reason === 'senior_experience' || reason === 'both') companyFiltered[c].senior_experience++;\n        if (reason === 'both') companyFiltered[c].both++;\n      }\n\n      const companyPool = {};\n      for (const job of publicJobs) {\n        const c = job.company_name || 'unknown';\n        if (!companyPool[c]) companyPool[c] = { total: 0, senior_tagged: 0, mid_tagged: 0, entry_tagged: 0 };\n        companyPool[c].total++;\n        const emp = job.tags?.employment;\n        if (emp === 'senior') companyPool[c].senior_tagged++;\n        else if (emp === 'mid_level') companyPool[c].mid_tagged++;\n        else if (emp === 'entry_level') companyPool[c].entry_tagged++;\n      }\n\n      const candidates = [];\n      for (const [company, filtered] of Object.entries(companyFiltered)) {\n        const pool = companyPool[company] || { total: 0 };\n        const totalForCompany = filtered.total + pool.total;\n        if (totalForCompany < MIN_JOBS_THRESHOLD) continue;\n\n        const filterRate = filtered.total / totalForCompany;\n        if (filterRate < HIGH_FILTER_RATE) continue;\n\n        const titleShare = filtered.senior_title / (filtered.total || 1);\n        if (titleShare < TITLE_FILTER_SHARE) continue;\n\n        const hasOverride = companyOverrideMap.has(company);\n        candidates.push({\n          company,\n          total_fetched: totalForCompany,\n          senior_filtered: filtered.total,\n          in_pool: pool.total,\n          filter_rate: +(filterRate * 100).toFixed(1),\n          title_filter_pct: +(titleShare * 100).toFixed(1),\n          senior_tagged_in_pool: pool.senior_tagged || 0,\n          has_override: hasOverride,\n          recommendation: hasOverride ? 'existing_override_check_accuracy' : 'add_override',\n        });\n      }\n\n      candidates.sort((a, b) => b.senior_filtered - a.senior_filtered);\n      fs.writeFileSync(OVERRIDE_CANDIDATES_FILE, JSON.stringify({ generated: new Date().toISOString(), candidates, threshold: { min_jobs: MIN_JOBS_THRESHOLD, filter_rate: HIGH_FILTER_RATE, title_share: TITLE_FILTER_SHARE } }, null, 2), 'utf8');\n      console.log(`\ud83d\udd0d AGG-COMPANY-2: ${candidates.length} override candidates \u2192 override-candidates.json`);\n      if (candidates.length > 0 && candidates.length <= 10) {\n        for (const c of candidates) {\n          console.log(`   ${c.has_override ? '\ud83d\udd04' : '\ud83c\udd95'} ${c.company}: ${c.senior_filtered}/${c.total_fetched} filtered (${c.filter_rate}%)`);\n        }\n      }\n    } catch (e) {\n      console.warn(`\u26a0\ufe0f AGG-COMPANY-2: Diagnostic failed (non-critical): ${e.message}`);\n    }\n\n    // Archive expiring jobs BEFORE overwriting all_jobs.json\n    const { getExpiringJobs, appendToWeeklyArchive } = require(`${SHARED}/utils/archiver`);\n    const ARCHIVE_DIR = path.join(DATA_DIR, 'archive');\n    const expiringJobs = getExpiringJobs(JOBS_OUTPUT_FILE, publicJobs);\n    if (expiringJobs.length > 0) {\n      const archiveFile = appendToWeeklyArchive(expiringJobs, ARCHIVE_DIR);\n      console.log(`\ud83d\udce6 Archived ${expiringJobs.length} expiring jobs \u2192 ${path.basename(archiveFile)}`);\n    } else {\n      console.log('\ud83d\udce6 No expiring jobs this run');\n    }\n\n    // Write jobs (JSONL format)\n    await writeJobsJSONL(publicJobs, JOBS_OUTPUT_FILE);\n\n    // Write metadata\n    // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).\n    // sortedJobs is current-run only \u2014 by_source.jsearch would show ~15 instead of ~400.\n    const duration = Date.now() - startTime;\n    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs);\n    await writeMetadata(metadata, METADATA_OUTPUT_FILE);\n\n    console.log('');\n    console.log(`\u2705 Step 9 complete: Output files written`);\n    console.log('');\n\n    // Step 10: Print summary\n    printSummary(sortedJobs, dedupedJobs.length, duplicates, duration);\n\n    // Step 11: Print tag distribution\n    printTagDistribution(sortedJobs);\n\n    // Step 12: Git commit (unless dry run)\n    if (!isDryRun) {\n      console.log('\ud83d\udcdd Step 12: Committing to git...');\n      console.log('\u2501'.repeat(60));\n\n      await gitCommit(sortedJobs.length);\n\n      console.log('');\n      console.log(`\u2705 Step 12 complete: Changes committed`);\n    } else {\n      console.log('\u23ed\ufe0f  Step 12: Skipping git commit (dry run)');\n    }\n\n    console.log('');\n    console.log('\u2550'.repeat(60));\n    console.log('\ud83c\udf89 Jobs Data Fetcher - Complete!');\n    console.log('\u2550'.repeat(60));\n\n    process.exit(0);\n\n  } catch (error) {\n    console.error('');\n    console.error('\u274c Fatal error:');\n    console.error(error.message);\n    console.error('');\n    console.error('Stack trace:');\n    console.error(error.stack);\n    process.exit(1);\n  }\n}\n\n/**\n * Generate metadata object\n * @param {Array} jobs - All jobs\n * @param {number} uniqueCount - Unique job count\n * @param {number} duplicateCount - Duplicate count\n * @param {number} duration - Duration in ms\n * @param {Object} tagStats - Tag statistics from tag engine\n * @param {Object} validationMetrics - Validation metrics\n * @param {Object} seniorFilterMetrics - Senior filter metrics\n * @returns {Object} - Metadata object\n */\nfunction generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs) {\n  const bySource = {};\n  const byEmploymentType = {};\n  const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };\n  const byRemote = { remote: 0, onsite: 0 };\n  const companyCounts = {};\n  const companyDomains = {};  // DASH-4b: track domain distribution per company\n\n  const now = Date.now();\n  const freshness = { last_1h: 0, last_6h: 0, last_24h: 0, last_48h: 0 };\n\n  for (const job of jobs) {\n    // Count by source\n    bySource[job.source] = (bySource[job.source] || 0) + 1;\n\n    // Count by employment type (handle null/missing/non-array)\n    const types = job.employment_types || [];\n    if (Array.isArray(types)) {\n      for (const type of types) {\n        byEmploymentType[type] = (byEmploymentType[type] || 0) + 1;\n      }\n    }\n\n    // Count by job type (use tags.employment \u2014 is_internship/is_new_grad stripped by STRIP_FIELDS)\n    if (job.tags?.employment === 'internship') {\n      byInternship.internship++;\n    } else if (job.tags?.employment === 'entry_level') {\n      byInternship['new-grad']++;\n    } else {\n      byInternship.mid_level++;\n    }\n\n    // Count by remote (use tags.locations \u2014 is_remote stripped by STRIP_FIELDS)\n    if (job.tags?.locations?.includes('remote')) {\n      byRemote.remote++;\n    } else {\n      byRemote.onsite++;\n    }\n\n    // Freshness buckets\n    if (job.posted_at) {\n      const ageMs = now - new Date(job.posted_at).getTime();\n      if (ageMs <= 1 * 60 * 60 * 1000)  freshness.last_1h++;\n      if (ageMs <= 6 * 60 * 60 * 1000)  freshness.last_6h++;\n      if (ageMs <= 24 * 60 * 60 * 1000) freshness.last_24h++;\n      if (ageMs <= 48 * 60 * 60 * 1000) freshness.last_48h++;\n    }\n\n    // Company counts + domain tracking (for top-N with domain)\n    const co = job.company_name;\n    if (co) {\n      companyCounts[co] = (companyCounts[co] || 0) + 1;\n      // DASH-4b: track primary domain per company\n      const domains = (job.tags && job.tags.domains) || [];\n      if (!companyDomains[co]) companyDomains[co] = {};\n      for (const d of domains) {\n        companyDomains[co][d] = (companyDomains[co][d] || 0) + 1;\n      }\n    }\n  }\n\n  // Top 20 companies by job count\n  // DASH-4b: includes primary domain (most common domain tag for that company)\n  const top_companies = Object.entries(companyCounts)\n    .sort((a, b) => b[1] - a[1])\n    .slice(0, 20)\n    .map(([company, count]) => {\n      const domains = companyDomains[company] || {};\n      const primaryDomain = Object.entries(domains).sort((a, b) => b[1] - a[1])[0];\n      return { company, count, domain: primaryDomain ? primaryDomain[0] : 'general' };\n    });\n\n  // Senior-filtered breakdown by source\n  const seniorBySource = {};\n  if (Array.isArray(seniorJobs)) {\n    for (const job of seniorJobs) {\n      const src = job.source || 'unknown';\n      seniorBySource[src] = (seniorBySource[src] || 0) + 1;\n    }\n  }\n\n  return {\n    version: '1.0',\n    generated: new Date().toISOString(),\n    duration_ms: duration,\n\n    total_jobs: jobs.length,\n    unique_jobs: uniqueCount,\n    duplicates_removed: duplicateCount,\n\n    by_source: bySource,\n    by_employment_type: byEmploymentType,\n    by_job_type: byInternship,\n    by_location: byRemote,\n\n    jsearch_stats: getUsageStats(),\n    ats_stats: getATSUsageStats(),\n\n    // Validation statistics\n    validation_stats: validationMetrics,\n\n    // Senior filter statistics\n    senior_filter_stats: {\n      ...seniorFilterMetrics,\n      by_source: seniorBySource,\n    },\n\n    // Tag statistics (Phase 1)\n    tag_stats: tagStats,\n\n    // Freshness \u2014 jobs posted within last N hours (entry-level pool)\n    freshness,\n\n    // Top 20 companies by job count (entry-level pool)\n    top_companies,\n  };\n}\n\n/**\n * Print execution summary\n * @param {Array} jobs - Final job array\n * @param {number} uniqueCount - Unique job count\n * @param {number} duplicateCount - Duplicate count\n * @param {number} duration - Duration in ms\n */\nfunction printSummary(jobs, uniqueCount, duplicateCount, duration) {\n  console.log('\ud83d\udcca Execution Summary:');\n  console.log('\u2501'.repeat(60));\n\n  // Count by job type (use tag fields \u2014 is_internship/is_new_grad/is_remote are never set)\n  const internships = jobs.filter(j => j.tags?.employment === 'internship').length;\n  const newGrad = jobs.filter(j => j.tags?.employment === 'entry_level').length;\n  const remote = jobs.filter(j => j.tags?.locations?.includes('remote')).length;\n\n  console.log(`Total jobs in output: ${jobs.length}`);\n  console.log(`  - Internships: ${internships}`);\n  console.log(`  - New Grad: ${newGrad}`);\n  console.log(`  - Remote: ${remote}`);\n  console.log('');\n  console.log(`Duplicates removed: ${duplicateCount}`);\n  console.log(`Duration: ${(duration / 1000).toFixed(1)}s`);\n\n  // JSearch usage\n  const jsearchStats = getUsageStats();\n  console.log('');\n  console.log('JSearch Usage:');\n  console.log(`  Total fetched this run: ${jsearchStats.total_fetched}`);\n  jsearchStats.queries.forEach(q => console.log(`  \"${q.query}\": ${q.count} jobs`));\n}\n\n/**\n * Commit changes to git\n * @param {number} jobCount - Number of jobs for commit message\n */\nasync function gitCommit(jobCount) {\n  const { execSync } = require('child_process');\n\n  try {\n    // Configure git\n    execSync('git config user.email \"bot@zapplyjobs.com\"');\n    execSync('git config user.name \"Data Bot\"');\n\n    // Add output files\n    execSync('git add .github/data/all_jobs.json');\n    execSync('git add .github/data/jobs-metadata.json');\n    execSync('git add .github/data/dedupe-store.json');\n    execSync('git add .github/data/filtered_jobs.json 2>/dev/null || true'); // senior-filter summary for analytics (PIPELINE-1)\n    execSync('git add .github/data/filtered-samples.jsonl 2>/dev/null || true'); // AGG-DATA-8: sampled filtered jobs for FP spot-check\n    // archive/ is NOT staged here \u2014 pushed separately to jobs-archive-private repo via workflow\n    execSync('git add .github/data/descriptions-*.jsonl 2>/dev/null || true'); // per-source description sidecars (published)\n    // descriptions.jsonl is Workday fetch cache \u2014 NOT staged (local state only, managed by Step 1b)\n\n    // Check if there are changes\n    const status = execSync('git status --porcelain', { encoding: 'utf8' });\n\n    if (!status.trim()) {\n      console.log('\u2139\ufe0f No changes to commit');\n      return;\n    }\n\n    // Create commit message\n    const now = new Date();\n    const dateStr = now.toISOString().split('T')[0];\n    const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);\n\n    const commitMessage = `Update jobs - ${dateStr} ${timeStr}\\n\\n${jobCount} jobs in shared database`;\n\n    // Commit\n    execSync(`git commit -m \"${commitMessage}\"`);\n\n    console.log(`\u2705 Committed: ${jobCount} jobs`);\n\n  } catch (error) {\n    console.error('\u26a0\ufe0f Git commit failed:', error.message);\n    throw error;\n  }\n}\n\n// Run main function\nif (require.main === module) {\n  main();\n}\n\nmodule.exports = { main };\n"
+#!/usr/bin/env node
+
+/**
+ * Main Orchestrator - Jobs Data Fetcher
+ *
+ * Coordinates all fetchers, normalizes jobs, deduplicates,
+ * and writes the shared output file.
+ *
+ * Usage:
+ *   node index.js                    # Normal run
+ *   node index.js --dry-run          # Dry run (no git commit)
+ *   node index.js --verbose          # Verbose logging
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+// Import from shared submodule (job-board-scripts/lib/aggregator/)
+const SHARED = path.join(__dirname, 'shared', 'lib', 'aggregator');
+
+// Import fetchers
+const { fetchFromJSearch, getUsageStats } = require(`${SHARED}/fetchers/jsearch-fetcher`);
+const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
+const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
+const { fetchAllNetflixJobs } = require(`${SHARED}/fetchers/netflix`);
+const { loadDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
+const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
+const { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);
+const { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);
+const { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);
+
+// Import processors
+const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
+const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
+const { deduplicateJobs } = require(`${SHARED}/processors/deduplicator`);
+const { tagJobs, generateTagStats, tagEmployment, setCompanyOverrideMap } = require(`${SHARED}/processors/tag-engine`);
+const { printTagDistribution } = require(`${SHARED}/processors/tag-monitor`);
+
+// Import utils
+const { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);
+
+// AGG-36: Load per-company title overrides from company-list.json
+const COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');
+let companyOverrideMap = new Map();
+try {
+  const companyList = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));
+  companyOverrideMap = buildCompanyOverrideMap(companyList);
+  if (companyOverrideMap.size > 0) {
+    console.log(`📋 AGG-36: Loaded ${companyOverrideMap.size} company title overrides`);
+    setCompanyOverrideMap(companyOverrideMap);
+  }
+} catch (e) {
+  console.warn(`⚠️ AGG-36: Could not load company overrides: ${e.message}`);
+}
+
+// Paths
+const DATA_DIR = path.join(process.cwd(), '.github', 'data');
+const JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'all_jobs.json');
+const METADATA_OUTPUT_FILE = path.join(DATA_DIR, 'jobs-metadata.json');
+
+// Command line args
+const args = process.argv.slice(2);
+const isDryRun = args.includes('--dry-run');
+const isVerbose = args.includes('--verbose');
+
+/**
+ * Main execution function
+ */
+async function main() {
+  const startTime = Date.now();
+
+  console.log('🚀 Jobs Data Fetcher - Starting...');
+  console.log('═'.repeat(60));
+  console.log(`Mode: ${isDryRun ? 'DRY RUN (no commits)' : 'NORMAL'}`);
+  console.log('');
+
+  try {
+    // Ensure data directory exists
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+
+    // Step 1: Fetch from all sources
+    console.log('📡 Step 1: Fetching jobs from all sources...');
+    console.log('━'.repeat(60));
+
+    // AGG-5 (S229): Overall timeout per fetcher. Prevents one hung API from blocking
+    // the entire pipeline (Amazon API hung for 23 min on 2026-03-26T00:15 run).
+    // Rolling window merge preserves prior-run jobs — skipping a source is safe.
+    function withTimeout(promise, ms, label) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms/1000}s`)), ms))
+      ]).catch(err => {
+        console.error(`⚠️ ${label}: ${err.message} — continuing with 0 jobs`);
+        return label.includes('ATS') ? { jobs: [] } : [];
+      });
+    }
+
+    let allJobs = [];
+
+    // Fetch from JSearch (normal: ~12s, timeout: 60s)
+    const jsearchJobs = await withTimeout(fetchFromJSearch(), 60_000, 'JSearch');
+    allJobs.push(...jsearchJobs);
+
+    // Fetch from ATS sources (normal: ~9.5 min, timeout: 12 min)
+    const atsResult = await withTimeout(fetchFromAllATS(), 720_000, 'ATS');
+    allJobs.push(...atsResult.jobs);
+
+    // Fetch from Amazon Jobs (normal: ~23s, timeout: 120s)
+    const amazonJobs = await withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon');
+    allJobs.push(...amazonJobs);
+
+    // Fetch from Netflix Jobs (normal: ~2.5 min, timeout: 5 min)
+    const netflixJobs = await withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix');
+    allJobs.push(...netflixJobs);
+
+    // Count Apple jobs from previous run for initial population detection (SUP-FETCHER-6)
+    // Threshold: if <2000 previous Apple jobs, the pool was seeded from capped runs —
+    // do a full fetch of all ~251 pages. Routine: caps at 50 pages.
+    // all_jobs.json is JSONL — count lines with source=apple without full parse.
+    let prevAppleCount = 0;
+    try {
+      if (fs.existsSync(JOBS_OUTPUT_FILE)) {
+        const content = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
+        prevAppleCount = (content.match(/"source":"apple"/g) || []).length;
+        if (prevAppleCount > 0) console.log(`  Previous Apple count: ${prevAppleCount}`);
+      }
+    } catch (e) { /* first run or corrupt file — treat as first run */ }
+    const appleTimeout = prevAppleCount === 0 ? 300_000 : 180_000;
+    const appleJobs = await withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount }), appleTimeout, 'Apple');
+    allJobs.push(...appleJobs);
+
+    // Fetch from Two Sigma Jobs (single RSS request, timeout: 30s)
+    const twoSigmaJobs = await withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma');
+    allJobs.push(...twoSigmaJobs);
+
+    // Fetch from Uber Jobs (POST API, ~12s, timeout: 60s)
+    const uberJobs = await withTimeout(fetchAllUberJobs(), 60_000, 'Uber');
+    allJobs.push(...uberJobs);
+
+    // Count Google jobs from previous run for initial population detection (SUP-FETCHER-7)
+    let prevGoogleCount = 0;
+    try {
+      if (fs.existsSync(JOBS_OUTPUT_FILE)) {
+        const gContent = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
+        prevGoogleCount = (gContent.match(/"source":"google"/g) || []).length;
+        if (prevGoogleCount > 0) console.log(`  Previous Google count: ${prevGoogleCount}`);
+      }
+    } catch (e) { /* first run */ }
+    const googleTimeout = prevGoogleCount === 0 ? 300_000 : 180_000;
+    const googleJobs = await withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), googleTimeout, 'Google');
+    allJobs.push(...googleJobs);
+
+    console.log('');
+    console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
+    console.log(`   - JSearch: ${jsearchJobs.length} jobs`);
+    console.log(`   - ATS: ${atsResult.jobs.length} jobs`);
+    console.log(`   - Amazon: ${amazonJobs.length} jobs`);
+    console.log(`   - Netflix: ${netflixJobs.length} jobs`);
+    console.log(`   - Apple: ${appleJobs.length} jobs`);
+    console.log(`   - Two Sigma: ${twoSigmaJobs.length} jobs`);
+    console.log(`   - Uber: ${uberJobs.length} jobs`);
+    console.log(`   - Google: ${googleJobs.length} jobs`);
+    console.log('');
+
+    // Steps 1b/1c REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment
+    // workflow in jobs-data-2026 (targeted: only tech+US jobs, no waste on senior/non-US).
+    console.log('📄 Steps 1b/1c: WD/SR descriptions → handled by enrichment workflow');
+    console.log('');
+
+    // Step 2: Enhance jobs (add fingerprints, employment_types arrays, etc.)
+    console.log('🔄 Step 2: Enhancing jobs with required fields...');
+    console.log('━'.repeat(60));
+
+    // Add missing fields (fingerprints, normalize employment_types to arrays)
+    const helpers = require(`${SHARED}/utils/helpers`);
+    const enhancedJobs = allJobs.map(job => {
+      // Add fingerprint if missing
+      if (!job.fingerprint) {
+        job.fingerprint = helpers.generateFingerprint(job);
+      }
+
+      // Normalize employment_type/employment_types to array
+      if (!job.employment_types) {
+        const types = job.employment_type || job.employment_types || [];
+        if (Array.isArray(types)) {
+          job.employment_types = types.map(t => String(t).toUpperCase());
+        } else if (typeof types === 'string') {
+          job.employment_types = types.split(',').map(t => t.trim().toUpperCase());
+        } else if (types === null || types === undefined) {
+          job.employment_types = [];
+        } else {
+          job.employment_types = [String(types).toUpperCase()];
+        }
+      }
+
+      return job;
+    });
+
+    console.log('');
+    console.log(`✅ Step 2 complete: ${enhancedJobs.length} jobs enhanced`);
+    console.log('');
+
+    // Step 3: Validate and fix malformed fields
+    console.log('📝 Step 3: Validating and fixing malformed fields...');
+    console.log('━'.repeat(60));
+
+    const { validJobs, invalidJobs, metrics: validationMetrics } = validateAndNormalizeJobs(enhancedJobs);
+
+    console.log('');
+    printValidationSummary(validationMetrics);
+    console.log('');
+    console.log(`✅ Step 3 complete: ${validJobs.length} valid jobs (${invalidJobs.length} filtered)`);
+    console.log('');
+
+    // Step 4: Filter senior jobs
+    console.log('🎓 Step 4: Filtering senior-level jobs...');
+    console.log('━'.repeat(60));
+
+    const { entryLevelJobs, seniorJobs, metrics: seniorFilterMetrics } = filterSeniorJobs(validJobs, companyOverrideMap);
+
+    console.log('');
+    printSeniorFilterSummary(seniorFilterMetrics);
+    console.log('');
+    const overrideCount = seniorFilterMetrics.override_applied || 0;
+    console.log(`✅ Step 4 complete: ${entryLevelJobs.length} entry-level jobs (${seniorJobs.length} senior filtered${overrideCount > 0 ? `, ${overrideCount} overrides applied` : ''})`);
+    console.log('');
+
+    // Step 4b: Write senior-filter analytics summary (PIPELINE-1)
+    // Summary counts only — full job objects are ~180 MB and exceed GitHub's 100 MB limit.
+    // Tags not yet available (Step 5), so breakdown is by source only.
+    const FILTERED_OUTPUT_FILE = path.join(DATA_DIR, 'filtered_jobs.json');
+    const seniorBySource = {};
+    for (const job of seniorJobs) {
+      seniorBySource[job.source || 'unknown'] = (seniorBySource[job.source || 'unknown'] || 0) + 1;
+    }
+    const filteredSummary = {
+      generated: new Date().toISOString(),
+      total_senior_filtered: seniorJobs.length,
+      by_source: seniorBySource,
+    };
+    fs.writeFileSync(FILTERED_OUTPUT_FILE, JSON.stringify(filteredSummary, null, 2), 'utf8');
+    console.log(`📋 Step 4b: Senior-filter summary → filtered_jobs.json (${seniorJobs.length} total)`);
+
+    // AGG-DATA-8: Sample 50 filtered jobs for false-positive spot-check.
+    // Enables measuring FP rate without storing all ~53K filtered jobs.
+    // File is append-only JSONL, rotated weekly by the pipeline (keep last 7 days).
+    {
+      const SAMPLE_SIZE = 50;
+      const SAMPLES_FILE = path.join(DATA_DIR, 'filtered-samples.jsonl');
+      const now = new Date();
+
+      // Rotate: remove entries older than 7 days
+      let existingLines = [];
+      if (fs.existsSync(SAMPLES_FILE)) {
+        const cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        existingLines = fs.readFileSync(SAMPLES_FILE, 'utf8').trim().split('\n')
+          .filter(line => { try { return JSON.parse(line).sampled_at >= cutoff; } catch { return false; } });
+      }
+
+      // Random sample without bias (Fisher-Yates partial shuffle)
+      const sampleIndices = [];
+      if (seniorJobs.length <= SAMPLE_SIZE) {
+        sampleIndices.push(...Array.from({ length: seniorJobs.length }, (_, i) => i));
+      } else {
+        const pool = Array.from({ length: seniorJobs.length }, (_, i) => i);
+        for (let i = 0; i < SAMPLE_SIZE; i++) {
+          const j = i + Math.floor(Math.random() * (pool.length - i));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+          sampleIndices.push(pool[i]);
+        }
+      }
+
+      const newSamples = sampleIndices.map(idx => {
+        const job = seniorJobs[idx];
+        return {
+          sampled_at: now.toISOString(),
+          id: job.id,
+          title: job.title,
+          company_name: job.company_name,
+          source: job.source,
+          location: job.location || null,
+          filter_reason: job._filter_reason || 'unknown',
+        };
+      });
+
+      const allLines = [...existingLines, ...newSamples.map(s => JSON.stringify(s))];
+      fs.writeFileSync(SAMPLES_FILE, allLines.join('\n') + '\n', 'utf8');
+      console.log(`📋 Step 4b-2: Filtered samples → filtered-samples.jsonl (${newSamples.length} sampled, ${allLines.length} total)`);
+    }
+    console.log('');
+
+    // Step 4c: Inject descriptions from ALL sidecar files for tag engine's description fallback.
+    // Carried-forward jobs lose their inline descriptions in Step 9 (stripped from all_jobs.json).
+    // This re-injects them from per-source sidecar files so the description-fallback layer can classify.
+    // Guard: !job.description prevents double-injection for freshly-fetched jobs with inline descriptions.
+    // TAG-9 S237: expanded from enriched-only to ALL sidecars — 1,317 additional jobs gain descriptions.
+    const descSidecarFiles = fs.readdirSync(DATA_DIR)
+      .filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
+    if (descSidecarFiles.length > 0) {
+      const descMap = new Map();
+      for (const fname of descSidecarFiles) {
+        const fpath = path.join(DATA_DIR, fname);
+        const descLines = fs.readFileSync(fpath, 'utf8').trim().split('\n').filter(Boolean);
+        for (const line of descLines) {
+          try {
+            const { id, description_text } = JSON.parse(line);
+            if (id && description_text) descMap.set(id, description_text);
+          } catch { /* skip malformed */ }
+        }
+      }
+      let injected = 0;
+      for (const job of entryLevelJobs) {
+        if (!job.description && descMap.has(job.id)) {
+          job.description = descMap.get(job.id);
+          injected++;
+        }
+      }
+      console.log(`📄 Step 4c: Injected ${injected} descriptions from ${descSidecarFiles.length} sidecar files (${descMap.size} available)`);
+    } else {
+      console.log('📄 Step 4c: No description sidecar files found — description fallback inactive');
+    }
+    console.log('');
+
+    // Step 5: Apply tags
+    console.log('🏷️  Step 5: Applying tags...');
+    console.log('━'.repeat(60));
+
+    const taggedJobs = tagJobs(entryLevelJobs);
+
+    console.log(`✅ Step 5 complete: ${taggedJobs.length} jobs tagged`);
+    console.log('');
+
+    // Step 6: Deduplicate
+    console.log('🔍 Step 6: Deduplicating jobs...');
+    console.log('━'.repeat(60));
+
+    const { unique: dedupedJobs, duplicates, stats: dedupeStats } = deduplicateJobs(taggedJobs);
+
+    console.log('');
+    console.log(`✅ Step 6 complete: ${dedupedJobs.length} unique jobs (${duplicates} duplicates removed)`);
+    console.log('');
+
+    // Step 7: Tag statistics deferred to post-merge (after Step 9).
+    // Previously computed from dedupedJobs (current-run only), missing ~4K carry-forward jobs.
+    // Now computed after carry-forward merge + AGG-32 stale filter for full-pool accuracy.
+    console.log('📊 Step 7: Tag statistics deferred to post-merge');
+
+    let tagStats = null;
+    console.log('');
+
+    // Step 8: Sort by date (newest first)
+    console.log('📊 Step 8: Sorting jobs by date...');
+    console.log('━'.repeat(60));
+
+    const sortedJobs = dedupedJobs.sort((a, b) => {
+      const dateA = new Date(a.posted_at || 0);
+      const dateB = new Date(b.posted_at || 0);
+      return dateB - dateA; // Newest first
+    });
+
+    console.log(`✅ Step 8 complete: Jobs sorted`);
+    console.log('');
+
+    // Step 8b: Write per-source description sidecars
+    //
+    // One file per source: descriptions-{source}.jsonl
+    // Each file is rewritten atomically each run.
+    // Non-Workday sources: pruned to liveJobIds (entry-level survivors).
+    // Workday: pruned to allWorkdayIds (full pre-filter pool, all seniorities) — see PIPELINE-3-FIX.
+    //
+    // Chunking: if a source exceeds SIDECAR_CHUNK_LIMIT_BYTES, split into
+    //   descriptions-{source}-1.jsonl, descriptions-{source}-2.jsonl, etc.
+    // This keeps every file well under GitHub's 100 MB hard limit.
+    //
+    // Stale file cleanup: when chunk count changes (1→2 or 2→1), old filenames are orphaned.
+    // After writing, we scan DATA_DIR for any descriptions-{src}*.jsonl files not written
+    // this run and delete them from disk + unstage from git. This handles both directions.
+    //
+    // Workday: descriptions were fetched live in Step 1b and injected as job.description.
+    // All other sources: descriptions are inline on job objects from their respective fetchers.
+    // After this step, all descriptions are in sidecar files. Step 9 strips description from publicJobs.
+    //
+    // enrich-jobs.js reads all files matching descriptions-*.jsonl — auto-picks up new chunks.
+
+    const SIDECAR_CHUNK_LIMIT_BYTES = 40 * 1024 * 1024; // 40 MB per file
+    const { execSync } = require('child_process');
+
+    // Group jobs by source, collect id + description for each
+    const bySource = {};
+    for (const job of sortedJobs) {
+      const src = job.source;
+      if (!src) continue;
+      if (!bySource[src]) bySource[src] = [];
+      if (job.description) {
+        bySource[src].push({ id: job.id, description_text: job.description });
+      }
+    }
+
+    // WD sidecar REMOVED (DESC-MIGRATE-1): WD descriptions now owned by enrichment workflow.
+    delete bySource['workday'];
+    // SR sidecar REMOVED (DESC-MIGRATE-1): SR descriptions now owned by enrichment workflow.
+    delete bySource['smartrecruiters'];
+
+    // ENR-2 description accumulation fix (S229): accumulate descriptions across runs for ALL sources.
+    // Without this, sidecars are rewritten from scratch each run — carried-forward jobs in the
+    // rolling window lose their descriptions. GH lost 713, Ashby 194, Lever 174 per run.
+    // Fix: load prior sidecar entries, overlay current-run data, write merged result.
+    // Size is bounded by the 7-day pool TTL — old jobs expire from all_jobs.json and their
+    // descriptions are no longer needed. Chunking (40MB limit) handles large sources.
+    // Pattern originally applied to JSearch only — now generalized to all sources.
+    for (const src of Object.keys(bySource)) {
+      // Load ALL prior sidecar files for this source (handles chunked files too)
+      const priorMap = new Map();
+      const priorFiles = fs.readdirSync(DATA_DIR)
+        .filter(f => f.startsWith(`descriptions-${src}`) && f.endsWith('.jsonl'));
+      for (const fname of priorFiles) {
+        const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
+        for (const line of lines) {
+          try {
+            const { id, description_text } = JSON.parse(line);
+            if (id && description_text) priorMap.set(id, description_text);
+          } catch (_) {}
+        }
+      }
+
+      // Merge: prior entries as base, current-run entries win on conflict
+      const merged = new Map(priorMap);
+      for (const entry of bySource[src]) {
+        if (entry.description_text) merged.set(entry.id, entry.description_text);
+      }
+
+      const priorCount = priorMap.size;
+      const newCount = merged.size - priorCount;
+      if (priorCount > 0 && newCount !== 0) {
+        console.log(`   📎 ${src}: accumulated ${priorCount} prior + ${bySource[src].length} current → ${merged.size} total`);
+      }
+
+      bySource[src] = Array.from(merged, ([id, description_text]) => ({ id, description_text }));
+    }
+
+    // Write per-source files (chunked if needed)
+    const writtenFiles = new Set(); // track filenames written this run for stale-file cleanup
+    for (const [src, entries] of Object.entries(bySource)) {
+      if (entries.length === 0) continue;
+
+      // Estimate total bytes for this source
+      const totalBytes = entries.reduce((sum, e) => sum + Buffer.byteLength(JSON.stringify(e), 'utf8') + 1, 0);
+      const numChunks = Math.ceil(totalBytes / SIDECAR_CHUNK_LIMIT_BYTES);
+
+      if (numChunks === 1) {
+        const fname = `descriptions-${src}.jsonl`;
+        fs.writeFileSync(path.join(DATA_DIR, fname), entries.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+        writtenFiles.add(fname);
+        console.log(`📄 ${fname}: ${entries.length} entries (${(totalBytes / 1024 / 1024).toFixed(1)} MB)`);
+      } else {
+        const perChunk = Math.ceil(entries.length / numChunks);
+        for (let i = 0; i < numChunks; i++) {
+          const chunk = entries.slice(i * perChunk, (i + 1) * perChunk);
+          const fname = `descriptions-${src}-${i + 1}.jsonl`;
+          const chunkBytes = chunk.reduce((sum, e) => sum + Buffer.byteLength(JSON.stringify(e), 'utf8') + 1, 0);
+          fs.writeFileSync(path.join(DATA_DIR, fname), chunk.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+          writtenFiles.add(fname);
+          console.log(`📄 ${fname}: ${chunk.length} entries (${(chunkBytes / 1024 / 1024).toFixed(1)} MB)`);
+        }
+      }
+    }
+
+    // Stale file cleanup: remove any descriptions-*.jsonl files on disk (and in git) that
+    // were not written this run. Covers both chunk-count transitions (1→2 and 2→1).
+    // descriptions.jsonl (no dash-source suffix) is the Workday fetch cache — never touched here.
+    const existingSidecarFiles = fs.readdirSync(DATA_DIR)
+      .filter(f => /^descriptions-.+\.jsonl$/.test(f) && !f.startsWith('descriptions-enriched') && !f.startsWith('descriptions-workday') && !f.startsWith('descriptions-smartrecruiters')); // skip enrichment-owned + legacy WD/SR files (incl. chunks)
+    for (const fname of existingSidecarFiles) {
+      if (!writtenFiles.has(fname)) {
+        fs.unlinkSync(path.join(DATA_DIR, fname));
+        execSync(`git rm --cached ".github/data/${fname}" 2>/dev/null || true`);
+        console.log(`🗑️  Removed stale sidecar: ${fname}`);
+      }
+    }
+
+    // NOTE: do NOT delete descriptions.jsonl — it is the Workday incremental fetch cache.
+    // Step 1b reads it to know which Workday IDs are already fetched, avoiding redundant HTTP calls.
+    // descriptions-workday.jsonl (written above) is the published sidecar for enrich-jobs.js.
+    // descriptions.jsonl remains local state only — it is NOT staged for git push.
+
+    console.log('');
+
+    // Step 9: Write output files
+    console.log('💾 Step 9: Writing output files...');
+    console.log('━'.repeat(60));
+
+    // Strip pipeline internals before writing public output file
+    // (source_url, source_id, _raw are internal — not needed downstream)
+    // Note: 'source' is kept for downstream observability (which ATS produced each job)
+    const STRIP_FIELDS = ['source_url', 'source_id', '_raw', 'description', 'enriched', 'enriched_at', 'is_internship', 'is_new_grad', 'is_us_only', 'remote'];
+    let publicJobs = sortedJobs.map(job => {
+      const stripped = { ...job };
+      for (const field of STRIP_FIELDS) {
+        delete stripped[field];
+      }
+      return stripped;
+    });
+
+    // Merge previous all_jobs.json into current run (rolling 7-day window)
+    // Jobs from prior runs that weren't re-fetched this run are preserved until their TTL expires.
+    if (fs.existsSync(JOBS_OUTPUT_FILE)) {
+      const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const currentIds = new Set(publicJobs.map(j => j.id));
+      // Fingerprint guard: prevents re-injection of jobs that changed ID (e.g. WD-ID-BUG fix)
+      const currentFingerprints = new Set(publicJobs.map(j => j.fingerprint).filter(Boolean));
+      const prevLines = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8').trim().split('\n').filter(Boolean);
+
+      // AGG-6: Preserve earliest posted_at for re-fetched jobs.
+      // Workday returns "Posted 30+ Days Ago" which parsePostedOn converts to today-30d
+      // each run, preventing these jobs from ever aging past 31 days. By keeping the
+      // earlier date from the prior run, jobs age naturally and eventually expire via TTL.
+      const priorDates = new Map();
+      for (const line of prevLines) {
+        try {
+          const job = JSON.parse(line);
+          if (job.id && job.posted_at) priorDates.set(job.id, job.posted_at);
+        } catch { /* skip malformed */ }
+      }
+      let datePreservedCount = 0;
+      for (const job of publicJobs) {
+        const prior = priorDates.get(job.id);
+        if (prior && new Date(prior) < new Date(job.posted_at)) {
+          job.posted_at = prior;
+          datePreservedCount++;
+        }
+      }
+      if (datePreservedCount > 0) {
+        console.log(`📅 Preserved earlier posted_at for ${datePreservedCount} re-fetched jobs`);
+      }
+
+      let mergedCount = 0;
+      let nullDateCount = 0;
+      let fpSkipCount = 0;
+      for (const line of prevLines) {
+        try {
+          const job = JSON.parse(line);
+          if (currentIds.has(job.id)) continue; // current run already has this job
+          if (job.fingerprint && currentFingerprints.has(job.fingerprint)) { fpSkipCount++; continue; } // same job, new ID — current version wins
+          if (!job.posted_at) { nullDateCount++; continue; } // null date — cannot verify TTL, drop
+          const postedTs = new Date(job.posted_at).getTime();
+          if (postedTs < cutoffMs) continue; // expired
+          if (isSeniorJob(job)) continue; // re-apply senior filter (WD-F5: bypass fix)
+          const strippedJob = { ...job };
+          for (const field of STRIP_FIELDS) delete strippedJob[field];
+          publicJobs.push(strippedJob);
+          mergedCount++;
+        } catch { /* skip malformed lines */ }
+      }
+      if (nullDateCount > 0) {
+        console.log(`⚠️ Rolling window: dropped ${nullDateCount} prior-run jobs with null posted_at (cannot verify TTL)`);
+      }
+      if (fpSkipCount > 0) {
+        console.log(`🔄 Rolling window: skipped ${fpSkipCount} prior-run jobs with matching fingerprint (ID changed, current version wins)`);
+      }
+      if (mergedCount > 0) {
+        // Re-sort after merge (newest first)
+        publicJobs.sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0));
+        // Re-tag employment on carry-forward jobs with current tag-engine rules.
+        // Only re-tags employment — domain tags preserved (may be from description-fallback).
+        let retagged = 0;
+        for (const job of publicJobs) {
+          if (currentIds.has(job.id)) continue;
+          const newEmp = tagEmployment(job);
+          if (job.tags?.employment !== newEmp) {
+            job.tags.employment = newEmp;
+            retagged++;
+          }
+        }
+        console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${retagged > 0 ? `, ${retagged} employment re-tagged` : ''})`);
+      } else {
+        console.log('🔄 No prior-run jobs to merge');
+      }
+    }
+
+    // AGG-32: Post-merge TTL safety net. AGG-6 may overwrite posted_at to an earlier
+    // date from the prior run, making current-run jobs stale. Carry-forward TTL check
+    // only applies to prior-run jobs — current-run jobs are skipped. This filter catches
+    // ALL stale jobs regardless of origin.
+    const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const preFilterCount = publicJobs.length;
+    publicJobs = publicJobs.filter(j => {
+      if (!j.posted_at) return false;
+      return new Date(j.posted_at).getTime() >= cutoffMs;
+    });
+    const staleRemoved = preFilterCount - publicJobs.length;
+    if (staleRemoved > 0) {
+      console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >7d) from post-merge pool`);
+    }
+
+    // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
+    tagStats = generateTagStats(publicJobs);
+    console.log(`📊 Tag stats: ${tagStats.total} jobs (full pool)`);
+
+    // AGG-COMPANY-2: Discovery diagnostic — auto-detect companies needing overrides.
+    // Compares senior-filter decisions vs tag-engine employment classification per company.
+    // Flags companies where the filter rate is high AND most filtering is title-based (not experience).
+    // Non-blocking: errors logged but never stop the pipeline.
+    try {
+      const OVERRIDE_CANDIDATES_FILE = path.join(DATA_DIR, 'override-candidates.json');
+      const MIN_JOBS_THRESHOLD = 10;
+      const HIGH_FILTER_RATE = 0.80;
+      const TITLE_FILTER_SHARE = 0.70;
+
+      const companyFiltered = {};
+      for (const job of seniorJobs) {
+        const c = job.company_name || 'unknown';
+        if (!companyFiltered[c]) companyFiltered[c] = { total: 0, senior_title: 0, senior_experience: 0, both: 0 };
+        companyFiltered[c].total++;
+        const reason = job._filter_reason || 'unknown';
+        if (reason === 'senior_title' || reason === 'both') companyFiltered[c].senior_title++;
+        if (reason === 'senior_experience' || reason === 'both') companyFiltered[c].senior_experience++;
+        if (reason === 'both') companyFiltered[c].both++;
+      }
+
+      const companyPool = {};
+      for (const job of publicJobs) {
+        const c = job.company_name || 'unknown';
+        if (!companyPool[c]) companyPool[c] = { total: 0, senior_tagged: 0, mid_tagged: 0, entry_tagged: 0 };
+        companyPool[c].total++;
+        const emp = job.tags?.employment;
+        if (emp === 'senior') companyPool[c].senior_tagged++;
+        else if (emp === 'mid_level') companyPool[c].mid_tagged++;
+        else if (emp === 'entry_level') companyPool[c].entry_tagged++;
+      }
+
+      const candidates = [];
+      for (const [company, filtered] of Object.entries(companyFiltered)) {
+        const pool = companyPool[company] || { total: 0 };
+        const totalForCompany = filtered.total + pool.total;
+        if (totalForCompany < MIN_JOBS_THRESHOLD) continue;
+
+        const filterRate = filtered.total / totalForCompany;
+        if (filterRate < HIGH_FILTER_RATE) continue;
+
+        const titleShare = filtered.senior_title / (filtered.total || 1);
+        if (titleShare < TITLE_FILTER_SHARE) continue;
+
+        const hasOverride = companyOverrideMap.has(company);
+        candidates.push({
+          company,
+          total_fetched: totalForCompany,
+          senior_filtered: filtered.total,
+          in_pool: pool.total,
+          filter_rate: +(filterRate * 100).toFixed(1),
+          title_filter_pct: +(titleShare * 100).toFixed(1),
+          senior_tagged_in_pool: pool.senior_tagged || 0,
+          has_override: hasOverride,
+          recommendation: hasOverride ? 'existing_override_check_accuracy' : 'add_override',
+        });
+      }
+
+      candidates.sort((a, b) => b.senior_filtered - a.senior_filtered);
+      fs.writeFileSync(OVERRIDE_CANDIDATES_FILE, JSON.stringify({ generated: new Date().toISOString(), candidates, threshold: { min_jobs: MIN_JOBS_THRESHOLD, filter_rate: HIGH_FILTER_RATE, title_share: TITLE_FILTER_SHARE } }, null, 2), 'utf8');
+      console.log(`🔍 AGG-COMPANY-2: ${candidates.length} override candidates → override-candidates.json`);
+      if (candidates.length > 0 && candidates.length <= 10) {
+        for (const c of candidates) {
+          console.log(`   ${c.has_override ? '🔄' : '🆕'} ${c.company}: ${c.senior_filtered}/${c.total_fetched} filtered (${c.filter_rate}%)`);
+        }
+      }
+    } catch (e) {
+      console.warn(`⚠️ AGG-COMPANY-2: Diagnostic failed (non-critical): ${e.message}`);
+    }
+
+    // Archive expiring jobs BEFORE overwriting all_jobs.json
+    const { getExpiringJobs, appendToWeeklyArchive } = require(`${SHARED}/utils/archiver`);
+    const ARCHIVE_DIR = path.join(DATA_DIR, 'archive');
+    const expiringJobs = getExpiringJobs(JOBS_OUTPUT_FILE, publicJobs);
+    if (expiringJobs.length > 0) {
+      const archiveFile = appendToWeeklyArchive(expiringJobs, ARCHIVE_DIR);
+      console.log(`📦 Archived ${expiringJobs.length} expiring jobs → ${path.basename(archiveFile)}`);
+    } else {
+      console.log('📦 No expiring jobs this run');
+    }
+
+    // Write jobs (JSONL format)
+    await writeJobsJSONL(publicJobs, JOBS_OUTPUT_FILE);
+
+    // Write metadata
+    // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
+    // sortedJobs is current-run only — by_source.jsearch would show ~15 instead of ~400.
+    const duration = Date.now() - startTime;
+    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs);
+    await writeMetadata(metadata, METADATA_OUTPUT_FILE);
+
+    console.log('');
+    console.log(`✅ Step 9 complete: Output files written`);
+    console.log('');
+
+    // Step 10: Print summary
+    printSummary(sortedJobs, dedupedJobs.length, duplicates, duration);
+
+    // Step 11: Print tag distribution
+    printTagDistribution(sortedJobs);
+
+    // Step 12: Git commit (unless dry run)
+    if (!isDryRun) {
+      console.log('📝 Step 12: Committing to git...');
+      console.log('━'.repeat(60));
+
+      await gitCommit(sortedJobs.length);
+
+      console.log('');
+      console.log(`✅ Step 12 complete: Changes committed`);
+    } else {
+      console.log('⏭️  Step 12: Skipping git commit (dry run)');
+    }
+
+    console.log('');
+    console.log('═'.repeat(60));
+    console.log('🎉 Jobs Data Fetcher - Complete!');
+    console.log('═'.repeat(60));
+
+    process.exit(0);
+
+  } catch (error) {
+    console.error('');
+    console.error('❌ Fatal error:');
+    console.error(error.message);
+    console.error('');
+    console.error('Stack trace:');
+    console.error(error.stack);
+    process.exit(1);
+  }
+}
+
+/**
+ * Generate metadata object
+ * @param {Array} jobs - All jobs
+ * @param {number} uniqueCount - Unique job count
+ * @param {number} duplicateCount - Duplicate count
+ * @param {number} duration - Duration in ms
+ * @param {Object} tagStats - Tag statistics from tag engine
+ * @param {Object} validationMetrics - Validation metrics
+ * @param {Object} seniorFilterMetrics - Senior filter metrics
+ * @returns {Object} - Metadata object
+ */
+function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs) {
+  const bySource = {};
+  const byEmploymentType = {};
+  const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
+  const byRemote = { remote: 0, onsite: 0 };
+  const companyCounts = {};
+  const companyDomains = {};  // DASH-4b: track domain distribution per company
+
+  const now = Date.now();
+  const freshness = { last_1h: 0, last_6h: 0, last_24h: 0, last_48h: 0 };
+
+  for (const job of jobs) {
+    // Count by source
+    bySource[job.source] = (bySource[job.source] || 0) + 1;
+
+    // Count by employment type (handle null/missing/non-array)
+    const types = job.employment_types || [];
+    if (Array.isArray(types)) {
+      for (const type of types) {
+        byEmploymentType[type] = (byEmploymentType[type] || 0) + 1;
+      }
+    }
+
+    // Count by job type (use tags.employment — is_internship/is_new_grad stripped by STRIP_FIELDS)
+    if (job.tags?.employment === 'internship') {
+      byInternship.internship++;
+    } else if (job.tags?.employment === 'entry_level') {
+      byInternship['new-grad']++;
+    } else {
+      byInternship.mid_level++;
+    }
+
+    // Count by remote (use tags.locations — is_remote stripped by STRIP_FIELDS)
+    if (job.tags?.locations?.includes('remote')) {
+      byRemote.remote++;
+    } else {
+      byRemote.onsite++;
+    }
+
+    // Freshness buckets
+    if (job.posted_at) {
+      const ageMs = now - new Date(job.posted_at).getTime();
+      if (ageMs <= 1 * 60 * 60 * 1000)  freshness.last_1h++;
+      if (ageMs <= 6 * 60 * 60 * 1000)  freshness.last_6h++;
+      if (ageMs <= 24 * 60 * 60 * 1000) freshness.last_24h++;
+      if (ageMs <= 48 * 60 * 60 * 1000) freshness.last_48h++;
+    }
+
+    // Company counts + domain tracking (for top-N with domain)
+    const co = job.company_name;
+    if (co) {
+      companyCounts[co] = (companyCounts[co] || 0) + 1;
+      // DASH-4b: track primary domain per company
+      const domains = (job.tags && job.tags.domains) || [];
+      if (!companyDomains[co]) companyDomains[co] = {};
+      for (const d of domains) {
+        companyDomains[co][d] = (companyDomains[co][d] || 0) + 1;
+      }
+    }
+  }
+
+  // Top 20 companies by job count
+  // DASH-4b: includes primary domain (most common domain tag for that company)
+  const top_companies = Object.entries(companyCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([company, count]) => {
+      const domains = companyDomains[company] || {};
+      const primaryDomain = Object.entries(domains).sort((a, b) => b[1] - a[1])[0];
+      return { company, count, domain: primaryDomain ? primaryDomain[0] : 'general' };
+    });
+
+  // Senior-filtered breakdown by source
+  const seniorBySource = {};
+  if (Array.isArray(seniorJobs)) {
+    for (const job of seniorJobs) {
+      const src = job.source || 'unknown';
+      seniorBySource[src] = (seniorBySource[src] || 0) + 1;
+    }
+  }
+
+  return {
+    version: '1.0',
+    generated: new Date().toISOString(),
+    duration_ms: duration,
+
+    total_jobs: jobs.length,
+    unique_jobs: uniqueCount,
+    duplicates_removed: duplicateCount,
+
+    by_source: bySource,
+    by_employment_type: byEmploymentType,
+    by_job_type: byInternship,
+    by_location: byRemote,
+
+    jsearch_stats: getUsageStats(),
+    ats_stats: getATSUsageStats(),
+
+    // Validation statistics
+    validation_stats: validationMetrics,
+
+    // Senior filter statistics
+    senior_filter_stats: {
+      ...seniorFilterMetrics,
+      by_source: seniorBySource,
+    },
+
+    // Tag statistics (Phase 1)
+    tag_stats: tagStats,
+
+    // Freshness — jobs posted within last N hours (entry-level pool)
+    freshness,
+
+    // Top 20 companies by job count (entry-level pool)
+    top_companies,
+  };
+}
+
+/**
+ * Print execution summary
+ * @param {Array} jobs - Final job array
+ * @param {number} uniqueCount - Unique job count
+ * @param {number} duplicateCount - Duplicate count
+ * @param {number} duration - Duration in ms
+ */
+function printSummary(jobs, uniqueCount, duplicateCount, duration) {
+  console.log('📊 Execution Summary:');
+  console.log('━'.repeat(60));
+
+  // Count by job type (use tag fields — is_internship/is_new_grad/is_remote are never set)
+  const internships = jobs.filter(j => j.tags?.employment === 'internship').length;
+  const newGrad = jobs.filter(j => j.tags?.employment === 'entry_level').length;
+  const remote = jobs.filter(j => j.tags?.locations?.includes('remote')).length;
+
+  console.log(`Total jobs in output: ${jobs.length}`);
+  console.log(`  - Internships: ${internships}`);
+  console.log(`  - New Grad: ${newGrad}`);
+  console.log(`  - Remote: ${remote}`);
+  console.log('');
+  console.log(`Duplicates removed: ${duplicateCount}`);
+  console.log(`Duration: ${(duration / 1000).toFixed(1)}s`);
+
+  // JSearch usage
+  const jsearchStats = getUsageStats();
+  console.log('');
+  console.log('JSearch Usage:');
+  console.log(`  Total fetched this run: ${jsearchStats.total_fetched}`);
+  jsearchStats.queries.forEach(q => console.log(`  "${q.query}": ${q.count} jobs`));
+}
+
+/**
+ * Commit changes to git
+ * @param {number} jobCount - Number of jobs for commit message
+ */
+async function gitCommit(jobCount) {
+  const { execSync } = require('child_process');
+
+  try {
+    // Configure git
+    execSync('git config user.email "bot@zapplyjobs.com"');
+    execSync('git config user.name "Data Bot"');
+
+    // Add output files
+    execSync('git add .github/data/all_jobs.json');
+    execSync('git add .github/data/jobs-metadata.json');
+    execSync('git add .github/data/dedupe-store.json');
+    execSync('git add .github/data/filtered_jobs.json 2>/dev/null || true'); // senior-filter summary for analytics (PIPELINE-1)
+    execSync('git add .github/data/filtered-samples.jsonl 2>/dev/null || true'); // AGG-DATA-8: sampled filtered jobs for FP spot-check
+    // archive/ is NOT staged here — pushed separately to jobs-archive-private repo via workflow
+    execSync('git add .github/data/descriptions-*.jsonl 2>/dev/null || true'); // per-source description sidecars (published)
+    // descriptions.jsonl is Workday fetch cache — NOT staged (local state only, managed by Step 1b)
+
+    // Check if there are changes
+    const status = execSync('git status --porcelain', { encoding: 'utf8' });
+
+    if (!status.trim()) {
+      console.log('ℹ️ No changes to commit');
+      return;
+    }
+
+    // Create commit message
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
+
+    const commitMessage = `Update jobs - ${dateStr} ${timeStr}\n\n${jobCount} jobs in shared database`;
+
+    // Commit
+    execSync(`git commit -m "${commitMessage}"`);
+
+    console.log(`✅ Committed: ${jobCount} jobs`);
+
+  } catch (error) {
+    console.error('⚠️ Git commit failed:', error.message);
+    throw error;
+  }
+}
+
+// Run main function
+if (require.main === module) {
+  main();
+}
+
+module.exports = { main };
