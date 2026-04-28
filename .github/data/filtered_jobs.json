@@ -1,17 +1,18 @@
 {
-  "generated": "2026-04-28T12:51:51.979Z",
-  "total_senior_filtered": 41335,
+  "generated": "2026-04-28T13:05:41.760Z",
+  "total_senior_filtered": 41310,
   "by_source": {
+    "jsearch": 1,
     "greenhouse": 16470,
-    "lever": 1644,
+    "lever": 1642,
     "ashby": 3045,
-    "workday": 17313,
+    "workday": 17289,
     "smartrecruiters": 1366,
-    "amazon": 432,
+    "amazon": 433,
     "eightfold": 69,
     "apple": 228,
     "twosigma": 3,
-    "uber": 317,
+    "uber": 316,
     "google": 448
   }
 }
