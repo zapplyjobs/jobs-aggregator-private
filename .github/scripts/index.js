@@ -35,7 +35,7 @@ const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
 const { deduplicateJobs } = require(`${SHARED}/processors/deduplicator`);
 const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap } = require(`${SHARED}/processors/tag-engine`);
-const { printTagDistribution, checkTagDrift, printDriftReport } = require(`${SHARED}/processors/tag-monitor`);
+const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport } = require(`${SHARED}/processors/tag-monitor`);
 
 // Import utils
 const { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);
@@ -616,6 +616,19 @@ async function main() {
       }
     } catch (driftErr) {
       console.warn('⚠️ Drift check failed (non-blocking):', driftErr.message);
+    }
+
+    // TAG-AUDIT-5: Per-domain precision monitoring.
+    // Checks consumer-facing domains for known FP patterns.
+    // Flags if >3% FP rate in any domain.
+    try {
+      const precisionReport = checkDomainPrecision(publicJobs);
+      printPrecisionReport(precisionReport);
+      if (precisionReport.warnings.length > 0) {
+        console.log('⚠️  PRECISION WARNING — FP rate exceeds threshold in one or more domains');
+      }
+    } catch (precErr) {
+      console.warn('⚠️ Precision check failed (non-blocking):', precErr.message);
     }
 
     // AGG-COMPANY-2: Discovery diagnostic — auto-detect companies needing overrides.
