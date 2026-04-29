@@ -1,1 +1,3 @@
-Part of the [Zapply](https://zapply.jobs) job board infrastructure. See [zapplyjobs](https://github.com/zapplyjobs) for the public job boards.
+# Zapply Aggregator
+
+Private repo. Contains the pipeline that fetches, tags, deduplicates, and publishes jobs.
