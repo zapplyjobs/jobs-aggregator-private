@@ -30,6 +30,13 @@ jobs:
         submodules: recursive
         token: ${{ secrets.GH_PAT }}
 
+    - name: Fix submodule index
+      run: |
+        # Workaround for GitHub Actions submodule checkout caching issue
+        # Force git to recompute submodule index from the tree
+        git submodule sync --recursive
+        git submodule update --init --force --recursive
+
     - name: Setup Node.js
       uses: actions/setup-node@v5
       with:
