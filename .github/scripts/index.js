@@ -34,8 +34,8 @@ const { fetchAllSimplifyJobs } = require(`${SHARED}/fetchers/simplify`);
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
 const { deduplicateJobs } = require(`${SHARED}/processors/deduplicator`);
-const { tagJobs, generateTagStats, tagEmployment, setCompanyOverrideMap } = require(`${SHARED}/processors/tag-engine`);
-const { printTagDistribution } = require(`${SHARED}/processors/tag-monitor`);
+const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap } = require(`${SHARED}/processors/tag-engine`);
+const { printTagDistribution, checkTagDrift, printDriftReport } = require(`${SHARED}/processors/tag-monitor`);
 
 // Import utils
 const { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);
@@ -604,6 +604,19 @@ async function main() {
     // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
     tagStats = generateTagStats(publicJobs);
     console.log(`📊 Tag stats: ${tagStats.total} jobs (full pool)`);
+
+    // TAG-AUDIT-4: Pipeline-code drift detection.
+    // Samples US jobs, re-runs tagDomains() on title-only, compares to pipeline tags.
+    // Flags if >5% drift — indicates carry-forward masking classification changes.
+    try {
+      const driftReport = checkTagDrift(publicJobs, tagDomains, 500);
+      printDriftReport(driftReport);
+      if (driftReport.warnings.length > 0) {
+        console.log('⚠️  TAG DRIFT WARNING — consider re-tagging carry-forward jobs');
+      }
+    } catch (driftErr) {
+      console.warn('⚠️ Drift check failed (non-blocking):', driftErr.message);
+    }
 
     // AGG-COMPANY-2: Discovery diagnostic — auto-detect companies needing overrides.
     // Compares senior-filter decisions vs tag-engine employment classification per company.
