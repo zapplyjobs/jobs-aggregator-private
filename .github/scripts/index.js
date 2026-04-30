@@ -100,66 +100,69 @@ async function main() {
 
     let allJobs = [];
 
-    // Fetch from JSearch (normal: ~12s, timeout: 60s)
-    const jsearchJobs = await withTimeout(fetchFromJSearch(), 60_000, 'JSearch');
-    allJobs.push(...jsearchJobs);
-
-    // Fetch from ATS sources (normal: ~9.5 min, timeout: 12 min)
-    const atsResult = await withTimeout(fetchFromAllATS(), 720_000, 'ATS');
-    allJobs.push(...atsResult.jobs);
-
-    // Fetch from Amazon Jobs (normal: ~23s, timeout: 120s)
-    const amazonJobs = await withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon');
-    allJobs.push(...amazonJobs);
-
-    // Fetch from Netflix Jobs (normal: ~2.5 min, timeout: 5 min)
-    const netflixJobs = await withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix');
-    allJobs.push(...netflixJobs);
-
-    // Count Apple jobs from previous run for initial population detection (SUP-FETCHER-6)
-    // Threshold: if <2000 previous Apple jobs, the pool was seeded from capped runs —
-    // do a full fetch of all ~251 pages. Routine: caps at 50 pages.
-    // all_jobs.json is JSONL — count lines with source=apple without full parse.
+    // INF-PIPE-1: Pre-compute previous counts for adaptive fetchers before parallel launch
     let prevAppleCount = 0;
+    let prevGoogleCount = 0;
     try {
       if (fs.existsSync(JOBS_OUTPUT_FILE)) {
         const content = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
         prevAppleCount = (content.match(/"source":"apple"/g) || []).length;
+        prevGoogleCount = (content.match(/"source":"google"/g) || []).length;
         if (prevAppleCount > 0) console.log(`  Previous Apple count: ${prevAppleCount}`);
+        if (prevGoogleCount > 0) console.log(`  Previous Google count: ${prevGoogleCount}`);
       }
     } catch (e) { /* first run or corrupt file — treat as first run */ }
     const appleTimeout = prevAppleCount === 0 ? 300_000 : 180_000;
-    const appleJobs = await withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount }), appleTimeout, 'Apple');
-    allJobs.push(...appleJobs);
-
-    // Fetch from Two Sigma Jobs (single RSS request, timeout: 30s)
-    const twoSigmaJobs = await withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma');
-    allJobs.push(...twoSigmaJobs);
-
-    // Fetch from Uber Jobs (POST API, ~12s, timeout: 60s)
-    const uberJobs = await withTimeout(fetchAllUberJobs(), 60_000, 'Uber');
-    allJobs.push(...uberJobs);
-
-    // Count Google jobs from previous run for initial population detection (SUP-FETCHER-7)
-    let prevGoogleCount = 0;
-    try {
-      if (fs.existsSync(JOBS_OUTPUT_FILE)) {
-        const gContent = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
-        prevGoogleCount = (gContent.match(/"source":"google"/g) || []).length;
-        if (prevGoogleCount > 0) console.log(`  Previous Google count: ${prevGoogleCount}`);
-      }
-    } catch (e) { /* first run */ }
     const googleTimeout = prevGoogleCount === 0 ? 300_000 : 180_000;
-    const googleJobs = await withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), googleTimeout, 'Google');
-    allJobs.push(...googleJobs);
 
-    // Fetch from SimplifyJobs (public GitHub data, ~5s, timeout: 30s)
-    // SUP-FETCHER-3: Fallback for companies on unfetchable ATS (iCIMS, Oracle HCM, etc.)
-    const simplifyJobs = await withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs');
-    allJobs.push(...simplifyJobs);
+    // INF-PIPE-1: Run all 9 fetchers in parallel via Promise.allSettled.
+    // Previously: ATS (~9.5 min) ran first, then 7 post-ATS fetchers sequentially (~170s).
+    // Now: all run simultaneously — total Step 1 time = max(individual) ≈ ATS time ≈ 9.5 min.
+    // Each fetcher has its own timeout via withTimeout, so a hung fetcher can't block others.
+    const fetchTasks = [
+      { label: 'JSearch', result: withTimeout(fetchFromJSearch(), 60_000, 'JSearch') },
+      { label: 'ATS', result: withTimeout(fetchFromAllATS(), 720_000, 'ATS') },
+      { label: 'Amazon', result: withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon') },
+      { label: 'Netflix', result: withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix') },
+      { label: 'Apple', result: withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount }), appleTimeout, 'Apple') },
+      { label: 'Two Sigma', result: withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma') },
+      { label: 'Uber', result: withTimeout(fetchAllUberJobs(), 60_000, 'Uber') },
+      { label: 'Google', result: withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), googleTimeout, 'Google') },
+      { label: 'SimplifyJobs', result: withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs') },
+    ];
+
+    console.log(`  Launching ${fetchTasks.length} fetchers in parallel...`);
+    const settled = await Promise.allSettled(fetchTasks.map(t => t.result));
+
+    // Extract results — each settled value is either an array (jobs) or { jobs: [] } (ATS)
+    const results = {};
+    for (let i = 0; i < fetchTasks.length; i++) {
+      const label = fetchTasks[i].label;
+      if (settled[i].status === 'fulfilled') {
+        results[label] = settled[i].value;
+      } else {
+        console.error(`\u26a0\ufe0f ${label}: ${settled[i].reason} — continuing with 0 jobs`);
+        results[label] = label === 'ATS' ? { jobs: [] } : [];
+      }
+    }
+
+    const jsearchJobs = results['JSearch'];
+    const atsResult = results['ATS'];
+    const amazonJobs = results['Amazon'];
+    const netflixJobs = results['Netflix'];
+    const appleJobs = results['Apple'];
+    const twoSigmaJobs = results['Two Sigma'];
+    const uberJobs = results['Uber'];
+    const googleJobs = results['Google'];
+    const simplifyJobs = results['SimplifyJobs'];
+
+    allJobs.push(
+      ...jsearchJobs, ...atsResult.jobs, ...amazonJobs, ...netflixJobs,
+      ...appleJobs, ...twoSigmaJobs, ...uberJobs, ...googleJobs, ...simplifyJobs,
+    );
 
     console.log('');
-    console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
+    console.log(`\ud83d\udcca Step 1 complete: ${allJobs.length} jobs fetched`);
     console.log(`   - JSearch: ${jsearchJobs.length} jobs`);
     console.log(`   - ATS: ${atsResult.jobs.length} jobs`);
     console.log(`   - Amazon: ${amazonJobs.length} jobs`);
