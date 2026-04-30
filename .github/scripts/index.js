@@ -534,7 +534,7 @@ async function main() {
     // Merge previous all_jobs.json into current run (rolling 7-day window)
     // Jobs from prior runs that weren't re-fetched this run are preserved until their TTL expires.
     if (fs.existsSync(JOBS_OUTPUT_FILE)) {
-      const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const cutoffMs = Date.now() - 14 * 24 * 60 * 60 * 1000;
       const currentIds = new Set(publicJobs.map(j => j.id));
       // Fingerprint guard: prevents re-injection of jobs that changed ID (e.g. WD-ID-BUG fix)
       const currentFingerprints = new Set(publicJobs.map(j => j.fingerprint).filter(Boolean));
@@ -611,7 +611,7 @@ async function main() {
     // date from the prior run, making current-run jobs stale. Carry-forward TTL check
     // only applies to prior-run jobs — current-run jobs are skipped. This filter catches
     // ALL stale jobs regardless of origin.
-    const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const cutoffMs = Date.now() - 14 * 24 * 60 * 60 * 1000;
     const preFilterCount = publicJobs.length;
     publicJobs = publicJobs.filter(j => {
       if (!j.posted_at) return false;
@@ -619,7 +619,7 @@ async function main() {
     });
     const staleRemoved = preFilterCount - publicJobs.length;
     if (staleRemoved > 0) {
-      console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >7d) from post-merge pool`);
+      console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >14d) from post-merge pool`);
     }
 
     // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
