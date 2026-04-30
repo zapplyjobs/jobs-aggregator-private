@@ -30,6 +30,7 @@ const { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);
 const { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);
 const { fetchAllSimplifyJobs } = require(`${SHARED}/fetchers/simplify`);
 const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
+const { fetchAllOracleJobs } = require(`${SHARED}/fetchers/oracle`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
@@ -105,6 +106,7 @@ async function main() {
     let prevAppleCount = 0;
     let prevGoogleCount = 0;
     let prevMicrosoftCount = 0;
+    let prevOracleCount = 0;
     try {
       if (fs.existsSync(JOBS_OUTPUT_FILE)) {
         const content = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
@@ -114,11 +116,14 @@ async function main() {
         if (prevGoogleCount > 0) console.log(`  Previous Google count: ${prevGoogleCount}`);
         prevMicrosoftCount = (content.match(/"source":"microsoft"/g) || []).length;
         if (prevMicrosoftCount > 0) console.log(`  Previous Microsoft count: ${prevMicrosoftCount}`);
+        prevOracleCount = (content.match(/"source":"oracle"/g) || []).length;
+        if (prevOracleCount > 0) console.log(`  Previous Oracle count: ${prevOracleCount}`);
       }
     } catch (e) { /* first run or corrupt file — treat as first run */ }
     const appleTimeout = prevAppleCount === 0 ? 300_000 : 180_000;
     const googleTimeout = prevGoogleCount === 0 ? 300_000 : 180_000;
     const microsoftTimeout = prevMicrosoftCount === 0 ? 600_000 : 300_000;
+    const oracleTimeout = prevOracleCount === 0 ? 120_000 : 60_000;
 
     // INF-PIPE-1: Run all 9 fetchers in parallel via Promise.allSettled.
     // Previously: ATS (~9.5 min) ran first, then 7 post-ATS fetchers sequentially (~170s).
@@ -135,6 +140,7 @@ async function main() {
       { label: 'Google', result: withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), googleTimeout, 'Google') },
       { label: 'SimplifyJobs', result: withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs') },
       { label: 'Microsoft', result: withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount }), microsoftTimeout, 'Microsoft') },
+      { label: 'Oracle', result: withTimeout(fetchAllOracleJobs(), oracleTimeout, 'Oracle') },
     ];
 
     console.log(`  Launching ${fetchTasks.length} fetchers in parallel...`);
@@ -162,11 +168,13 @@ async function main() {
     const googleJobs = results['Google'];
     const simplifyJobs = results['SimplifyJobs'];
     const microsoftJobs = results['Microsoft'];
+    const oracleJobs = results['Oracle'];
 
     allJobs.push(
       ...jsearchJobs, ...atsResult.jobs, ...amazonJobs, ...netflixJobs,
       ...appleJobs, ...twoSigmaJobs, ...uberJobs, ...googleJobs, ...simplifyJobs,
       ...microsoftJobs,
+      ...oracleJobs,
     );
 
     console.log('');
@@ -181,6 +189,7 @@ async function main() {
     console.log(`   - Google: ${googleJobs.length} jobs`);
     console.log(`   - SimplifyJobs: ${simplifyJobs.length} jobs`);
     console.log(`   - Microsoft: ${microsoftJobs.length} jobs`);
+    console.log(`   - Oracle: ${oracleJobs.length} jobs`);
     console.log('');
 
     // Steps 1b/1c REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment
