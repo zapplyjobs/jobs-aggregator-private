@@ -29,8 +29,6 @@ const { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);
 const { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);
 const { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);
 const { fetchAllSimplifyJobs } = require(`${SHARED}/fetchers/simplify`);
-const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
-const { fetchAllOracleJobs } = require(`${SHARED}/fetchers/oracle`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
@@ -102,83 +100,66 @@ async function main() {
 
     let allJobs = [];
 
-    // INF-PIPE-1: Pre-compute previous counts for adaptive fetchers before parallel launch
+    // Fetch from JSearch (normal: ~12s, timeout: 60s)
+    const jsearchJobs = await withTimeout(fetchFromJSearch(), 60_000, 'JSearch');
+    allJobs.push(...jsearchJobs);
+
+    // Fetch from ATS sources (normal: ~9.5 min, timeout: 12 min)
+    const atsResult = await withTimeout(fetchFromAllATS(), 720_000, 'ATS');
+    allJobs.push(...atsResult.jobs);
+
+    // Fetch from Amazon Jobs (normal: ~23s, timeout: 120s)
+    const amazonJobs = await withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon');
+    allJobs.push(...amazonJobs);
+
+    // Fetch from Netflix Jobs (normal: ~2.5 min, timeout: 5 min)
+    const netflixJobs = await withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix');
+    allJobs.push(...netflixJobs);
+
+    // Count Apple jobs from previous run for initial population detection (SUP-FETCHER-6)
+    // Threshold: if <2000 previous Apple jobs, the pool was seeded from capped runs —
+    // do a full fetch of all ~251 pages. Routine: caps at 50 pages.
+    // all_jobs.json is JSONL — count lines with source=apple without full parse.
     let prevAppleCount = 0;
-    let prevGoogleCount = 0;
-    let prevMicrosoftCount = 0;
-    let prevOracleCount = 0;
     try {
       if (fs.existsSync(JOBS_OUTPUT_FILE)) {
         const content = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
         prevAppleCount = (content.match(/"source":"apple"/g) || []).length;
-        prevGoogleCount = (content.match(/"source":"google"/g) || []).length;
         if (prevAppleCount > 0) console.log(`  Previous Apple count: ${prevAppleCount}`);
-        if (prevGoogleCount > 0) console.log(`  Previous Google count: ${prevGoogleCount}`);
-        prevMicrosoftCount = (content.match(/"source":"microsoft"/g) || []).length;
-        if (prevMicrosoftCount > 0) console.log(`  Previous Microsoft count: ${prevMicrosoftCount}`);
-        prevOracleCount = (content.match(/"source":"oracle"/g) || []).length;
-        if (prevOracleCount > 0) console.log(`  Previous Oracle count: ${prevOracleCount}`);
       }
     } catch (e) { /* first run or corrupt file — treat as first run */ }
     const appleTimeout = prevAppleCount === 0 ? 300_000 : 180_000;
-    const googleTimeout = prevGoogleCount === 0 ? 300_000 : 180_000;
-    const microsoftTimeout = prevMicrosoftCount === 0 ? 600_000 : 300_000;
-    const oracleTimeout = prevOracleCount === 0 ? 120_000 : 60_000;
+    const appleJobs = await withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount }), appleTimeout, 'Apple');
+    allJobs.push(...appleJobs);
 
-    // INF-PIPE-1: Run all 9 fetchers in parallel via Promise.allSettled.
-    // Previously: ATS (~9.5 min) ran first, then 7 post-ATS fetchers sequentially (~170s).
-    // Now: all run simultaneously — total Step 1 time = max(individual) ≈ ATS time ≈ 9.5 min.
-    // Each fetcher has its own timeout via withTimeout, so a hung fetcher can't block others.
-    const fetchTasks = [
-      { label: 'JSearch', result: withTimeout(fetchFromJSearch(), 60_000, 'JSearch') },
-      { label: 'ATS', result: withTimeout(fetchFromAllATS(), 720_000, 'ATS') },
-      { label: 'Amazon', result: withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon') },
-      { label: 'Netflix', result: withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix') },
-      { label: 'Apple', result: withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount }), appleTimeout, 'Apple') },
-      { label: 'Two Sigma', result: withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma') },
-      { label: 'Uber', result: withTimeout(fetchAllUberJobs(), 60_000, 'Uber') },
-      { label: 'Google', result: withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), googleTimeout, 'Google') },
-      { label: 'SimplifyJobs', result: withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs') },
-      { label: 'Microsoft', result: withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount }), microsoftTimeout, 'Microsoft') },
-      { label: 'Oracle', result: withTimeout(fetchAllOracleJobs(), oracleTimeout, 'Oracle') },
-    ];
+    // Fetch from Two Sigma Jobs (single RSS request, timeout: 30s)
+    const twoSigmaJobs = await withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma');
+    allJobs.push(...twoSigmaJobs);
 
-    console.log(`  Launching ${fetchTasks.length} fetchers in parallel...`);
-    const settled = await Promise.allSettled(fetchTasks.map(t => t.result));
+    // Fetch from Uber Jobs (POST API, ~12s, timeout: 60s)
+    const uberJobs = await withTimeout(fetchAllUberJobs(), 60_000, 'Uber');
+    allJobs.push(...uberJobs);
 
-    // Extract results — each settled value is either an array (jobs) or { jobs: [] } (ATS)
-    const results = {};
-    for (let i = 0; i < fetchTasks.length; i++) {
-      const label = fetchTasks[i].label;
-      if (settled[i].status === 'fulfilled') {
-        results[label] = settled[i].value;
-      } else {
-        console.error(`\u26a0\ufe0f ${label}: ${settled[i].reason} — continuing with 0 jobs`);
-        results[label] = label === 'ATS' ? { jobs: [] } : [];
+    // Count Google jobs from previous run for initial population detection (SUP-FETCHER-7)
+    let prevGoogleCount = 0;
+    try {
+      if (fs.existsSync(JOBS_OUTPUT_FILE)) {
+        const gContent = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
+        prevGoogleCount = (gContent.match(/"source":"google"/g) || []).length;
+        if (prevGoogleCount > 0) console.log(`  Previous Google count: ${prevGoogleCount}`);
       }
-    }
+    } catch (e) { /* first run */ }
+    const googleTimeout = prevGoogleCount === 0 ? 300_000 : 180_000;
+    const googleJobs = await withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), googleTimeout, 'Google');
+    allJobs.push(...googleJobs);
 
-    const jsearchJobs = results['JSearch'];
-    const atsResult = results['ATS'];
-    const amazonJobs = results['Amazon'];
-    const netflixJobs = results['Netflix'];
-    const appleJobs = results['Apple'];
-    const twoSigmaJobs = results['Two Sigma'];
-    const uberJobs = results['Uber'];
-    const googleJobs = results['Google'];
-    const simplifyJobs = results['SimplifyJobs'];
-    const microsoftJobs = results['Microsoft'];
-    const oracleJobs = results['Oracle'];
-
-    allJobs.push(
-      ...jsearchJobs, ...atsResult.jobs, ...amazonJobs, ...netflixJobs,
-      ...appleJobs, ...twoSigmaJobs, ...uberJobs, ...googleJobs, ...simplifyJobs,
-      ...microsoftJobs,
-      ...oracleJobs,
-    );
+    // Fetch from SimplifyJobs (public GitHub data, ~5s, timeout: 30s)
+    // SUP-FETCHER-3: Fallback for companies on unfetchable ATS (iCIMS, Oracle HCM, etc.)
+    const simplifyJobs = await withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs');
+    allJobs.push(...simplifyJobs);
 
     console.log('');
-    console.log(`\ud83d\udcca Step 1 complete: ${allJobs.length} jobs fetched`);
+    console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
     console.log(`   - JSearch: ${jsearchJobs.length} jobs`);
     console.log(`   - ATS: ${atsResult.jobs.length} jobs`);
     console.log(`   - Amazon: ${amazonJobs.length} jobs`);
@@ -188,8 +169,6 @@ async function main() {
     console.log(`   - Uber: ${uberJobs.length} jobs`);
     console.log(`   - Google: ${googleJobs.length} jobs`);
     console.log(`   - SimplifyJobs: ${simplifyJobs.length} jobs`);
-    console.log(`   - Microsoft: ${microsoftJobs.length} jobs`);
-    console.log(`   - Oracle: ${oracleJobs.length} jobs`);
     console.log('');
 
     // Steps 1b/1c REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment
@@ -534,7 +513,7 @@ async function main() {
     // Merge previous all_jobs.json into current run (rolling 7-day window)
     // Jobs from prior runs that weren't re-fetched this run are preserved until their TTL expires.
     if (fs.existsSync(JOBS_OUTPUT_FILE)) {
-      const cutoffMs = Date.now() - 14 * 24 * 60 * 60 * 1000;
+      const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
       const currentIds = new Set(publicJobs.map(j => j.id));
       // Fingerprint guard: prevents re-injection of jobs that changed ID (e.g. WD-ID-BUG fix)
       const currentFingerprints = new Set(publicJobs.map(j => j.fingerprint).filter(Boolean));
@@ -611,7 +590,7 @@ async function main() {
     // date from the prior run, making current-run jobs stale. Carry-forward TTL check
     // only applies to prior-run jobs — current-run jobs are skipped. This filter catches
     // ALL stale jobs regardless of origin.
-    const cutoffMs = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const preFilterCount = publicJobs.length;
     publicJobs = publicJobs.filter(j => {
       if (!j.posted_at) return false;
@@ -619,7 +598,7 @@ async function main() {
     });
     const staleRemoved = preFilterCount - publicJobs.length;
     if (staleRemoved > 0) {
-      console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >14d) from post-merge pool`);
+      console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >7d) from post-merge pool`);
     }
 
     // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
