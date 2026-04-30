@@ -29,6 +29,9 @@ const { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);
 const { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);
 const { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);
 const { fetchAllSimplifyJobs } = require(`${SHARED}/fetchers/simplify`);
+const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
+const { fetchAllOracleJobs } = require(`${SHARED}/fetchers/oracle`);
+const { fetchAllAmdJobs } = require(`${SHARED}/fetchers/amd`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
@@ -158,6 +161,30 @@ async function main() {
     const simplifyJobs = await withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs');
     allJobs.push(...simplifyJobs);
 
+    // Fetch from Microsoft PCSX API (normal: ~60s initial, ~30s routine, timeout: 5/3 min)
+    // SUP-FETCHER-10: Two-phase fetch. Initial run: search-only. Routine: details for new positions.
+    let prevMicrosoftCount = 0;
+    try {
+      if (fs.existsSync(JOBS_OUTPUT_FILE)) {
+        const msContent = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
+        prevMicrosoftCount = (msContent.match(/"source":"microsoft"/g) || []).length;
+        if (prevMicrosoftCount > 0) console.log(`  Previous Microsoft count: ${prevMicrosoftCount}`);
+      }
+    } catch (e) { /* first run */ }
+    const microsoftTimeout = prevMicrosoftCount === 0 ? 600_000 : 300_000;
+    const microsoftJobs = await withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount }), microsoftTimeout, 'Microsoft');
+    allJobs.push(...microsoftJobs);
+
+    // Fetch from Oracle HCM Cloud (normal: ~45s, timeout: 2/1 min)
+    // SUP-FETCHER-11: Single-phase fetch, ShortDescriptionStr for descriptions.
+    const oracleJobs = await withTimeout(fetchAllOracleJobs(), 120_000, 'Oracle');
+    allJobs.push(...oracleJobs);
+
+    // Fetch from AMD Careers API (normal: ~45s, timeout: 2 min)
+    // SUP-FETCHER-13: Public JSON API, 100% description coverage.
+    const amdJobs = await withTimeout(fetchAllAmdJobs(), 120_000, 'AMD');
+    allJobs.push(...amdJobs);
+
     console.log('');
     console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
     console.log(`   - JSearch: ${jsearchJobs.length} jobs`);
@@ -169,6 +196,9 @@ async function main() {
     console.log(`   - Uber: ${uberJobs.length} jobs`);
     console.log(`   - Google: ${googleJobs.length} jobs`);
     console.log(`   - SimplifyJobs: ${simplifyJobs.length} jobs`);
+    console.log(`   - Microsoft: ${microsoftJobs.length} jobs`);
+    console.log(`   - Oracle: ${oracleJobs.length} jobs`);
+    console.log(`   - AMD: ${amdJobs.length} jobs`);
     console.log('');
 
     // Steps 1b/1c REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment
