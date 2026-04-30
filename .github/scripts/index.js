@@ -19,7 +19,6 @@ const path = require('path');
 const SHARED = path.join(__dirname, 'shared', 'lib', 'aggregator');
 
 // Import fetchers
-const { fetchFromJSearch, getUsageStats } = require(`${SHARED}/fetchers/jsearch-fetcher`);
 const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
 const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
 const { fetchAllNetflixJobs } = require(`${SHARED}/fetchers/netflix`);
@@ -103,102 +102,57 @@ async function main() {
 
     let allJobs = [];
 
-    // Fetch from JSearch (normal: ~12s, timeout: 60s)
-    const jsearchJobs = await withTimeout(fetchFromJSearch(), 60_000, 'JSearch');
-    allJobs.push(...jsearchJobs);
-
-    // Fetch from ATS sources (normal: ~9.5 min, timeout: 12 min)
+    // Phase A: ATS fetcher solo (needs exclusive runner bandwidth — ~500 HTTP requests)
+    console.log('  Phase A: ATS fetcher (solo)...');
     const atsResult = await withTimeout(fetchFromAllATS(), 720_000, 'ATS');
     allJobs.push(...atsResult.jobs);
+    console.log(`  ATS: ${atsResult.jobs.length} jobs`);
 
-    // Fetch from Amazon Jobs (normal: ~23s, timeout: 120s)
-    const amazonJobs = await withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon');
-    allJobs.push(...amazonJobs);
-
-    // Fetch from Netflix Jobs (normal: ~2.5 min, timeout: 5 min)
-    const netflixJobs = await withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix');
-    allJobs.push(...netflixJobs);
-
-    // Count Apple jobs from previous run for initial population detection (SUP-FETCHER-6)
-    // Threshold: if <2000 previous Apple jobs, the pool was seeded from capped runs —
-    // do a full fetch of all ~251 pages. Routine: caps at 50 pages.
-    // all_jobs.json is JSONL — count lines with source=apple without full parse.
-    let prevAppleCount = 0;
+    // Phase B: Read previous counts (needed for initial-population detection) before parallel phase
+    let prevAppleCount = 0, prevGoogleCount = 0, prevMicrosoftCount = 0;
     try {
       if (fs.existsSync(JOBS_OUTPUT_FILE)) {
         const content = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
         prevAppleCount = (content.match(/"source":"apple"/g) || []).length;
+        prevGoogleCount = (content.match(/"source":"google"/g) || []).length;
+        prevMicrosoftCount = (content.match(/"source":"microsoft"/g) || []).length;
         if (prevAppleCount > 0) console.log(`  Previous Apple count: ${prevAppleCount}`);
-      }
-    } catch (e) { /* first run or corrupt file — treat as first run */ }
-    const appleTimeout = prevAppleCount === 0 ? 300_000 : 180_000;
-    const appleJobs = await withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount }), appleTimeout, 'Apple');
-    allJobs.push(...appleJobs);
-
-    // Fetch from Two Sigma Jobs (single RSS request, timeout: 30s)
-    const twoSigmaJobs = await withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma');
-    allJobs.push(...twoSigmaJobs);
-
-    // Fetch from Uber Jobs (POST API, ~12s, timeout: 60s)
-    const uberJobs = await withTimeout(fetchAllUberJobs(), 60_000, 'Uber');
-    allJobs.push(...uberJobs);
-
-    // Count Google jobs from previous run for initial population detection (SUP-FETCHER-7)
-    let prevGoogleCount = 0;
-    try {
-      if (fs.existsSync(JOBS_OUTPUT_FILE)) {
-        const gContent = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
-        prevGoogleCount = (gContent.match(/"source":"google"/g) || []).length;
         if (prevGoogleCount > 0) console.log(`  Previous Google count: ${prevGoogleCount}`);
-      }
-    } catch (e) { /* first run */ }
-    const googleTimeout = prevGoogleCount === 0 ? 300_000 : 180_000;
-    const googleJobs = await withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), googleTimeout, 'Google');
-    allJobs.push(...googleJobs);
-
-    // Fetch from SimplifyJobs (public GitHub data, ~5s, timeout: 30s)
-    // SUP-FETCHER-3: Fallback for companies on unfetchable ATS (iCIMS, Oracle HCM, etc.)
-    const simplifyJobs = await withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs');
-    allJobs.push(...simplifyJobs);
-
-    // Fetch from Microsoft PCSX API (normal: ~60s initial, ~30s routine, timeout: 5/3 min)
-    // SUP-FETCHER-10: Two-phase fetch. Initial run: search-only. Routine: details for new positions.
-    let prevMicrosoftCount = 0;
-    try {
-      if (fs.existsSync(JOBS_OUTPUT_FILE)) {
-        const msContent = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
-        prevMicrosoftCount = (msContent.match(/"source":"microsoft"/g) || []).length;
         if (prevMicrosoftCount > 0) console.log(`  Previous Microsoft count: ${prevMicrosoftCount}`);
       }
     } catch (e) { /* first run */ }
-    const microsoftTimeout = prevMicrosoftCount === 0 ? 600_000 : 300_000;
-    const microsoftJobs = await withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount }), microsoftTimeout, 'Microsoft');
-    allJobs.push(...microsoftJobs);
 
-    // Fetch from Oracle HCM Cloud (normal: ~45s, timeout: 2/1 min)
-    // SUP-FETCHER-11: Single-phase fetch, ShortDescriptionStr for descriptions.
-    const oracleJobs = await withTimeout(fetchAllOracleJobs(), 120_000, 'Oracle');
-    allJobs.push(...oracleJobs);
+    // Phase B: All non-ATS fetchers in parallel (bounded by Netflix at ~2.5 min)
+    console.log('  Phase B: Non-ATS fetchers (parallel)...');
+    const phaseBResults = await Promise.allSettled([
+      withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon'),
+      withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix'),
+      withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount }), prevAppleCount === 0 ? 300_000 : 180_000, 'Apple'),
+      withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma'),
+      withTimeout(fetchAllUberJobs(), 60_000, 'Uber'),
+      withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), prevGoogleCount === 0 ? 300_000 : 180_000, 'Google'),
+      withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs'),
+      withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount }), prevMicrosoftCount === 0 ? 600_000 : 300_000, 'Microsoft'),
+      withTimeout(fetchAllOracleJobs(), 120_000, 'Oracle'),
+      withTimeout(fetchAllAmdJobs(), 120_000, 'AMD'),
+    ]);
 
-    // Fetch from AMD Careers API (normal: ~45s, timeout: 2 min)
-    // SUP-FETCHER-13: Public JSON API, 100% description coverage.
-    const amdJobs = await withTimeout(fetchAllAmdJobs(), 120_000, 'AMD');
-    allJobs.push(...amdJobs);
+    // Collect results — Promise.allSettled means individual failures don't block others
+    const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Microsoft', 'Oracle', 'AMD'];
+    const fetcherResults = {};
+    phaseBResults.forEach((result, i) => {
+      const name = fetcherNames[i];
+      const jobs = result.status === 'fulfilled' ? result.value : [];
+      fetcherResults[name] = Array.isArray(jobs) ? jobs : [];
+      allJobs.push(...fetcherResults[name]);
+    });
 
     console.log('');
     console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
-    console.log(`   - JSearch: ${jsearchJobs.length} jobs`);
     console.log(`   - ATS: ${atsResult.jobs.length} jobs`);
-    console.log(`   - Amazon: ${amazonJobs.length} jobs`);
-    console.log(`   - Netflix: ${netflixJobs.length} jobs`);
-    console.log(`   - Apple: ${appleJobs.length} jobs`);
-    console.log(`   - Two Sigma: ${twoSigmaJobs.length} jobs`);
-    console.log(`   - Uber: ${uberJobs.length} jobs`);
-    console.log(`   - Google: ${googleJobs.length} jobs`);
-    console.log(`   - SimplifyJobs: ${simplifyJobs.length} jobs`);
-    console.log(`   - Microsoft: ${microsoftJobs.length} jobs`);
-    console.log(`   - Oracle: ${oracleJobs.length} jobs`);
-    console.log(`   - AMD: ${amdJobs.length} jobs`);
+    for (const name of fetcherNames) {
+      console.log(`   - ${name}: ${fetcherResults[name].length} jobs`);
+    }
     console.log('');
 
     // Steps 1b/1c REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment
@@ -747,7 +701,7 @@ async function main() {
 
     // Write metadata
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
-    // sortedJobs is current-run only — by_source.jsearch would show ~15 instead of ~400.
+    // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
     const duration = Date.now() - startTime;
     const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
@@ -899,7 +853,6 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     by_job_type: byInternship,
     by_location: byRemote,
 
-    jsearch_stats: getUsageStats(),
     ats_stats: getATSUsageStats(),
 
     // Validation statistics
@@ -945,13 +898,6 @@ function printSummary(jobs, uniqueCount, duplicateCount, duration) {
   console.log('');
   console.log(`Duplicates removed: ${duplicateCount}`);
   console.log(`Duration: ${(duration / 1000).toFixed(1)}s`);
-
-  // JSearch usage
-  const jsearchStats = getUsageStats();
-  console.log('');
-  console.log('JSearch Usage:');
-  console.log(`  Total fetched this run: ${jsearchStats.total_fetched}`);
-  jsearchStats.queries.forEach(q => console.log(`  "${q.query}": ${q.count} jobs`));
 }
 
 /**
