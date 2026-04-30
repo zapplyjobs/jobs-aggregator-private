@@ -33,7 +33,7 @@ const { fetchAllSimplifyJobs } = require(`${SHARED}/fetchers/simplify`);
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
-const { deduplicateJobs } = require(`${SHARED}/processors/deduplicator`);
+const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS } = require(`${SHARED}/processors/deduplicator`);
 const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap } = require(`${SHARED}/processors/tag-engine`);
 const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport } = require(`${SHARED}/processors/tag-monitor`);
 
@@ -510,10 +510,10 @@ async function main() {
       return stripped;
     });
 
-    // Merge previous all_jobs.json into current run (rolling 7-day window)
+    // Merge previous all_jobs.json into current run (rolling window — TTL from deduplicator)
     // Jobs from prior runs that weren't re-fetched this run are preserved until their TTL expires.
     if (fs.existsSync(JOBS_OUTPUT_FILE)) {
-      const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const cutoffMs = Date.now() - DEDUPE_TTL_MS;
       const currentIds = new Set(publicJobs.map(j => j.id));
       // Fingerprint guard: prevents re-injection of jobs that changed ID (e.g. WD-ID-BUG fix)
       const currentFingerprints = new Set(publicJobs.map(j => j.fingerprint).filter(Boolean));
@@ -590,7 +590,7 @@ async function main() {
     // date from the prior run, making current-run jobs stale. Carry-forward TTL check
     // only applies to prior-run jobs — current-run jobs are skipped. This filter catches
     // ALL stale jobs regardless of origin.
-    const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const cutoffMs = Date.now() - DEDUPE_TTL_MS;
     const preFilterCount = publicJobs.length;
     publicJobs = publicJobs.filter(j => {
       if (!j.posted_at) return false;
@@ -598,7 +598,7 @@ async function main() {
     });
     const staleRemoved = preFilterCount - publicJobs.length;
     if (staleRemoved > 0) {
-      console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >7d) from post-merge pool`);
+      console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >${DEDUPE_TTL_DAYS}d) from post-merge pool`);
     }
 
     // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
