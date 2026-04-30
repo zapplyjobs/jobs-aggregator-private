@@ -1,19 +1,19 @@
 {
-  "generated": "2026-04-30T15:28:00.270Z",
-  "total_senior_filtered": 41132,
+  "generated": "2026-04-30T15:41:21.058Z",
+  "total_senior_filtered": 41146,
   "by_source": {
-    "jsearch": 2,
-    "greenhouse": 16633,
-    "lever": 1661,
-    "ashby": 3071,
-    "workday": 16836,
-    "smartrecruiters": 1376,
-    "amazon": 426,
+    "jsearch": 13,
+    "greenhouse": 16630,
+    "lever": 1660,
+    "ashby": 3073,
+    "workday": 16843,
+    "smartrecruiters": 1377,
+    "amazon": 427,
     "eightfold": 73,
-    "apple": 280,
+    "apple": 281,
     "twosigma": 3,
-    "uber": 303,
-    "google": 460,
+    "uber": 299,
+    "google": 459,
     "simplify": 8
   }
 }
