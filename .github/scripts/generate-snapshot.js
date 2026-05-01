@@ -231,6 +231,24 @@ async function buildSnapshot(meta, repoStats) {
   const submoduleHead = metadata ? null : null; // fetched per-repo below
   const ttlExpiring7d = computeTtlExpiring7d(dedupeStore);
 
+  // TAG-AUDIT-6: Tag history — append entry from this run, keep last 30 days.
+  const tagHistoryEntry = g1 ? {
+    date: meta.generatedAt,
+    g1_rate: g1.us_general_rate,
+    us_general: g1.us_general,
+    us_total: g1.us_total,
+    senior: tagStats.employment?.senior ?? null,
+    mid_level: tagStats.employment?.mid_level ?? null,
+    entry_level: tagStats.employment?.entry_level ?? null,
+    internship: tagStats.employment?.internship ?? null,
+  } : null;
+  const prevTagHistory = previousSnapshot?.tag_history || [];
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const tagHistory = [
+    ...prevTagHistory.filter(e => new Date(e.date).getTime() > thirtyDaysAgo),
+    ...(tagHistoryEntry ? [tagHistoryEntry] : []),
+  ];
+
   const snapshot = {
     meta: {
       generated_at: meta.generatedAt,
@@ -239,6 +257,7 @@ async function buildSnapshot(meta, repoStats) {
       stale_if_older_than_hours: STALE_HOURS,
     },
     pool,
+    tag_history: tagHistory,
     enrichment,
     pipeline: {
       submodule_head: repoStats.aggregatorSubmodule,
@@ -466,6 +485,7 @@ async function main() {
       last_run_at: snapshot.pipeline.last_run_at,
     },
     repos: snapshot.repos,
+    tag_history: snapshot.tag_history,
     deltas: snapshot.deltas,
   };
   const publicSnapshotPath = path.join(JOBS_DATA_DIR, 'zjp-public-snapshot.json');
@@ -479,7 +499,7 @@ async function main() {
 
   // Summary
   const pool = snapshot.pool;
-  console.log(`[generate-snapshot] Pool: ${pool.total} total · ${pool.us_entry_level} US entry-level · ${pool.us_interns} interns`);
+  console.log(`[generate-snapshot] Pool: ${pool.total} total · ${pool.us_entry_level} US entry-level · ${pool.us_interns} interns · tag_history: ${snapshot.tag_history.length} entries`);
   if (snapshot.deltas?.total_delta !== null && snapshot.deltas?.total_delta !== undefined) {
     const sign = snapshot.deltas.total_delta >= 0 ? '+' : '';
     console.log(`[generate-snapshot] Delta vs prior: ${sign}${snapshot.deltas.total_delta} jobs`);
