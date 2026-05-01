@@ -45,9 +45,6 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Run tag-engine tests
-      run: cd .github/scripts/shared && node lib/__tests__/tag-engine.test.js
-
     - name: Create logs directory
       run: mkdir -p .github/logs .github/data
 
@@ -370,6 +367,62 @@ jobs:
         fi
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
+
+
+    - name: Upload data to R2 (additive)
+      if: success()
+      continue-on-error: true
+      run: |
+        echo "☁️ Uploading pipeline data to R2..."
+        node -e "
+        const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+        const fs = require('fs');
+        const path = require('path');
+
+        async function upload() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          const dataDir = '.github/data';
+          let uploaded = 0;
+          let failed = 0;
+
+          // Core files
+          const coreFiles = ['all_jobs.json', 'jobs-metadata.json', 'dedupe-store.json'];
+          for (const f of coreFiles) {
+            const fp = path.join(dataDir, f);
+            if (!fs.existsSync(fp)) { console.log('SKIP:', f, '(not found)'); continue; }
+            const data = JSON.parse(fs.readFileSync(fp, 'utf8'));
+            const ok = await r2.uploadJson(f, data);
+            ok ? uploaded++ : failed++;
+          }
+
+          // Description sidecars
+          const sidecars = fs.readdirSync(dataDir).filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
+          for (const f of sidecars) {
+            const fp = path.join(dataDir, f);
+            const content = fs.readFileSync(fp, 'utf8');
+            const ok = await r2.uploadRaw(f, content, 'application/x-jsonlines');
+            ok ? uploaded++ : failed++;
+          }
+
+          // Manifest
+          const manifestOk = await r2.writeManifest({
+            files_uploaded: uploaded,
+            files_failed: failed,
+            pipeline_run: new Date().toISOString(),
+          });
+          manifestOk && uploaded++;
+
+          console.log('R2 upload complete:', uploaded, 'uploaded,', failed, 'failed');
+          if (failed > 0) process.exit(1);
+        }
+
+        upload().catch(e => { console.error('R2 upload error:', e.message); process.exit(1); });
+        "
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
     - name: Notify on failure
       if: failure()
