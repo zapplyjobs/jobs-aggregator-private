@@ -36,7 +36,7 @@ const { fetchAllAmdJobs } = require(`${SHARED}/fetchers/amd`);
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
 const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS } = require(`${SHARED}/processors/deduplicator`);
-const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap, TAG_ENGINE_VERSION } = require(`${SHARED}/processors/tag-engine`);
+const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap } = require(`${SHARED}/processors/tag-engine`);
 const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport } = require(`${SHARED}/processors/tag-monitor`);
 
 // Import utils
@@ -153,6 +153,16 @@ async function main() {
     for (const name of fetcherNames) {
       console.log(`   - ${name}: ${fetcherResults[name].length} jobs`);
     }
+
+    // GAP-6: Compute zero-yield companies from raw fetch results (pre-filter).
+    // Compares companies configured in company-list.json against companies that
+    // produced jobs this run. A company returning 0 raw jobs may have a broken
+    // slug, API change, or auth issue (LLNL incident class).
+    const zeroYieldCompanies = computeZeroYield(atsResult, fetcherResults, COMPANY_LIST_PATH);
+    if (zeroYieldCompanies.length > 0) {
+      console.log(`   ⚠️  GAP-6: ${zeroYieldCompanies.length} companies returned 0 raw jobs`);
+    }
+
     console.log('');
 
     // Steps 1b/1c REMOVED (DESC-MIGRATE-1): WD/SR descriptions now fetched by enrichment
@@ -553,32 +563,18 @@ async function main() {
       if (mergedCount > 0) {
         // Re-sort after merge (newest first)
         publicJobs.sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0));
-        // Re-tag carry-forward jobs with current tag-engine rules.
-        // TAG-23: Employment always re-tagged. TAG-DRIFT-1: Domains re-tagged when
-        // tag-engine version changed (keyword/guard/taxonomy updates).
-        let empRetagged = 0;
-        let domainRetagged = 0;
+        // Re-tag employment on carry-forward jobs with current tag-engine rules.
+        // Only re-tags employment — domain tags preserved (may be from description-fallback).
+        let retagged = 0;
         for (const job of publicJobs) {
           if (currentIds.has(job.id)) continue;
-          // Employment: always re-tag (TAG-23)
           const newEmp = tagEmployment(job);
           if (job.tags?.employment !== newEmp) {
             job.tags.employment = newEmp;
-            empRetagged++;
-          }
-          // Domains: re-tag when tag_engine_version is stale or missing (TAG-DRIFT-1)
-          if (!job.tags?.tag_engine_version || job.tags.tag_engine_version < TAG_ENGINE_VERSION) {
-            const freshDomains = tagDomains(job);
-            const oldDomains = (job.tags?.domains || []).slice().sort().join(',');
-            const newDomains = (freshDomains || []).slice().sort().join(',');
-            if (oldDomains !== newDomains) {
-              job.tags.domains = freshDomains;
-              domainRetagged++;
-            }
-            job.tags.tag_engine_version = TAG_ENGINE_VERSION;
+            retagged++;
           }
         }
-        console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${empRetagged > 0 ? `, ${empRetagged} employment re-tagged` : ''}${domainRetagged > 0 ? `, ${domainRetagged} domains re-tagged (version ${TAG_ENGINE_VERSION})` : ''})`);
+        console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${retagged > 0 ? `, ${retagged} employment re-tagged` : ''})`);
       } else {
         console.log('🔄 No prior-run jobs to merge');
       }
@@ -717,7 +713,7 @@ async function main() {
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
     const duration = Date.now() - startTime;
-    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs);
+    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
@@ -762,6 +758,49 @@ async function main() {
 }
 
 /**
+ * GAP-6: Compute companies configured in company-list.json that returned 0 raw jobs.
+ * Uses company_name from ATS stats (not slug) to match against configured company names.
+ * Excludes custom-fetcher companies (Apple, Amazon, etc.) — only ATS companies are checked.
+ * @param {Object} atsResult - ATS fetch result with stats.by_company
+ * @param {Object} fetcherResults - Custom fetcher results by name
+ * @param {string} companyListPath - Path to company-list.json
+ * @returns {Array<string>} Company names that returned 0 raw jobs
+ */
+function computeZeroYield(atsResult, fetcherResults, companyListPath) {
+  try {
+    const companyList = JSON.parse(fs.readFileSync(companyListPath, 'utf8'));
+
+    // Build set of company names that produced jobs this run (ATS only)
+    const companiesWithJobs = new Set(Object.keys(atsResult.stats.by_company || {}));
+
+    // Build set of configured company names per ATS source
+    const zeroYield = [];
+    const sources = [
+      { key: 'greenhouse', entries: companyList.greenhouse },
+      { key: 'lever', entries: companyList.lever },
+      { key: 'ashby', entries: companyList.ashby },
+      { key: 'workday', entries: companyList.workday },
+      { key: 'smartrecruiters', entries: companyList.smartrecruiters },
+    ];
+
+    for (const { key, entries } of sources) {
+      if (!Array.isArray(entries)) continue;
+      for (const entry of entries) {
+        const name = entry.name;
+        if (name && !companiesWithJobs.has(name)) {
+          zeroYield.push(`${name} (${key})`);
+        }
+      }
+    }
+
+    return zeroYield;
+  } catch (e) {
+    console.warn(`⚠️ GAP-6: Could not compute zero-yield companies: ${e.message}`);
+    return [];
+  }
+}
+
+/**
  * Generate metadata object
  * @param {Array} jobs - All jobs
  * @param {number} uniqueCount - Unique job count
@@ -772,7 +811,7 @@ async function main() {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs) {
+function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -886,6 +925,10 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
 
     // Top 20 companies by job count (entry-level pool)
     top_companies,
+
+    // GAP-6: Companies that returned 0 raw jobs this run (pre-filter).
+    // Used by pipeline-alert.js for consecutive-failure detection.
+    zero_yield_companies: zeroYieldCompanies || [],
   };
 }
 
