@@ -36,7 +36,7 @@ const { fetchAllAmdJobs } = require(`${SHARED}/fetchers/amd`);
 const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
 const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS } = require(`${SHARED}/processors/deduplicator`);
-const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap } = require(`${SHARED}/processors/tag-engine`);
+const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap, TAG_ENGINE_VERSION } = require(`${SHARED}/processors/tag-engine`);
 const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport } = require(`${SHARED}/processors/tag-monitor`);
 
 // Import utils
@@ -553,18 +553,32 @@ async function main() {
       if (mergedCount > 0) {
         // Re-sort after merge (newest first)
         publicJobs.sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0));
-        // Re-tag employment on carry-forward jobs with current tag-engine rules.
-        // Only re-tags employment — domain tags preserved (may be from description-fallback).
-        let retagged = 0;
+        // Re-tag carry-forward jobs with current tag-engine rules.
+        // TAG-23: Employment always re-tagged. TAG-DRIFT-1: Domains re-tagged when
+        // tag-engine version changed (keyword/guard/taxonomy updates).
+        let empRetagged = 0;
+        let domainRetagged = 0;
         for (const job of publicJobs) {
           if (currentIds.has(job.id)) continue;
+          // Employment: always re-tag (TAG-23)
           const newEmp = tagEmployment(job);
           if (job.tags?.employment !== newEmp) {
             job.tags.employment = newEmp;
-            retagged++;
+            empRetagged++;
+          }
+          // Domains: re-tag when tag_engine_version is stale or missing (TAG-DRIFT-1)
+          if (!job.tags?.tag_engine_version || job.tags.tag_engine_version < TAG_ENGINE_VERSION) {
+            const freshDomains = tagDomains(job);
+            const oldDomains = (job.tags?.domains || []).slice().sort().join(',');
+            const newDomains = (freshDomains || []).slice().sort().join(',');
+            if (oldDomains !== newDomains) {
+              job.tags.domains = freshDomains;
+              domainRetagged++;
+            }
+            job.tags.tag_engine_version = TAG_ENGINE_VERSION;
           }
         }
-        console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${retagged > 0 ? `, ${retagged} employment re-tagged` : ''})`);
+        console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${empRetagged > 0 ? `, ${empRetagged} employment re-tagged` : ''}${domainRetagged > 0 ? `, ${domainRetagged} domains re-tagged (version ${TAG_ENGINE_VERSION})` : ''})`);
       } else {
         console.log('🔄 No prior-run jobs to merge');
       }
