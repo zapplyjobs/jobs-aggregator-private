@@ -45,6 +45,9 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
+    - name: Run tag-engine tests
+      run: cd .github/scripts/shared && node lib/__tests__/tag-engine.test.js
+
     - name: Create logs directory
       run: mkdir -p .github/logs .github/data
 
