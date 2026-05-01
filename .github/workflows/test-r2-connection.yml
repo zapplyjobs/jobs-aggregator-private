@@ -21,6 +21,7 @@ jobs:
           npm install
 
       - name: Test R2 write, read, delete
+        working-directory: .github/scripts/shared
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
