@@ -6,22 +6,14 @@ jobs:
   test-r2:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-        with:
-          submodules: true
-          token: ${{ secrets.GH_PAT }}
-
       - uses: actions/setup-node@v5
         with:
           node-version: '20'
 
-      - name: Install dependencies
-        run: |
-          cd .github/scripts/shared
-          npm install
+      - name: Install AWS SDK
+        run: npm install @aws-sdk/client-s3
 
       - name: Test R2 write, read, delete
-        working-directory: .github/scripts/shared
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
