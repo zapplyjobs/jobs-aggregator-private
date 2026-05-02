@@ -33,7 +33,7 @@ const { fetchAllOracleJobs } = require(`${SHARED}/fetchers/oracle`);
 const { fetchAllAmdJobs } = require(`${SHARED}/fetchers/amd`);
 
 // Import processors
-const { validateAndNormalizeJobs, printValidationSummary } = require(`${SHARED}/processors/validator`);
+const { validateAndNormalizeJobs, printValidationSummary, normalizeJob } = require(`${SHARED}/processors/validator`);
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
 const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS } = require(`${SHARED}/processors/deduplicator`);
 const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap, TAG_ENGINE_VERSION } = require(`${SHARED}/processors/tag-engine`);
@@ -568,6 +568,7 @@ async function main() {
         // tag-engine version changed (keyword/guard/taxonomy updates).
         let empRetagged = 0;
         let domainRetagged = 0;
+        let locRefreshed = 0;
         for (const job of publicJobs) {
           if (currentIds.has(job.id)) continue;
           const newEmp = tagEmployment(job);
@@ -586,8 +587,16 @@ async function main() {
             }
             job.tags.tag_engine_version = TAG_ENGINE_VERSION;
           }
+          // AGG-LOC-1: Refresh empty job_state/job_city from location string.
+          // Carry-forward preserves old metadata even when the parser would produce values.
+          if ((!job.job_state || job.job_state === '') || (!job.job_city || job.job_city === '')) {
+            const hadState = job.job_state && job.job_state !== '';
+            const hadCity = job.job_city && job.job_city !== '';
+            normalizeJob(job);
+            if ((!hadState && job.job_state) || (!hadCity && job.job_city)) locRefreshed++;
+          }
         }
-        console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${empRetagged > 0 ? `, ${empRetagged} employment re-tagged` : ''}${domainRetagged > 0 ? `, ${domainRetagged} domains re-tagged (version ${TAG_ENGINE_VERSION})` : ''})`);
+        console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${empRetagged > 0 ? `, ${empRetagged} employment re-tagged` : ''}${domainRetagged > 0 ? `, ${domainRetagged} domains re-tagged (version ${TAG_ENGINE_VERSION})` : ''}${locRefreshed > 0 ? `, ${locRefreshed} locations refreshed` : ''})`);
       } else {
         console.log('🔄 No prior-run jobs to merge');
       }
