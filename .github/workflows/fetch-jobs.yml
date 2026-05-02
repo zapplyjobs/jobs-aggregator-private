@@ -175,6 +175,61 @@ jobs:
           fi
         fi
 
+        # AGG-PIPE-8: File-existence checks for critical submodule files.
+        # Origin: d06bb81 deleted tag-engine.js, pipeline produced corrupt output for 7h.
+
+        # 6. tag-engine.js exists and exports expected functions
+        TAG_ENGINE_PATH=".github/scripts/shared/lib/aggregator/processors/tag-engine.js"
+        if [ ! -f "$TAG_ENGINE_PATH" ]; then
+          echo "❌ tag-engine.js MISSING — pipeline will produce corrupt output"
+          PASS=false
+        else
+          TAG_LINE_COUNT=$(wc -l < "$TAG_ENGINE_PATH")
+          if [ "$TAG_LINE_COUNT" -lt 100 ]; then
+            echo "❌ tag-engine.js: $TAG_LINE_COUNT lines (expected >3000) — likely truncated"
+            PASS=false
+          else
+            echo "✅ tag-engine.js: $TAG_LINE_COUNT lines"
+          fi
+        fi
+
+        # 7. company-list.json is parseable with expected platforms
+        CL_PATH=".github/scripts/shared/lib/aggregator/fetchers/company-list.json"
+        if [ ! -f "$CL_PATH" ]; then
+          echo "❌ company-list.json MISSING — fetchers have no tenant list"
+          PASS=false
+        else
+          CL_PLATFORMS=$(python3 -c "
+        import json
+        cl = json.load(open('$CL_PATH'))
+        platforms = set(cl.keys())
+        required = {'greenhouse', 'lever', 'ashby', 'workday', 'smartrecruiters'}
+        missing = required - platforms
+        print('MISSING:' + ','.join(missing) if missing else 'OK')
+        " 2>/dev/null || echo "MISSING:parse-error")
+          if [[ "$CL_PLATFORMS" == MISSING:* ]]; then
+            echo "❌ company-list.json missing platforms: ${CL_PLATFORMS#MISSING:}"
+            PASS=false
+          else
+            echo "✅ company-list.json has all required platforms"
+          fi
+        fi
+
+        # 8. deduplicator.js exports DEDUPE_TTL constants
+        DEDUP_PATH=".github/scripts/shared/lib/aggregator/processors/deduplicator.js"
+        if [ ! -f "$DEDUP_PATH" ]; then
+          echo "❌ deduplicator.js MISSING — pipeline cannot deduplicate"
+          PASS=false
+        else
+          HAS_TTL=$(grep -c "DEDUPE_TTL_DAYS" "$DEDUP_PATH" || echo 0)
+          if [ "$HAS_TTL" -lt 1 ]; then
+            echo "❌ deduplicator.js missing DEDUPE_TTL_DAYS export"
+            PASS=false
+          else
+            echo "✅ deduplicator.js exports DEDUPE_TTL_DAYS"
+          fi
+        fi
+
         if [ "$PASS" = "true" ]; then
           echo "✅ All invariant checks passed"
         else
