@@ -372,6 +372,56 @@ jobs:
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
 
+
+    - name: Upload data to R2 (additive)
+      if: success()
+      continue-on-error: true
+      run: |
+        echo "📤 Uploading pipeline data to R2 (additive — git push still primary)..."
+        node -e "
+        const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+        const fs = require('fs');
+        const path = require('path');
+
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          const dataDir = '.github/data';
+          const files = [
+            'all_jobs.json',
+            'jobs-metadata.json',
+            'dedupe-store.json',
+          ];
+
+          // Add description sidecars
+          const sidecars = fs.readdirSync(dataDir).filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
+          for (const s of sidecars) files.push(s);
+
+          let ok = 0, fail = 0;
+          for (const file of files) {
+            const fp = path.join(dataDir, file);
+            if (!fs.existsSync(fp)) { console.log('SKIP: ' + file); continue; }
+            try {
+              const data = fs.readFileSync(fp, 'utf8');
+              const isJson = file.endsWith('.json');
+              const uploaded = isJson
+                ? await r2.uploadRaw(file, data, 'application/json')
+                : await r2.uploadRaw(file, data, 'application/x-jsonlines');
+              if (uploaded) { ok++; } else { fail++; }
+            } catch (e) { console.error('ERR: ' + file + ' - ' + e.message); fail++; }
+          }
+
+          await r2.writeManifest({ files_uploaded: ok, files_failed: fail, pipeline_run: process.env.GITHUB_RUN_ID });
+          console.log('R2 upload done: ' + ok + ' ok, ' + fail + ' failed');
+        }
+        main().catch(e => { console.error('R2 fatal: ' + e.message); process.exit(1); });
+        "
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        GITHUB_RUN_ID: ${{ github.run_id }}
+
     - name: Notify on failure
       if: failure()
       run: |
