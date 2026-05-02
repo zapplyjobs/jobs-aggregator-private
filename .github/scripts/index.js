@@ -72,6 +72,7 @@ const isVerbose = args.includes('--verbose');
  */
 async function main() {
   const startTime = Date.now();
+  const stageTimings = {};
 
   console.log('🚀 Jobs Data Fetcher - Starting...');
   console.log('═'.repeat(60));
@@ -123,6 +124,7 @@ async function main() {
 
     // Step 1: Fetch from all sources
     console.log('📡 Step 1: Fetching jobs from all sources...');
+    let _stepStart = Date.now();
     console.log('━'.repeat(60));
 
     // AGG-5 (S229): Overall timeout per fetcher. Prevents one hung API from blocking
@@ -187,6 +189,7 @@ async function main() {
 
     console.log('');
     console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
+    stageTimings.step1_fetch_ms = Date.now() - _stepStart;
     console.log(`   - ATS: ${atsResult.jobs.length} jobs`);
     for (const name of fetcherNames) {
       console.log(`   - ${name}: ${fetcherResults[name].length} jobs`);
@@ -210,6 +213,7 @@ async function main() {
 
     // Step 2: Enhance jobs (add fingerprints, employment_types arrays, etc.)
     console.log('🔄 Step 2: Enhancing jobs with required fields...');
+    _stepStart = Date.now();
     console.log('━'.repeat(60));
 
     // Add missing fields (fingerprints, normalize employment_types to arrays)
@@ -239,10 +243,12 @@ async function main() {
 
     console.log('');
     console.log(`✅ Step 2 complete: ${enhancedJobs.length} jobs enhanced`);
+    stageTimings.step2_enhance_ms = Date.now() - _stepStart;
     console.log('');
 
     // Step 3: Validate and fix malformed fields
     console.log('📝 Step 3: Validating and fixing malformed fields...');
+    _stepStart = Date.now();
     console.log('━'.repeat(60));
 
     const { validJobs, invalidJobs, metrics: validationMetrics } = validateAndNormalizeJobs(enhancedJobs);
@@ -251,10 +257,12 @@ async function main() {
     printValidationSummary(validationMetrics);
     console.log('');
     console.log(`✅ Step 3 complete: ${validJobs.length} valid jobs (${invalidJobs.length} filtered)`);
+    stageTimings.step3_validate_ms = Date.now() - _stepStart;
     console.log('');
 
     // Step 4: Filter senior jobs
     console.log('🎓 Step 4: Filtering senior-level jobs...');
+    _stepStart = Date.now();
     console.log('━'.repeat(60));
 
     const { entryLevelJobs, seniorJobs, metrics: seniorFilterMetrics } = filterSeniorJobs(validJobs, companyOverrideMap);
@@ -264,6 +272,7 @@ async function main() {
     console.log('');
     const overrideCount = seniorFilterMetrics.override_applied || 0;
     console.log(`✅ Step 4 complete: ${entryLevelJobs.length} entry-level jobs (${seniorJobs.length} senior filtered${overrideCount > 0 ? `, ${overrideCount} overrides applied` : ''})`);
+    stageTimings.step4_filter_ms = Date.now() - _stepStart;
     console.log('');
 
     // Step 4b: Write senior-filter analytics summary (PIPELINE-1)
@@ -364,21 +373,25 @@ async function main() {
 
     // Step 5: Apply tags
     console.log('🏷️  Step 5: Applying tags...');
+    _stepStart = Date.now();
     console.log('━'.repeat(60));
 
     const taggedJobs = tagJobs(entryLevelJobs);
 
     console.log(`✅ Step 5 complete: ${taggedJobs.length} jobs tagged`);
+    stageTimings.step5_tag_ms = Date.now() - _stepStart;
     console.log('');
 
     // Step 6: Deduplicate
     console.log('🔍 Step 6: Deduplicating jobs...');
+    _stepStart = Date.now();
     console.log('━'.repeat(60));
 
     const { unique: dedupedJobs, duplicates, stats: dedupeStats } = deduplicateJobs(taggedJobs);
 
     console.log('');
     console.log(`✅ Step 6 complete: ${dedupedJobs.length} unique jobs (${duplicates} duplicates removed)`);
+    stageTimings.step6_dedup_ms = Date.now() - _stepStart;
     console.log('');
 
     // Step 7: Tag statistics deferred to post-merge (after Step 9).
@@ -391,6 +404,7 @@ async function main() {
 
     // Step 8: Sort by date (newest first)
     console.log('📊 Step 8: Sorting jobs by date...');
+    _stepStart = Date.now();
     console.log('━'.repeat(60));
 
     const sortedJobs = dedupedJobs.sort((a, b) => {
@@ -400,6 +414,7 @@ async function main() {
     });
 
     console.log(`✅ Step 8 complete: Jobs sorted`);
+    stageTimings.step8_sort_ms = Date.now() - _stepStart;
     console.log('');
 
     // Step 8b: Write per-source description sidecars
@@ -528,6 +543,7 @@ async function main() {
 
     // Step 9: Write output files
     console.log('💾 Step 9: Writing output files...');
+    _stepStart = Date.now();
     console.log('━'.repeat(60));
 
     // Strip pipeline internals before writing public output file
@@ -773,11 +789,12 @@ async function main() {
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
     const duration = Date.now() - startTime;
-    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies);
+    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
     console.log(`✅ Step 9 complete: Output files written`);
+    stageTimings.step9_write_ms = Date.now() - _stepStart;
     console.log('');
 
     // Step 10: Print summary
@@ -787,6 +804,7 @@ async function main() {
     printTagDistribution(sortedJobs);
 
     // Step 12: Git commit (unless dry run)
+    _stepStart = Date.now();
     if (!isDryRun) {
       console.log('📝 Step 12: Committing to git...');
       console.log('━'.repeat(60));
@@ -795,8 +813,10 @@ async function main() {
 
       console.log('');
       console.log(`✅ Step 12 complete: Changes committed`);
+      stageTimings.step12_commit_ms = Date.now() - _stepStart;
     } else {
       console.log('⏭️  Step 12: Skipping git commit (dry run)');
+      stageTimings.step12_commit_ms = 0;
     }
 
     console.log('');
@@ -871,7 +891,7 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath) {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies) {
+function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -989,6 +1009,9 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     // GAP-6: Companies that returned 0 raw jobs this run (pre-filter).
     // Used by pipeline-alert.js for consecutive-failure detection.
     zero_yield_companies: zeroYieldCompanies || [],
+
+    // INF-OBSERV-3: Per-stage timing breakdown (ms)
+    stage_timings: stageTimings || {},
   };
 }
 
