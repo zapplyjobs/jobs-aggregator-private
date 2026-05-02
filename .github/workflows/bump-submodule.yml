@@ -50,25 +50,31 @@ jobs:
           fi
           echo "SHA existence verified: ${TARGET_SHA:0:12} resolves to commit on job-board-shared"
 
-      - name: Disable workflows on all 8 repos
+      - name: Disable dangerous workflows
         id: disable-workflows
         run: |
-          REPOS=(
-            zapplyjobs/jobs-aggregator-private
-            zapplyjobs/jobs-data-2026
-            zapplyjobs/New-Grad-Jobs-2026
-            zapplyjobs/Internships-2026
-            zapplyjobs/New-Grad-Software-Engineering-Jobs-2026
-            zapplyjobs/New-Grad-Data-Science-Jobs-2026
-            zapplyjobs/New-Grad-Hardware-Engineering-Jobs-2026
-            zapplyjobs/New-Grad-Healthcare-Jobs-2026
+          # Per-workflow disable/enable API works with repo scope.
+          # Repo-level actions/permissions requires admin scope (GH_PAT lacks it).
+          # Only disable workflows that could race with the bump (checkout submodules).
+
+          # Aggregator: Fetch All Jobs (234555372)
+          gh api repos/zapplyjobs/jobs-aggregator-private/actions/workflows/234555372/disable --method PUT --silent && echo "Disabled: aggregator/Fetch All Jobs" || echo "WARN: Could not disable aggregator/Fetch All Jobs"
+
+          # jobs-data-2026: Enrich Jobs (239692001)
+          gh api repos/zapplyjobs/jobs-data-2026/actions/workflows/239692001/disable --method PUT --silent && echo "Disabled: jobs-data/Enrich Jobs" || echo "WARN: Could not disable jobs-data/Enrich Jobs"
+
+          # Consumer repos: Update Jobs from Aggregator
+          declare -A CONSUMER_WORKFLOWS=(
+            ["New-Grad-Jobs-2026"]="172507830"
+            ["Internships-2026"]="197229424"
+            ["New-Grad-Software-Engineering-Jobs-2026"]="194987480"
+            ["New-Grad-Data-Science-Jobs-2026"]="181160192"
+            ["New-Grad-Hardware-Engineering-Jobs-2026"]="181164092"
+            ["New-Grad-Healthcare-Jobs-2026"]="189226548"
           )
-          for REPO in "${REPOS[@]}"; do
-            gh api "repos/$REPO/actions/permissions" \
-              --method PUT \
-              --field enabled=false \
-              --field allowed_actions=all \
-              --silent && echo "Disabled: $REPO" || echo "WARN: Could not disable $REPO"
+          for REPO in "${!CONSUMER_WORKFLOWS[@]}"; do
+            WF_ID="${CONSUMER_WORKFLOWS[$REPO]}"
+            gh api "repos/zapplyjobs/$REPO/actions/workflows/$WF_ID/disable" --method PUT --silent && echo "Disabled: $REPO/Update Jobs" || echo "WARN: Could not disable $REPO/Update Jobs"
           done
 
       - name: Bump all 8 repos
@@ -166,25 +172,27 @@ jobs:
             echo "::warning::$FAIL repo(s) failed to bump. Re-run with same SHA for failed repos."
           fi
 
-      - name: Re-enable workflows on all 8 repos
+      - name: Re-enable dangerous workflows
         if: always()
         run: |
-          REPOS=(
-            zapplyjobs/jobs-aggregator-private
-            zapplyjobs/jobs-data-2026
-            zapplyjobs/New-Grad-Jobs-2026
-            zapplyjobs/Internships-2026
-            zapplyjobs/New-Grad-Software-Engineering-Jobs-2026
-            zapplyjobs/New-Grad-Data-Science-Jobs-2026
-            zapplyjobs/New-Grad-Hardware-Engineering-Jobs-2026
-            zapplyjobs/New-Grad-Healthcare-Jobs-2026
+          # Aggregator: Fetch All Jobs (234555372)
+          gh api repos/zapplyjobs/jobs-aggregator-private/actions/workflows/234555372/enable --method PUT --silent && echo "Enabled: aggregator/Fetch All Jobs" || echo "WARN: Could not enable aggregator/Fetch All Jobs"
+
+          # jobs-data-2026: Enrich Jobs (239692001)
+          gh api repos/zapplyjobs/jobs-data-2026/actions/workflows/239692001/enable --method PUT --silent && echo "Enabled: jobs-data/Enrich Jobs" || echo "WARN: Could not enable jobs-data/Enrich Jobs"
+
+          # Consumer repos: Update Jobs from Aggregator
+          declare -A CONSUMER_WORKFLOWS=(
+            ["New-Grad-Jobs-2026"]="172507830"
+            ["Internships-2026"]="197229424"
+            ["New-Grad-Software-Engineering-Jobs-2026"]="194987480"
+            ["New-Grad-Data-Science-Jobs-2026"]="181160192"
+            ["New-Grad-Hardware-Engineering-Jobs-2026"]="181164092"
+            ["New-Grad-Healthcare-Jobs-2026"]="189226548"
           )
-          for REPO in "${REPOS[@]}"; do
-            gh api "repos/$REPO/actions/permissions" \
-              --method PUT \
-              --field enabled=true \
-              --field allowed_actions=all \
-              --silent && echo "Enabled: $REPO" || echo "WARN: Could not enable $REPO"
+          for REPO in "${!CONSUMER_WORKFLOWS[@]}"; do
+            WF_ID="${CONSUMER_WORKFLOWS[$REPO]}"
+            gh api "repos/zapplyjobs/$REPO/actions/workflows/$WF_ID/enable" --method PUT --silent && echo "Enabled: $REPO/Update Jobs" || echo "WARN: Could not enable $REPO/Update Jobs"
           done
 
       - name: Verify P-2 alignment
