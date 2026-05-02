@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const assert = require('assert');
 
 // Import from shared submodule (job-board-scripts/lib/aggregator/)
 const SHARED = path.join(__dirname, 'shared', 'lib', 'aggregator');
@@ -76,6 +77,43 @@ async function main() {
   console.log('═'.repeat(60));
   console.log(`Mode: ${isDryRun ? 'DRY RUN (no commits)' : 'NORMAL'}`);
   console.log('');
+
+  // AGG-PIPE-7: Startup assertions — fail fast when critical files are missing.
+  // Origin: d06bb81 deleted tag-engine.js, pipeline ran 25+ failing runs over 7h.
+  try {
+    // (a) Submodule directory exists and isn't empty
+    const sharedFiles = fs.readdirSync(SHARED);
+    assert(sharedFiles.length > 0, `Submodule directory ${SHARED} is empty`);
+
+    // (b) tag-engine.js exports expected functions
+    assert(typeof tagJobs === 'function', 'tag-engine.js does not export tagJobs');
+    assert(typeof tagEmployment === 'function', 'tag-engine.js does not export tagEmployment');
+    assert(typeof tagDomains === 'function', 'tag-engine.js does not export tagDomains');
+    assert(typeof generateTagStats === 'function', 'tag-engine.js does not export generateTagStats');
+
+    // (c) Senior filter exports expected functions
+    assert(typeof filterSeniorJobs === 'function', 'senior-filter.js does not export filterSeniorJobs');
+    assert(typeof isSeniorJob === 'function', 'senior-filter.js does not export isSeniorJob');
+    assert(typeof buildCompanyOverrideMap === 'function', 'senior-filter.js does not export buildCompanyOverrideMap');
+
+    // (d) Deduplicator exports TTL constants
+    assert(typeof DEDUPE_TTL_MS === 'number' && DEDUPE_TTL_MS > 0, 'deduplicator.js does not export valid DEDUPE_TTL_MS');
+    assert(typeof DEDUPE_TTL_DAYS === 'number' && DEDUPE_TTL_DAYS > 0, 'deduplicator.js does not export valid DEDUPE_TTL_DAYS');
+
+    // (e) company-list.json is parseable with expected platforms
+    const companyList = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));
+    const platforms = Object.keys(companyList);
+    const requiredPlatforms = ['greenhouse', 'lever', 'ashby', 'workday', 'smartrecruiters'];
+    for (const p of requiredPlatforms) {
+      assert(platforms.includes(p), `company-list.json missing required platform: ${p}`);
+    }
+
+    console.log('✅ Startup assertions passed (AGG-PIPE-7)');
+  } catch (assertionErr) {
+    console.error(`❌ STARTUP ASSERTION FAILED: ${assertionErr.message}`);
+    console.error('Pipeline cannot proceed — critical file/module missing or corrupt.');
+    process.exit(1);
+  }
 
   try {
     // Ensure data directory exists
