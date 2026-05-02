@@ -1,8 +1,8 @@
 {
   "meta": {
-    "generated_at": "2026-05-02T05:12:03.220Z",
+    "generated_at": "2026-05-02T05:27:38.898Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "25244296340",
+    "aggregator_run_id": "25244565599",
     "stale_if_older_than_hours": 2
   },
   "pool": {
@@ -240,19 +240,29 @@
       "mid_level": 3416,
       "entry_level": 46499,
       "internship": 2122
+    },
+    {
+      "date": "2026-05-02T05:27:38.898Z",
+      "g1_rate": 19.4,
+      "us_general": 6021,
+      "us_total": 31001,
+      "senior": 552,
+      "mid_level": 3416,
+      "entry_level": 46499,
+      "internship": 2122
     }
   ],
   "enrichment": {
-    "total_enriched": 10238,
-    "total_has_description": 9868,
+    "total_enriched": 10239,
+    "total_has_description": 9869,
     "workday_waiting_for_desc": null,
     "jsearch_sidecar_lines": 0
   },
   "pipeline": {
     "submodule_head": "bb2d7d4",
     "last_run_status": "success",
-    "last_run_at": "2026-05-02T05:12:03.220Z",
-    "last_run_id": "25244296340",
+    "last_run_at": "2026-05-02T05:27:38.898Z",
+    "last_run_id": "25244565599",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -291,7 +301,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-05-02T04:56:58.026Z",
-    "total_delta": 7
+    "compared_to": "2026-05-02T05:12:03.220Z",
+    "total_delta": 0
   }
 }
