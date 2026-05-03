@@ -44,12 +44,12 @@ const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecis
 const { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);
 
 // AGG-36: Company override map (populated by loadCompanyOverrides)
+const COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');
 let companyOverrideMap = new Map();
 
 function loadCompanyOverrides() {
-  const companyListPath = path.join(SHARED, 'fetchers', 'company-list.json');
   try {
-    const companyList = JSON.parse(fs.readFileSync(companyListPath, 'utf8'));
+    const companyList = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));
     companyOverrideMap = buildCompanyOverrideMap(companyList);
     if (companyOverrideMap.size > 0) {
       console.log(`📋 AGG-36: Loaded ${companyOverrideMap.size} company title overrides`);
