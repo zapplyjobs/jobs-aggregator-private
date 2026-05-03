@@ -822,12 +822,12 @@ async function main() {
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
     const duration = Date.now() - startTime;
+    stageTimings.step9_write_ms = Date.now() - _stepStart;
     const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
     console.log(`✅ Step 9 complete: Output files written`);
-    stageTimings.step9_write_ms = Date.now() - _stepStart;
     console.log('');
 
     // Step 10: Print summary
