@@ -463,7 +463,7 @@ async function main() {
     // Fix: load prior sidecar entries, overlay current-run data, write merged result.
     // Size is bounded by the 7-day pool TTL — old jobs expire from all_jobs.json and their
     // descriptions are no longer needed. Chunking (40MB limit) handles large sources.
-    // Pattern originally applied to JSearch only — now generalized to all sources.
+    // Pattern originally applied to early sources — now generalized to all sources.
     for (const src of Object.keys(bySource)) {
       // Load ALL prior sidecar files for this source (handles chunked files too)
       const priorMap = new Map();
