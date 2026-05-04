@@ -2,8 +2,6 @@ name: Fetch All Jobs
 
 on:
   workflow_dispatch:  # Triggered by job-board-cron-worker (Cloudflare) every 15 min
-  schedule:
-    - cron: '0 * * * *'  # Hourly fallback if CF worker stops firing. Concurrency guard prevents overlap.
   push:
     branches: [ main ]
     paths:
