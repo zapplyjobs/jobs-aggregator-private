@@ -80,7 +80,10 @@ const isVerbose = args.includes('--verbose');
  * Workday "Posted 30+ Days Ago" resets each run — preserving the earlier date
  * lets jobs age naturally and expire via TTL.
  */
-function preservePostedAt(publicJobs, prevLines) {
+function resolvePostedAt(publicJobs, prevLines) {
+  const cutoffMs = Date.now() - DEDUPE_TTL_MS;
+
+  // Collect prior dates for re-fetched jobs
   const priorDates = new Map();
   for (const line of prevLines) {
     try {
@@ -88,17 +91,30 @@ function preservePostedAt(publicJobs, prevLines) {
       if (job.id && job.posted_at) priorDates.set(job.id, job.posted_at);
     } catch { /* skip malformed */ }
   }
+
+  // AGG-6: Preserve earlier dates; AGG-32: filter stale — single pass
   let datePreservedCount = 0;
-  for (const job of publicJobs) {
+  let staleRemoved = 0;
+  const filtered = publicJobs.filter(job => {
     const prior = priorDates.get(job.id);
     if (prior && new Date(prior) < new Date(job.posted_at)) {
       job.posted_at = prior;
       datePreservedCount++;
     }
-  }
+    if (!job.posted_at) { staleRemoved++; return false; }
+    if (new Date(job.posted_at).getTime() < cutoffMs) { staleRemoved++; return false; }
+    return true;
+  });
+
   if (datePreservedCount > 0) {
     console.log(`📅 Preserved earlier posted_at for ${datePreservedCount} re-fetched jobs`);
   }
+  if (staleRemoved > 0) {
+    console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >${DEDUPE_TTL_DAYS}d) from post-merge pool`);
+  }
+
+  publicJobs.length = 0;
+  publicJobs.push(...filtered);
 }
 
 /**
@@ -163,27 +179,6 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
   } else {
     console.log('🔄 No prior-run jobs to merge');
   }
-}
-
-/**
- * AGG-32: Post-merge TTL safety net.
- * AGG-6 may overwrite posted_at to an earlier date, making current-run jobs stale.
- * Carry-forward TTL only applies to prior-run jobs — this catches ALL stale jobs.
- */
-function filterStalePostMerge(publicJobs) {
-  const cutoffMs = Date.now() - DEDUPE_TTL_MS;
-  const preFilterCount = publicJobs.length;
-  const filtered = publicJobs.filter(j => {
-    if (!j.posted_at) return false;
-    return new Date(j.posted_at).getTime() >= cutoffMs;
-  });
-  const staleRemoved = preFilterCount - filtered.length;
-  if (staleRemoved > 0) {
-    console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >${DEDUPE_TTL_DAYS}d) from post-merge pool`);
-  }
-  // Replace array contents in-place so the caller's reference stays valid
-  publicJobs.length = 0;
-  publicJobs.push(...filtered);
 }
 
 /**
@@ -696,14 +691,11 @@ async function main() {
       const currentFingerprints = new Set(publicJobs.map(j => j.fingerprint).filter(Boolean));
       const prevLines = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8').trim().split('\n').filter(Boolean);
 
-      // AGG-6: Preserve earliest posted_at for re-fetched jobs.
-      preservePostedAt(publicJobs, prevLines);
+      // AGG-6/AGG-32: Preserve earlier posted_at and filter stale — single pass
+      resolvePostedAt(publicJobs, prevLines);
 
       mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, STRIP_FIELDS, cutoffMs);
     }
-
-    // AGG-32: Post-merge TTL safety net
-    filterStalePostMerge(publicJobs);
 
     // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
     tagStats = computeFullPoolTagStats(publicJobs);
