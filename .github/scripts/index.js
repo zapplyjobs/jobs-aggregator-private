@@ -266,13 +266,7 @@ async function main() {
 
     let allJobs = [];
 
-    // Phase A: ATS fetcher solo (needs exclusive runner bandwidth — ~500 HTTP requests)
-    console.log('  Phase A: ATS fetcher (solo)...');
-    const atsResult = await withTimeout(fetchFromAllATS(), 720_000, 'ATS');
-    allJobs.push(...atsResult.jobs);
-    console.log(`  ATS: ${atsResult.jobs.length} jobs`);
-
-    // Phase B: Read previous counts (needed for initial-population detection) before parallel phase
+    // Read previous counts (needed for initial-population detection) before fetch
     let prevAppleCount = 0, prevGoogleCount = 0, prevMicrosoftCount = 0;
     try {
       if (fs.existsSync(JOBS_OUTPUT_FILE)) {
@@ -286,9 +280,11 @@ async function main() {
       }
     } catch (e) { /* first run */ }
 
-    // Phase B: All non-ATS fetchers in parallel (bounded by Netflix at ~2.5 min)
-    console.log('  Phase B: Non-ATS fetchers (parallel)...');
-    const phaseBResults = await Promise.allSettled([
+    // Phase A+B: Run ATS and custom fetchers in parallel (AGG-SPEED-5)
+    // ~5.5 min savings: max(PhaseA, PhaseB) instead of PhaseA + PhaseB
+    console.log('  Phase A+B: ATS + custom fetchers (parallel)...');
+    const [phaseAResult, ...phaseBSettled] = await Promise.allSettled([
+      withTimeout(fetchFromAllATS(), 720_000, 'ATS'),
       withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon'),
       withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix'),
       withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount }), prevAppleCount === 0 ? 300_000 : 180_000, 'Apple'),
@@ -301,10 +297,15 @@ async function main() {
       withTimeout(fetchAllAmdJobs(), 120_000, 'AMD'),
     ]);
 
-    // Collect results — Promise.allSettled means individual failures don't block others
+    // Collect ATS results
+    const atsResult = phaseAResult.status === 'fulfilled' ? phaseAResult.value : { jobs: [] };
+    allJobs.push(...atsResult.jobs);
+    console.log(`  ATS: ${atsResult.jobs.length} jobs`);
+
+    // Collect custom fetcher results
     const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Microsoft', 'Oracle', 'AMD'];
     const fetcherResults = {};
-    phaseBResults.forEach((result, i) => {
+    phaseBSettled.forEach((result, i) => {
       const name = fetcherNames[i];
       const jobs = result.status === 'fulfilled' ? result.value : [];
       fetcherResults[name] = Array.isArray(jobs) ? jobs : [];
