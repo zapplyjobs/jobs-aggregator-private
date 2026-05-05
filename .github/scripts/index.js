@@ -269,6 +269,7 @@ async function main() {
     // Read previous counts (needed for initial-population detection) before fetch
     let prevAppleCount = 0, prevGoogleCount = 0, prevMicrosoftCount = 0;
     let prevAppleIds = new Set();
+    let wdPreviousTotals = null;
     try {
       if (fs.existsSync(JOBS_OUTPUT_FILE)) {
         const content = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
@@ -284,11 +285,21 @@ async function main() {
       }
     } catch (e) { /* first run */ }
 
+    // AGG-SPEED-2: Load WD totals cache from prior run
+    const WD_TOTALS_CACHE = path.join(DATA_DIR, 'wd-totals-cache.json');
+    try {
+      if (fs.existsSync(WD_TOTALS_CACHE)) {
+        wdPreviousTotals = JSON.parse(fs.readFileSync(WD_TOTALS_CACHE, 'utf8'));
+        const cachedCount = Object.keys(wdPreviousTotals).length;
+        if (cachedCount > 0) console.log(`  WD incremental cache: ${cachedCount} tenants`);
+      }
+    } catch (e) { /* first run or corrupt cache */ }
+
     // Phase A+B: Run ATS and custom fetchers in parallel (AGG-SPEED-5)
     // ~5.5 min savings: max(PhaseA, PhaseB) instead of PhaseA + PhaseB
     console.log('  Phase A+B: ATS + custom fetchers (parallel)...');
     const [phaseAResult, ...phaseBSettled] = await Promise.allSettled([
-      withTimeout(fetchFromAllATS(), 720_000, 'ATS'),
+      withTimeout(fetchFromAllATS({ wdPreviousTotals }), 720_000, 'ATS'),
       withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon'),
       withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix'),
       withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds }), prevAppleCount === 0 ? 300_000 : 180_000, 'Apple'),
@@ -305,6 +316,12 @@ async function main() {
     const atsResult = phaseAResult.status === 'fulfilled' ? phaseAResult.value : { jobs: [] };
     allJobs.push(...atsResult.jobs);
     console.log(`  ATS: ${atsResult.jobs.length} jobs`);
+
+    // AGG-SPEED-2: Save WD totals cache for next run
+    if (atsResult.wdCurrentTotals && Object.keys(atsResult.wdCurrentTotals).length > 0) {
+      fs.writeFileSync(WD_TOTALS_CACHE, JSON.stringify(atsResult.wdCurrentTotals, null, 2));
+      console.log(`  WD totals cache saved: ${Object.keys(atsResult.wdCurrentTotals).length} tenants`);
+    }
 
     // Collect custom fetcher results
     const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Microsoft', 'Oracle', 'AMD'];
@@ -1086,6 +1103,7 @@ async function gitCommit(jobCount) {
     execSync('git add .github/data/all_jobs.json');
     execSync('git add .github/data/jobs-metadata.json');
     execSync('git add .github/data/dedupe-store.json');
+    execSync('git add .github/data/wd-totals-cache.json 2>/dev/null || true'); // AGG-SPEED-2: WD incremental fetch cache
     execSync('git add .github/data/filtered_jobs.json 2>/dev/null || true'); // senior-filter summary for analytics (PIPELINE-1)
     execSync('git add .github/data/filtered-samples.jsonl 2>/dev/null || true'); // AGG-DATA-8: sampled filtered jobs for FP spot-check
     // archive/ is NOT staged here — pushed separately to jobs-archive-private repo via workflow
