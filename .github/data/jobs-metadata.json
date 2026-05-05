@@ -1,33 +1,33 @@
 {
   "version": "1.0",
-  "generated": "2026-05-05T17:51:33.762Z",
-  "duration_ms": 296767,
-  "total_jobs": 57209,
-  "unique_jobs": 32138,
-  "duplicates_removed": 32092,
+  "generated": "2026-05-05T18:06:41.854Z",
+  "duration_ms": 314216,
+  "total_jobs": 57306,
+  "unique_jobs": 32807,
+  "duplicates_removed": 32712,
   "by_source": {
-    "workday": 31717,
-    "greenhouse": 16496,
-    "smartrecruiters": 1516,
+    "workday": 31799,
+    "greenhouse": 16504,
+    "smartrecruiters": 1514,
+    "lever": 1753,
     "ashby": 3234,
     "apple": 486,
-    "lever": 1752,
-    "microsoft": 315,
+    "microsoft": 316,
     "google": 609,
     "amd": 126,
     "simplify": 461,
-    "amazon": 190,
+    "amazon": 191,
     "eightfold": 25,
-    "oracle": 166,
+    "oracle": 172,
     "uber": 17,
     "jsearch": 99
   },
   "by_employment_type": {
-    "FULL-TIME": 1542,
+    "FULL-TIME": 1557,
     "FULLTIME": 3045,
     "FULL_TIME": 119,
     "INTERN": 73,
-    "INTERNSHIP": 36,
+    "INTERNSHIP": 35,
     "CONTRACT": 109,
     "TEMPORARY": 5,
     "FULL-TIME AND INTERNSHIP": 5,
@@ -37,13 +37,13 @@
     "FULL-TIME AND PART-TIME": 1
   },
   "by_job_type": {
-    "internship": 2149,
-    "new-grad": 50816,
-    "mid_level": 4244
+    "internship": 2151,
+    "new-grad": 50898,
+    "mid_level": 4257
   },
   "by_location": {
-    "remote": 4131,
-    "onsite": 53078
+    "remote": 4135,
+    "onsite": 53171
   },
   "ats_stats": {
     "companies_total": 549,
@@ -54,112 +54,112 @@
     "smartrecruiters_companies": 18
   },
   "validation_stats": {
-    "total_input": 70621,
-    "valid_jobs": 70481,
-    "invalid_jobs": 140,
+    "total_input": 71189,
+    "valid_jobs": 71035,
+    "invalid_jobs": 154,
     "invalid_reasons": {
-      "missing_title": 2,
+      "missing_title": 12,
       "missing_company": 0,
       "missing_url": 0,
-      "invalid_title_length": 10,
+      "invalid_title_length": 12,
       "invalid_company_length": 0,
       "invalid_url_format": 0,
       "garbage_title": null
     },
     "normalized_fields": {
-      "state_extracted": 15243,
-      "city_extracted": 19052
+      "state_extracted": 15693,
+      "city_extracted": 17696
     }
   },
   "senior_filter_stats": {
-    "total_input": 70481,
-    "entry_level_jobs": 38582,
-    "senior_jobs": 31899,
-    "override_applied": 405,
+    "total_input": 71035,
+    "entry_level_jobs": 39296,
+    "senior_jobs": 31739,
+    "override_applied": 406,
     "senior_reasons": {
-      "senior_title": 20849,
-      "senior_experience": 3304,
-      "both": 7746
+      "senior_title": 20699,
+      "senior_experience": 3306,
+      "both": 7734
     },
     "by_source": {
-      "greenhouse": 17081,
+      "greenhouse": 17088,
       "lever": 1588,
-      "ashby": 3064,
-      "workday": 6760,
-      "smartrecruiters": 1317,
-      "amazon": 425,
+      "ashby": 3065,
+      "workday": 6573,
+      "smartrecruiters": 1321,
+      "amazon": 426,
       "eightfold": 65,
       "apple": 202,
       "twosigma": 3,
-      "uber": 289,
-      "google": 439,
+      "uber": 290,
+      "google": 438,
       "simplify": 1,
-      "microsoft": 259,
-      "oracle": 145,
-      "amd": 261
+      "microsoft": 260,
+      "oracle": 159,
+      "amd": 260
     }
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 50816,
-      "mid_level": 3641,
-      "internship": 2149,
-      "senior": 603
+      "entry_level": 50898,
+      "mid_level": 3653,
+      "internship": 2151,
+      "senior": 604
     },
     "domains": {
-      "general": 15462,
-      "sales": 5813,
-      "product": 1239,
-      "software": 9981,
-      "manufacturing": 2900,
-      "data_science": 2132,
+      "finance": 3056,
+      "general": 15486,
+      "logistics": 1463,
+      "healthcare": 961,
+      "operations": 5112,
+      "retail": 4441,
+      "manufacturing": 2913,
       "hardware": 4893,
-      "operations": 5102,
-      "finance": 3047,
-      "ai": 1236,
-      "retail": 4440,
-      "logistics": 1460,
-      "healthcare": 959,
-      "legal": 668,
-      "marketing": 1366,
+      "software": 10001,
+      "sales": 5823,
+      "legal": 670,
+      "ai": 1237,
+      "marketing": 1367,
+      "product": 1239,
+      "data_science": 2133,
       "hr": 830
     },
     "locations": {
-      "us": 34795,
-      "remote": 4131,
-      "on_site": 2735,
+      "us": 34863,
+      "remote": 4135,
+      "on_site": 2734,
       "hybrid": 923
     },
     "experience": {
-      "unknown": 40335,
-      "entry_level": 4166,
-      "mid_level": 6539,
-      "senior_level": 6169
+      "unknown": 40396,
+      "entry_level": 4174,
+      "senior_level": 6177,
+      "mid_level": 6559
     },
     "special": {
       "unicorn": 1345,
-      "faang": 1887,
-      "fortune500": 3798
+      "faang": 1889,
+      "fortune500": 3799
     },
-    "total": 57209,
+    "total": 57306,
     "g1": {
-      "us_total": 34360,
-      "us_general": 6583,
+      "us_total": 34427,
+      "us_general": 6597,
       "us_general_rate_pct": 19.2,
-      "tech_us_total": 10670,
+      "tech_us_total": 10683,
       "tech_us_general_rate_pct": 38.2
     }
   },
   "freshness": {
-    "last_1h": 257,
-    "last_6h": 1941,
-    "last_24h": 6360,
-    "last_48h": 9190
+    "last_1h": 266,
+    "last_6h": 1976,
+    "last_24h": 6349,
+    "last_48h": 9281
   },
   "top_companies": [
     {
       "company": "Lowe's",
-      "count": 3526,
+      "count": 3538,
       "domain": "retail"
     },
     {
@@ -174,7 +174,7 @@
     },
     {
       "company": "TD Bank",
-      "count": 877,
+      "count": 884,
       "domain": "finance"
     },
     {
@@ -189,7 +189,7 @@
     },
     {
       "company": "Anduril",
-      "count": 816,
+      "count": 818,
       "domain": "software"
     },
     {
@@ -199,12 +199,17 @@
     },
     {
       "company": "RTX",
-      "count": 730,
+      "count": 738,
       "domain": "general"
     },
     {
       "company": "Johnson Controls",
       "count": 627,
+      "domain": "general"
+    },
+    {
+      "company": "Johnson & Johnson",
+      "count": 624,
       "domain": "general"
     },
     {
@@ -214,12 +219,7 @@
     },
     {
       "company": "Boeing",
-      "count": 618,
-      "domain": "general"
-    },
-    {
-      "company": "Johnson & Johnson",
-      "count": 616,
+      "count": 619,
       "domain": "general"
     },
     {
@@ -243,14 +243,14 @@
       "domain": "general"
     },
     {
-      "company": "T-Mobile",
-      "count": 535,
-      "domain": "retail"
+      "company": "Caterpillar",
+      "count": 537,
+      "domain": "general"
     },
     {
-      "company": "Caterpillar",
-      "count": 535,
-      "domain": "general"
+      "company": "T-Mobile",
+      "count": 531,
+      "domain": "retail"
     },
     {
       "company": "Hitachi",
@@ -263,103 +263,105 @@
     "Plaid (lever)",
     "Ivo (lever)",
     "Abbott (workday)",
+    "Adobe (workday)",
     "AES Corporation (workday)",
     "AIG (workday)",
-    "Allegion (workday)",
+    "AllianceBernstein (workday)",
     "Allison Transmission (workday)",
-    "Ameriprise Financial (workday)",
     "Analog Devices (workday)",
-    "Applied Materials (workday)",
     "Aptiv (workday)",
     "Arrow Electronics (workday)",
     "ASML (workday)",
+    "AspenTech (workday)",
     "athenahealth (workday)",
+    "Baker Hughes (workday)",
     "Biogen (workday)",
     "BlackRock (workday)",
     "Bloomberg Industry Group (workday)",
     "Blue Origin (workday)",
     "Boston Dynamics (workday)",
+    "Broadcom (workday)",
     "Broadridge (workday)",
     "Cadence (workday)",
     "Cadence (University) (workday)",
     "CAE (workday)",
+    "Carrier Global (workday)",
     "Cboe (workday)",
     "Ciena (workday)",
+    "Cigna (workday)",
     "Citi (workday)",
     "Cognex (workday)",
-    "Comcast (workday)",
-    "Copart (workday)",
     "CrowdStrike (workday)",
     "Curtiss-Wright (workday)",
     "Dell Technologies (workday)",
     "Disney (workday)",
     "Elanco (workday)",
-    "Entrust (workday)",
+    "Entegris (workday)",
     "Etsy (workday)",
     "Exact Sciences (workday)",
     "Expedia Group (workday)",
-    "Fidelity Investments (workday)",
+    "F5 (workday)",
     "FIS (workday)",
+    "FLIR Systems (workday)",
     "Franklin Templeton (workday)",
     "Freddie Mac (workday)",
+    "GE Aerospace (workday)",
     "Genentech (workday)",
-    "Guidehouse (workday)",
+    "Generac (workday)",
+    "General Motors (workday)",
+    "GlobalFoundries (workday)",
     "Hitachi (workday)",
     "HP Inc (workday)",
-    "HPE (workday)",
     "Ibotta (workday)",
     "IDEXX (workday)",
     "Illumina (workday)",
+    "Intel (workday)",
     "InterDigital (workday)",
     "iRhythm (workday)",
-    "Johnson & Johnson (workday)",
     "KLA (workday)",
     "Logitech (workday)",
-    "Lowe's (workday)",
     "LPL Financial (workday)",
-    "Lumentum (workday)",
     "Manhattan Associates (workday)",
     "Marvell (workday)",
-    "Mastercard (workday)",
+    "Medtronic (workday)",
     "Merck & Co. (workday)",
-    "Microchip Technology (workday)",
     "Micron (workday)",
     "Moog (workday)",
     "Morgan Stanley (workday)",
     "Morningstar (workday)",
-    "Motorola Solutions (workday)",
     "nCino (workday)",
     "NCR Voyix (workday)",
+    "Northrop Grumman (workday)",
     "NVIDIA (workday)",
     "NXP (workday)",
-    "Oshkosh Corporation (workday)",
-    "Palo Alto Networks (workday)",
+    "Philips (workday)",
     "PIMCO (workday)",
-    "Polaris (workday)",
     "Proofpoint (workday)",
     "Prudential Financial (workday)",
-    "Red Hat (workday)",
     "Rockwell Automation (workday)",
-    "RTX (workday)",
-    "S&P Global (workday)",
-    "Salesforce (workday)",
     "SEL (workday)",
     "Silicon Labs (workday)",
     "Snap (workday)",
     "Sonos (workday)",
     "Southwest Airlines (workday)",
-    "State Street (workday)",
+    "Synchrony (workday)",
     "Target (workday)",
-    "Takeda (workday)",
+    "T. Rowe Price (workday)",
+    "Thermo Fisher Scientific (workday)",
+    "TransUnion (workday)",
     "Trimble (workday)",
     "Unisys (workday)",
     "USAA (workday)",
+    "Vanguard (workday)",
+    "Visa (workday)",
     "Walmart (workday)",
     "Warner Bros. Discovery (workday)",
     "Workday Inc (workday)",
     "Workiva (workday)",
     "Yahoo (workday)",
+    "Zayo (workday)",
     "Zendesk (workday)",
+    "Zoom (workday)",
     "Veolia (smartrecruiters)",
     "Intuitive Surgical (smartrecruiters)",
     "RESPEC (smartrecruiters)",
@@ -368,13 +370,13 @@
     "Lawrence Livermore National Laboratory (smartrecruiters)"
   ],
   "stage_timings": {
-    "step1_fetch_ms": 277671,
-    "step2_enhance_ms": 198,
-    "step3_validate_ms": 152,
-    "step4_filter_ms": 720,
-    "step5_tag_ms": 9684,
-    "step6_dedup_ms": 246,
-    "step8_sort_ms": 127,
-    "step9_write_ms": 2175
+    "step1_fetch_ms": 294980,
+    "step2_enhance_ms": 172,
+    "step3_validate_ms": 148,
+    "step4_filter_ms": 715,
+    "step5_tag_ms": 9761,
+    "step6_dedup_ms": 254,
+    "step8_sort_ms": 110,
+    "step9_write_ms": 2322
   }
 }
