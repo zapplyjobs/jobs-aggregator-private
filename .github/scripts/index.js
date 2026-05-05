@@ -268,13 +268,17 @@ async function main() {
 
     // Read previous counts (needed for initial-population detection) before fetch
     let prevAppleCount = 0, prevGoogleCount = 0, prevMicrosoftCount = 0;
+    let prevAppleIds = new Set();
     try {
       if (fs.existsSync(JOBS_OUTPUT_FILE)) {
         const content = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
         prevAppleCount = (content.match(/"source":"apple"/g) || []).length;
         prevGoogleCount = (content.match(/"source":"google"/g) || []).length;
         prevMicrosoftCount = (content.match(/"source":"microsoft"/g) || []).length;
-        if (prevAppleCount > 0) console.log(`  Previous Apple count: ${prevAppleCount}`);
+        if (prevAppleCount > 0) {
+          prevAppleIds = new Set((content.match(/"id":"apple-[^"]+"/g) || []).map(m => m.slice(6, -1)));
+          console.log(`  Previous Apple count: ${prevAppleCount} (${prevAppleIds.size} IDs)`);
+        }
         if (prevGoogleCount > 0) console.log(`  Previous Google count: ${prevGoogleCount}`);
         if (prevMicrosoftCount > 0) console.log(`  Previous Microsoft count: ${prevMicrosoftCount}`);
       }
@@ -287,7 +291,7 @@ async function main() {
       withTimeout(fetchFromAllATS(), 720_000, 'ATS'),
       withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon'),
       withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix'),
-      withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount }), prevAppleCount === 0 ? 300_000 : 180_000, 'Apple'),
+      withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds }), prevAppleCount === 0 ? 300_000 : 180_000, 'Apple'),
       withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma'),
       withTimeout(fetchAllUberJobs(), 60_000, 'Uber'),
       withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), prevGoogleCount === 0 ? 300_000 : 180_000, 'Google'),
