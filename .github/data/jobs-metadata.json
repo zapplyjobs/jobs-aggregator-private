@@ -1,21 +1,21 @@
 {
   "version": "1.0",
-  "generated": "2026-05-05T16:08:58.979Z",
-  "duration_ms": 361465,
-  "total_jobs": 56867,
-  "unique_jobs": 42693,
-  "duplicates_removed": 42617,
+  "generated": "2026-05-05T16:22:37.530Z",
+  "duration_ms": 356258,
+  "total_jobs": 56924,
+  "unique_jobs": 42840,
+  "duplicates_removed": 42774,
   "by_source": {
-    "workday": 31425,
+    "workday": 31479,
+    "ashby": 3228,
+    "lever": 1750,
+    "smartrecruiters": 1514,
+    "apple": 487,
     "greenhouse": 16464,
-    "smartrecruiters": 1513,
-    "lever": 1749,
-    "ashby": 3227,
+    "microsoft": 312,
     "google": 609,
-    "microsoft": 310,
-    "amd": 131,
+    "amd": 130,
     "simplify": 461,
-    "apple": 488,
     "amazon": 185,
     "eightfold": 23,
     "oracle": 166,
@@ -23,11 +23,11 @@
     "jsearch": 99
   },
   "by_employment_type": {
+    "FULLTIME": 3039,
     "FULL-TIME": 1549,
-    "FULLTIME": 3038,
-    "FULL_TIME": 124,
+    "FULL_TIME": 123,
     "INTERN": 73,
-    "INTERNSHIP": 35,
+    "INTERNSHIP": 34,
     "CONTRACT": 109,
     "TEMPORARY": 5,
     "FULL-TIME AND INTERNSHIP": 5,
@@ -37,13 +37,13 @@
     "FULL-TIME AND PART-TIME": 1
   },
   "by_job_type": {
-    "internship": 2139,
-    "new-grad": 50507,
-    "mid_level": 4221
+    "internship": 2145,
+    "new-grad": 50557,
+    "mid_level": 4222
   },
   "by_location": {
-    "remote": 4120,
-    "onsite": 52747
+    "remote": 4121,
+    "onsite": 52803
   },
   "ats_stats": {
     "companies_total": 549,
@@ -54,11 +54,11 @@
     "smartrecruiters_companies": 18
   },
   "validation_stats": {
-    "total_input": 99827,
-    "valid_jobs": 99601,
+    "total_input": 99836,
+    "valid_jobs": 99610,
     "invalid_jobs": 226,
     "invalid_reasons": {
-      "missing_title": 17,
+      "missing_title": 19,
       "missing_company": 0,
       "missing_url": 0,
       "invalid_title_length": 17,
@@ -67,103 +67,104 @@
       "garbage_title": null
     },
     "normalized_fields": {
-      "state_extracted": 22798,
-      "city_extracted": 23828
+      "state_extracted": 22735,
+      "city_extracted": 23861
     }
   },
   "senior_filter_stats": {
-    "total_input": 99601,
-    "entry_level_jobs": 56988,
-    "senior_jobs": 42613,
-    "override_applied": 464,
+    "total_input": 99610,
+    "entry_level_jobs": 56913,
+    "senior_jobs": 42697,
+    "override_applied": 465,
     "senior_reasons": {
-      "senior_title": 31553,
-      "senior_experience": 3328,
-      "both": 7732
+      "senior_title": 31600,
+      "senior_experience": 3336,
+      "both": 7761
     },
     "by_source": {
-      "greenhouse": 17109,
-      "lever": 1590,
+      "greenhouse": 17106,
+      "lever": 1589,
       "ashby": 3064,
-      "workday": 17682,
-      "smartrecruiters": 1330,
-      "amazon": 428,
+      "workday": 17508,
+      "smartrecruiters": 1329,
+      "amazon": 426,
       "eightfold": 65,
       "apple": 198,
       "twosigma": 3,
-      "uber": 296,
+      "uber": 303,
       "google": 439,
       "simplify": 1,
+      "microsoft": 260,
       "oracle": 147,
-      "amd": 261
+      "amd": 259
     }
   },
   "tag_stats": {
     "employment": {
-      "entry_level": 50507,
-      "internship": 2139,
-      "senior": 602,
-      "mid_level": 3619
+      "entry_level": 50557,
+      "internship": 2145,
+      "mid_level": 3620,
+      "senior": 602
     },
     "domains": {
-      "logistics": 1449,
-      "retail": 4423,
-      "general": 15342,
+      "general": 15374,
+      "retail": 4431,
+      "sales": 5788,
       "hardware": 4862,
-      "finance": 3028,
-      "software": 9962,
+      "healthcare": 950,
+      "logistics": 1451,
+      "finance": 3031,
+      "legal": 667,
+      "software": 9963,
       "operations": 5068,
+      "data_science": 2119,
+      "marketing": 1362,
       "product": 1230,
-      "healthcare": 949,
-      "hr": 830,
+      "hr": 829,
       "manufacturing": 2879,
-      "data_science": 2120,
-      "sales": 5782,
-      "legal": 666,
-      "ai": 1235,
-      "marketing": 1359
+      "ai": 1235
     },
     "locations": {
-      "us": 34540,
-      "remote": 4120,
-      "on_site": 2727,
-      "hybrid": 921
+      "us": 34580,
+      "remote": 4121,
+      "on_site": 2729,
+      "hybrid": 922
     },
     "experience": {
-      "unknown": 40075,
-      "mid_level": 6514,
-      "entry_level": 4136,
-      "senior_level": 6142
+      "unknown": 40113,
+      "entry_level": 4148,
+      "senior_level": 6148,
+      "mid_level": 6515
     },
     "special": {
-      "fortune500": 3780,
-      "unicorn": 1341,
-      "faang": 1879
+      "fortune500": 3785,
+      "faang": 1880,
+      "unicorn": 1341
     },
-    "total": 56867,
+    "total": 56924,
     "g1": {
-      "us_total": 34106,
-      "us_general": 6507,
+      "us_total": 34146,
+      "us_general": 6530,
       "us_general_rate_pct": 19.1,
-      "tech_us_total": 10611,
-      "tech_us_general_rate_pct": 38
+      "tech_us_total": 10614,
+      "tech_us_general_rate_pct": 38.1
     }
   },
   "freshness": {
-    "last_1h": 388,
-    "last_6h": 2775,
-    "last_24h": 6441,
-    "last_48h": 8792
+    "last_1h": 362,
+    "last_6h": 2838,
+    "last_24h": 6466,
+    "last_48h": 8853
   },
   "top_companies": [
     {
       "company": "Lowe's",
-      "count": 3507,
+      "count": 3510,
       "domain": "retail"
     },
     {
       "company": "Walmart",
-      "count": 3116,
+      "count": 3122,
       "domain": "general"
     },
     {
@@ -173,7 +174,7 @@
     },
     {
       "company": "TD Bank",
-      "count": 862,
+      "count": 864,
       "domain": "finance"
     },
     {
@@ -183,7 +184,7 @@
     },
     {
       "company": "Citi",
-      "count": 832,
+      "count": 834,
       "domain": "general"
     },
     {
@@ -198,7 +199,7 @@
     },
     {
       "company": "RTX",
-      "count": 715,
+      "count": 717,
       "domain": "general"
     },
     {
@@ -213,7 +214,7 @@
     },
     {
       "company": "Johnson & Johnson",
-      "count": 609,
+      "count": 610,
       "domain": "general"
     },
     {
@@ -223,7 +224,7 @@
     },
     {
       "company": "Boeing",
-      "count": 599,
+      "count": 600,
       "domain": "general"
     },
     {
@@ -238,18 +239,18 @@
     },
     {
       "company": "Abbott",
-      "count": 557,
+      "count": 558,
       "domain": "general"
+    },
+    {
+      "company": "T-Mobile",
+      "count": 531,
+      "domain": "retail"
     },
     {
       "company": "Caterpillar",
       "count": 529,
       "domain": "general"
-    },
-    {
-      "company": "T-Mobile",
-      "count": 527,
-      "domain": "retail"
     },
     {
       "company": "Hitachi",
@@ -272,13 +273,13 @@
     "Lawrence Livermore National Laboratory (smartrecruiters)"
   ],
   "stage_timings": {
-    "step1_fetch_ms": 340981,
-    "step2_enhance_ms": 217,
-    "step3_validate_ms": 206,
-    "step4_filter_ms": 786,
-    "step5_tag_ms": 11898,
-    "step6_dedup_ms": 236,
-    "step8_sort_ms": 146,
-    "step9_write_ms": 2028
+    "step1_fetch_ms": 336847,
+    "step2_enhance_ms": 189,
+    "step3_validate_ms": 188,
+    "step4_filter_ms": 653,
+    "step5_tag_ms": 10308,
+    "step6_dedup_ms": 288,
+    "step8_sort_ms": 124,
+    "step9_write_ms": 2240
   }
 }
