@@ -109,11 +109,9 @@
   "Palo Alto Networks": 0,
   "PIMCO": 0,
   "Polaris": 0,
-  "PricewaterhouseCoopers": 0,
   "Proofpoint": 0,
   "Prudential Financial": 0,
   "Red Hat": 0,
-  "ResMed": 0,
   "Rockwell Automation": 0,
   "RTX": 0,
   "S&P Global": 0,
@@ -146,5 +144,7 @@
   "Yahoo": 0,
   "Zayo": 0,
   "Zendesk": 0,
-  "Zoom": 0
+  "Zoom": 0,
+  "PricewaterhouseCoopers": 0,
+  "ResMed": 0
 }
