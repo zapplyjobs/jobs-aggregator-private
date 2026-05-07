@@ -1,14 +1,14 @@
 {
   "meta": {
-    "generated_at": "2026-05-07T05:38:41.423Z",
+    "generated_at": "2026-05-07T05:53:30.802Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "25477799765",
+    "aggregator_run_id": "25478219084",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 58476,
+    "total": 58477,
     "by_source": {
-      "greenhouse": 16763,
+      "greenhouse": 16764,
       "ashby": 3318,
       "microsoft": 379,
       "apple": 500,
@@ -25,12 +25,12 @@
       "jsearch": 99
     },
     "by_domain": {
-      "general": 15832,
+      "software": 10145,
+      "general": 15829,
       "hr": 847,
-      "sales": 5933,
-      "software": 10144,
+      "sales": 5934,
       "logistics": 1507,
-      "operations": 5232,
+      "operations": 5234,
       "data_science": 2165,
       "finance": 3145,
       "hardware": 4997,
@@ -46,7 +46,7 @@
     "us_interns": 2209,
     "g1_metric": {
       "us_total": 35214,
-      "us_general": 6751,
+      "us_general": 6749,
       "us_general_rate": 19.2,
       "tech_us_total": 10899,
       "tech_us_general_rate": 38.2
@@ -1770,19 +1770,29 @@
       "mid_level": 3792,
       "entry_level": 51869,
       "internship": 2209
+    },
+    {
+      "date": "2026-05-07T05:53:30.802Z",
+      "g1_rate": 19.2,
+      "us_general": 6749,
+      "us_total": 35214,
+      "senior": 606,
+      "mid_level": 3793,
+      "entry_level": 51869,
+      "internship": 2209
     }
   ],
   "enrichment": {
     "total_enriched": 10691,
-    "total_has_description": 9889,
+    "total_has_description": 9898,
     "workday_waiting_for_desc": null,
     "jsearch_sidecar_lines": 0
   },
   "pipeline": {
     "submodule_head": "6a4338f",
     "last_run_status": "success",
-    "last_run_at": "2026-05-07T05:38:41.423Z",
-    "last_run_id": "25477799765",
+    "last_run_at": "2026-05-07T05:53:30.802Z",
+    "last_run_id": "25478219084",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -1821,7 +1831,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-05-07T05:23:22.832Z",
+    "compared_to": "2026-05-07T05:38:41.423Z",
     "total_delta": 1
   }
 }
