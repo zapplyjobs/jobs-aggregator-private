@@ -6,10 +6,8 @@
   "AIG": 0,
   "Allegion": 0,
   "AllianceBernstein": 0,
-  "Allison Transmission": 0,
   "Ameriprise Financial": 0,
   "Analog Devices": 0,
-  "Applied Materials": 0,
   "Aptiv": 0,
   "Arrow Electronics": 0,
   "ASML": 0,
@@ -31,6 +29,7 @@
   "Cadence (University)": 35,
   "CAE": 0,
   "Capital One": 0,
+  "Carrier Global": 0,
   "Caterpillar": 0,
   "Cboe": 0,
   "Ciena": 0,
@@ -146,5 +145,6 @@
   "Zayo": 0,
   "Zendesk": 0,
   "Zoom": 0,
-  "Carrier Global": 0
+  "Allison Transmission": 0,
+  "Applied Materials": 0
 }
