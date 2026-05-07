@@ -24,7 +24,6 @@
   "Boeing": 0,
   "Booz Allen Hamilton": 0,
   "Boston Dynamics": 0,
-  "Broadcom": 0,
   "Broadridge": 0,
   "CACI": 0,
   "Cadence": 0,
@@ -114,7 +113,6 @@
   "Prudential Financial": 0,
   "Red Hat": 0,
   "ResMed": 0,
-  "Rockwell Automation": 0,
   "RTX": 0,
   "S&P Global": 0,
   "Salesforce": 0,
@@ -146,5 +144,7 @@
   "Yahoo": 0,
   "Zayo": 0,
   "Zendesk": 0,
-  "Zoom": 0
+  "Zoom": 0,
+  "Broadcom": 0,
+  "Rockwell Automation": 0
 }
