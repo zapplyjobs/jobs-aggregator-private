@@ -1,8 +1,8 @@
 {
   "meta": {
-    "generated_at": "2026-05-07T03:08:46.133Z",
+    "generated_at": "2026-05-07T03:23:01.714Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "25473604252",
+    "aggregator_run_id": "25474060164",
     "stale_if_older_than_hours": 2
   },
   "pool": {
@@ -26,7 +26,7 @@
     },
     "by_domain": {
       "finance": 3144,
-      "hardware": 4998,
+      "hardware": 4997,
       "general": 15824,
       "sales": 5937,
       "marketing": 1417,
@@ -42,11 +42,11 @@
       "legal": 691,
       "healthcare": 981
     },
-    "us_entry_level": 35653,
+    "us_entry_level": 35654,
     "us_interns": 2207,
     "g1_metric": {
-      "us_total": 35211,
-      "us_general": 6746,
+      "us_total": 35212,
+      "us_general": 6747,
       "us_general_rate": 19.2,
       "tech_us_total": 10898,
       "tech_us_general_rate": 38.2
@@ -1670,19 +1670,29 @@
       "mid_level": 3791,
       "entry_level": 51865,
       "internship": 2207
+    },
+    {
+      "date": "2026-05-07T03:23:01.714Z",
+      "g1_rate": 19.2,
+      "us_general": 6747,
+      "us_total": 35212,
+      "senior": 606,
+      "mid_level": 3791,
+      "entry_level": 51865,
+      "internship": 2207
     }
   ],
   "enrichment": {
-    "total_enriched": 10686,
-    "total_has_description": 9922,
+    "total_enriched": 10689,
+    "total_has_description": 9924,
     "workday_waiting_for_desc": null,
     "jsearch_sidecar_lines": 0
   },
   "pipeline": {
     "submodule_head": "6a4338f",
     "last_run_status": "success",
-    "last_run_at": "2026-05-07T03:08:46.133Z",
-    "last_run_id": "25473604252",
+    "last_run_at": "2026-05-07T03:23:01.714Z",
+    "last_run_id": "25474060164",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -1721,7 +1731,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-05-07T02:52:36.028Z",
-    "total_delta": 5
+    "compared_to": "2026-05-07T03:08:46.133Z",
+    "total_delta": 0
   }
 }
