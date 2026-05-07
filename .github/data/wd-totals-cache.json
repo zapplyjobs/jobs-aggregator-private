@@ -1,5 +1,4 @@
 {
-  "Abbott": 2000,
   "Accuray": 0,
   "Adobe": 0,
   "AES Corporation": 0,
@@ -139,6 +138,7 @@
   "USAA": 0,
   "Vanguard": 0,
   "Visa": 0,
+  "Walmart": 0,
   "Warner Bros. Discovery": 0,
   "Workday Inc": 0,
   "Workiva": 0,
@@ -146,5 +146,5 @@
   "Zayo": 0,
   "Zendesk": 0,
   "Zoom": 0,
-  "Walmart": 0
+  "Abbott": 0
 }
