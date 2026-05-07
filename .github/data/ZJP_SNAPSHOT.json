@@ -1,23 +1,23 @@
 {
   "meta": {
-    "generated_at": "2026-05-07T20:22:58.466Z",
+    "generated_at": "2026-05-07T20:37:51.182Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "25519651919",
+    "aggregator_run_id": "25520360754",
     "stale_if_older_than_hours": 2
   },
   "pool": {
-    "total": 57578,
+    "total": 57587,
     "by_source": {
-      "smartrecruiters": 1615,
-      "greenhouse": 16965,
-      "apple": 505,
-      "ashby": 3343,
-      "lever": 1782,
-      "microsoft": 381,
       "google": 670,
+      "ashby": 3345,
+      "greenhouse": 16969,
+      "smartrecruiters": 1614,
+      "apple": 507,
+      "lever": 1782,
+      "microsoft": 382,
       "amd": 98,
       "simplify": 555,
-      "amazon": 220,
+      "amazon": 221,
       "eightfold": 30,
       "oracle": 175,
       "uber": 18,
@@ -25,30 +25,30 @@
       "jsearch": 99
     },
     "by_domain": {
-      "general": 15401,
+      "hardware": 4917,
+      "finance": 3095,
+      "manufacturing": 2918,
+      "marketing": 1412,
+      "product": 1236,
+      "software": 10107,
+      "general": 15400,
       "retail": 4483,
       "data_science": 2156,
-      "operations": 5191,
-      "hardware": 4916,
-      "software": 10104,
-      "manufacturing": 2918,
+      "operations": 5192,
       "sales": 5892,
-      "marketing": 1411,
       "logistics": 1492,
       "healthcare": 937,
       "ai": 1243,
-      "product": 1233,
-      "finance": 3093,
       "legal": 685,
       "hr": 835
     },
-    "us_entry_level": 35253,
+    "us_entry_level": 35261,
     "us_interns": 2177,
     "g1_metric": {
-      "us_total": 34822,
-      "us_general": 6609,
+      "us_total": 34830,
+      "us_general": 6608,
       "us_general_rate": 19,
-      "tech_us_total": 10877,
+      "tech_us_total": 10880,
       "tech_us_general_rate": 37.8
     },
     "ats_stats": {
@@ -2360,19 +2360,29 @@
       "mid_level": 3759,
       "entry_level": 51052,
       "internship": 2177
+    },
+    {
+      "date": "2026-05-07T20:37:51.182Z",
+      "g1_rate": 19,
+      "us_general": 6608,
+      "us_total": 34830,
+      "senior": 590,
+      "mid_level": 3759,
+      "entry_level": 51061,
+      "internship": 2177
     }
   ],
   "enrichment": {
-    "total_enriched": 10680,
-    "total_has_description": 9875,
+    "total_enriched": 10683,
+    "total_has_description": 9886,
     "workday_waiting_for_desc": null,
     "jsearch_sidecar_lines": 0
   },
   "pipeline": {
     "submodule_head": "6a4338f",
     "last_run_status": "success",
-    "last_run_at": "2026-05-07T20:22:58.466Z",
-    "last_run_id": "25519651919",
+    "last_run_at": "2026-05-07T20:37:51.182Z",
+    "last_run_id": "25520360754",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -2411,7 +2421,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-05-07T20:07:45.414Z",
-    "total_delta": 6
+    "compared_to": "2026-05-07T20:22:58.466Z",
+    "total_delta": 9
   }
 }
