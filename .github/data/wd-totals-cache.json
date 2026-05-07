@@ -34,7 +34,6 @@
   "Carrier Global": 0,
   "Caterpillar": 0,
   "Cboe": 0,
-  "Ciena": 0,
   "Cigna": 0,
   "Cisco": 0,
   "Citi": 2000,
@@ -56,7 +55,6 @@
   "FIS": 0,
   "FLIR Systems": 0,
   "Franklin Templeton": 0,
-  "Freddie Mac": 0,
   "GE Aerospace": 0,
   "GE Vernova": 0,
   "Genentech": 6,
@@ -146,5 +144,7 @@
   "Yahoo": 0,
   "Zayo": 0,
   "Zendesk": 0,
-  "Zoom": 0
+  "Zoom": 0,
+  "Ciena": 0,
+  "Freddie Mac": 0
 }
