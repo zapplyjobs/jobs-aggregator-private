@@ -92,7 +92,6 @@
   "Medtronic": 0,
   "Merck & Co.": 0,
   "Microchip Technology": 0,
-  "Micron": 0,
   "Moog": 0,
   "Morgan Stanley": 0,
   "Morningstar": 0,
@@ -146,5 +145,6 @@
   "Yahoo": 0,
   "Zayo": 0,
   "Zendesk": 0,
-  "Zoom": 0
+  "Zoom": 0,
+  "Micron": 0
 }
