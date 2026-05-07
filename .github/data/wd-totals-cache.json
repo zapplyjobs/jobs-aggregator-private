@@ -21,7 +21,6 @@
   "BlackRock": 0,
   "Bloomberg Industry Group": 0,
   "Blue Origin": 0,
-  "Boeing": 0,
   "Booz Allen Hamilton": 0,
   "Boston Dynamics": 0,
   "Broadcom": 0,
@@ -61,6 +60,7 @@
   "GE Vernova": 0,
   "Genentech": 0,
   "Generac": 0,
+  "General Motors": 0,
   "GlobalFoundries": 0,
   "Globus Medical": 0,
   "Guidehouse": 0,
@@ -146,5 +146,5 @@
   "Zayo": 0,
   "Zendesk": 0,
   "Zoom": 0,
-  "General Motors": 0
+  "Boeing": 0
 }
