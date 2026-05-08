@@ -370,18 +370,26 @@ async function main() {
         job.fingerprint = helpers.generateFingerprint(job);
       }
 
-      // Normalize employment_type/employment_types to array
+      // Normalize employment_type/employment_types to canonical array (AGG-DATA-13)
       if (!job.employment_types) {
         const types = job.employment_type || job.employment_types || [];
+        let arr;
         if (Array.isArray(types)) {
-          job.employment_types = types.map(t => String(t).toUpperCase());
+          arr = types.map(t => String(t).toUpperCase());
         } else if (typeof types === 'string') {
-          job.employment_types = types.split(',').map(t => t.trim().toUpperCase());
+          arr = types.split(',').map(t => t.trim().toUpperCase());
         } else if (types === null || types === undefined) {
-          job.employment_types = [];
+          arr = [];
         } else {
-          job.employment_types = [String(types).toUpperCase()];
+          arr = [String(types).toUpperCase()];
         }
+        // AGG-DATA-13: normalize variants to 5 canonical forms
+        const EMPLOYMENT_MAP = {
+          'FULL-TIME': 'FULL_TIME', 'FULLTIME': 'FULL_TIME',
+          'PART-TIME': 'PART_TIME', 'PARTTIME': 'PART_TIME',
+          'INTERNSHIP': 'INTERN', 'TEMPORARY': 'CONTRACT',
+        };
+        job.employment_types = arr.map(t => EMPLOYMENT_MAP[t] || t);
       }
 
       return job;
