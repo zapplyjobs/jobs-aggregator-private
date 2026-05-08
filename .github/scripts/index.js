@@ -345,7 +345,7 @@ async function main() {
     // Compares companies configured in company-list.json against companies that
     // produced jobs this run. A company returning 0 raw jobs may have a broken
     // slug, API change, or auth issue (LLNL incident class).
-    const zeroYieldCompanies = computeZeroYield(atsResult, fetcherResults, COMPANY_LIST_PATH);
+    const zeroYieldCompanies = computeZeroYield(atsResult, fetcherResults, COMPANY_LIST_PATH, atsResult.wdCurrentTotals);
     if (zeroYieldCompanies.length > 0) {
       console.log(`   ⚠️  GAP-6: ${zeroYieldCompanies.length} companies returned 0 raw jobs`);
     }
@@ -929,12 +929,21 @@ async function main() {
  * @param {string} companyListPath - Path to company-list.json
  * @returns {Array<string>} Company names that returned 0 raw jobs
  */
-function computeZeroYield(atsResult, fetcherResults, companyListPath) {
+function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
   try {
     const companyList = JSON.parse(fs.readFileSync(companyListPath, 'utf8'));
 
     // Build set of company names that produced jobs this run (ATS only)
     const companiesWithJobs = new Set(Object.keys(atsResult.stats.by_company || {}));
+
+    // AGG-ZEROYIELD-1: Include WD tenants from incremental cache.
+    // When the cache skips a tenant, it doesn't appear in atsResult.by_company,
+    // but it still has jobs (verified by wd-totals-cache.json).
+    if (wdCache && typeof wdCache === 'object') {
+      for (const [name, count] of Object.entries(wdCache)) {
+        if (count > 0) companiesWithJobs.add(name);
+      }
+    }
 
     // Build set of configured company names per ATS source
     const zeroYield = [];
