@@ -428,9 +428,9 @@ jobs:
 
     - name: Upload data to R2 (additive)
       if: success()
-      continue-on-error: true
+      # continue-on-error removed — R2 upload failures now visible (INF-BLOAT-5)
       run: |
-        echo "📤 Uploading pipeline data to R2 (additive — git push still primary)..."
+        echo "📤 Uploading pipeline data to R2 (additive — failures are now visible)..."
         node -e "
         const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
         const fs = require('fs');
