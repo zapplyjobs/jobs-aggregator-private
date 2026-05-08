@@ -873,7 +873,7 @@ async function main() {
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
     const duration = Date.now() - startTime;
     stageTimings.step9_write_ms = Date.now() - _stepStart;
-    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings);
+    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
@@ -974,7 +974,7 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath) {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings) {
+function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
