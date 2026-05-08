@@ -1,8 +1,8 @@
 {
   "meta": {
-    "generated_at": "2026-05-08T04:52:55.227Z",
+    "generated_at": "2026-05-08T05:08:16.776Z",
     "generated_by": "zjp-snapshot-script v1",
-    "aggregator_run_id": "25537270942",
+    "aggregator_run_id": "25537732179",
     "stale_if_older_than_hours": 2
   },
   "pool": {
@@ -26,13 +26,13 @@
     },
     "by_domain": {
       "software": 10107,
-      "operations": 5214,
+      "operations": 5215,
       "ai": 1245,
       "data_science": 2156,
       "hardware": 4920,
       "retail": 4489,
-      "general": 15411,
-      "sales": 5902,
+      "general": 15409,
+      "sales": 5903,
       "logistics": 1493,
       "healthcare": 938,
       "product": 1239,
@@ -46,7 +46,7 @@
     "us_interns": 2174,
     "g1_metric": {
       "us_total": 34871,
-      "us_general": 6611,
+      "us_general": 6610,
       "us_general_rate": 19,
       "tech_us_total": 10880,
       "tech_us_general_rate": 37.8
@@ -2700,19 +2700,29 @@
       "mid_level": 3764,
       "entry_level": 51133,
       "internship": 2174
+    },
+    {
+      "date": "2026-05-08T05:08:16.776Z",
+      "g1_rate": 19,
+      "us_general": 6610,
+      "us_total": 34871,
+      "senior": 589,
+      "mid_level": 3764,
+      "entry_level": 51133,
+      "internship": 2174
     }
   ],
   "enrichment": {
-    "total_enriched": 10701,
-    "total_has_description": 9877,
+    "total_enriched": 10703,
+    "total_has_description": 9897,
     "workday_waiting_for_desc": null,
     "jsearch_sidecar_lines": 0
   },
   "pipeline": {
     "submodule_head": "6a4338f",
     "last_run_status": "success",
-    "last_run_at": "2026-05-08T04:52:55.227Z",
-    "last_run_id": "25537270942",
+    "last_run_at": "2026-05-08T05:08:16.776Z",
+    "last_run_id": "25537732179",
     "ttl_expiring_7d": 0
   },
   "repos": {
@@ -2751,7 +2761,7 @@
     "GH_PAT expiry 2026-05-30 — rotate in all 8 repos + CF Worker by May 1."
   ],
   "deltas": {
-    "compared_to": "2026-05-08T04:38:16.558Z",
-    "total_delta": 4
+    "compared_to": "2026-05-08T04:52:55.227Z",
+    "total_delta": 0
   }
 }
