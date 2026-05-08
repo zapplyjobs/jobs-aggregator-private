@@ -37,8 +37,8 @@ const { fetchAllAmdJobs } = require(`${SHARED}/fetchers/amd`);
 const { validateAndNormalizeJobs, printValidationSummary, normalizeJob } = require(`${SHARED}/processors/validator`);
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
 const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS } = require(`${SHARED}/processors/deduplicator`);
-const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap, TAG_ENGINE_VERSION } = require(`${SHARED}/processors/tag-engine`);
-const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport } = require(`${SHARED}/processors/tag-monitor`);
+const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap, TAG_ENGINE_VERSION, getKeywordMap } = require(`${SHARED}/processors/tag-engine`);
+const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport, checkKeywordHealth } = require(`${SHARED}/processors/tag-monitor`);
 
 // Import utils
 const { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);
@@ -747,6 +747,20 @@ async function main() {
       console.warn('⚠️ Precision check failed (non-blocking):', precErr.message);
     }
 
+    // TAG-SELF-3: Per-keyword health monitoring.
+    let keywordHealthReport = null;
+    try {
+      const keywordMap = getKeywordMap();
+      if (Object.keys(keywordMap).length > 0) {
+        keywordHealthReport = checkKeywordHealth(publicJobs, keywordMap);
+        if (keywordHealthReport.warnings.length > 0) {
+          console.log('⚠️  KEYWORD HEALTH WARNING — keyword over-match detected');
+        }
+      }
+    } catch (kwErr) {
+      console.warn('⚠️ Keyword health check failed (non-blocking):', kwErr.message);
+    }
+
     // TAG-SELF-2: Append tag monitoring history to JSONL for trend analysis.
     // One line per pipeline run. Auto-prunes to 30 days.
     try {
@@ -762,6 +776,15 @@ async function main() {
         } : null,
         precision: tagPrecisionReport ? Object.fromEntries(
           Object.entries(tagPrecisionReport.domains).map(([d, r]) => [d, { total: r.total, fps: r.fps, fp_rate: r.fp_rate }])
+        ) : null,
+        // TAG-SELF-3: Per-keyword volume summary for drift detection.
+        keyword_health: keywordHealthReport ? Object.fromEntries(
+          Object.entries(keywordHealthReport.domains).map(([d, r]) => [d, {
+            total_jobs: r.total_jobs,
+            keywords_with_matches: r.keywords_with_matches,
+            keyword_count: r.keyword_count,
+            top_3: r.top_contributors.slice(0, 3).map(tc => ({ keyword: tc.keyword, matches: tc.matches })),
+          }])
         ) : null,
         tag_engine_version: TAG_ENGINE_VERSION,
       };
