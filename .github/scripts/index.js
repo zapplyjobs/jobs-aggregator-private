@@ -723,12 +723,13 @@ async function main() {
     tagStats = computeFullPoolTagStats(publicJobs);
 
     // TAG-AUDIT-4: Pipeline-code drift detection.
-    // Samples US jobs, re-runs tagDomains() on title-only, compares to pipeline tags.
-    // Flags if >5% drift — indicates carry-forward masking classification changes.
+    // TAG-SELF-2: Persist drift + precision reports for trend analysis.
+    let tagDriftReport = null;
+    let tagPrecisionReport = null;
     try {
-      const driftReport = checkTagDrift(publicJobs, tagDomains, 500);
-      printDriftReport(driftReport);
-      if (driftReport.warnings.length > 0) {
+      tagDriftReport = checkTagDrift(publicJobs, tagDomains, 500);
+      printDriftReport(tagDriftReport);
+      if (tagDriftReport.warnings.length > 0) {
         console.log('⚠️  TAG DRIFT WARNING — consider re-tagging carry-forward jobs');
       }
     } catch (driftErr) {
@@ -736,16 +737,51 @@ async function main() {
     }
 
     // TAG-AUDIT-5: Per-domain precision monitoring.
-    // Checks consumer-facing domains for known FP patterns.
-    // Flags if >3% FP rate in any domain.
     try {
-      const precisionReport = checkDomainPrecision(publicJobs);
-      printPrecisionReport(precisionReport);
-      if (precisionReport.warnings.length > 0) {
+      tagPrecisionReport = checkDomainPrecision(publicJobs);
+      printPrecisionReport(tagPrecisionReport);
+      if (tagPrecisionReport.warnings.length > 0) {
         console.log('⚠️  PRECISION WARNING — FP rate exceeds threshold in one or more domains');
       }
     } catch (precErr) {
       console.warn('⚠️ Precision check failed (non-blocking):', precErr.message);
+    }
+
+    // TAG-SELF-2: Append tag monitoring history to JSONL for trend analysis.
+    // One line per pipeline run. Auto-prunes to 30 days.
+    try {
+      const HISTORY_FILE = path.join(DATA_DIR, 'tag-history.jsonl');
+      const MAX_AGE_DAYS = 30;
+      const entry = {
+        timestamp: new Date().toISOString(),
+        g1: tagStats?.g1 || null,
+        drift: tagDriftReport ? {
+          drift_rate: tagDriftReport.drift_rate,
+          sample_size: tagDriftReport.sample_size,
+          drifted: tagDriftReport.drifted,
+        } : null,
+        precision: tagPrecisionReport ? Object.fromEntries(
+          Object.entries(tagPrecisionReport.domains).map(([d, r]) => [d, { total: r.total, fps: r.fps, fp_rate: r.fp_rate }])
+        ) : null,
+        tag_engine_version: TAG_ENGINE_VERSION,
+      };
+      fs.appendFileSync(HISTORY_FILE, JSON.stringify(entry) + '\n');
+      // Prune entries older than MAX_AGE_DAYS
+      try {
+        const lines = fs.readFileSync(HISTORY_FILE, 'utf8').trim().split('\n');
+        const cutoff = Date.now() - MAX_AGE_DAYS * 86400000;
+        const kept = lines.filter(line => {
+          try { return new Date(JSON.parse(line).timestamp).getTime() >= cutoff; } catch { return true; }
+        });
+        if (kept.length < lines.length) {
+          fs.writeFileSync(HISTORY_FILE, kept.join('\n') + '\n');
+          console.log(`📊 Tag history pruned: ${lines.length} → ${kept.length} entries`);
+        }
+      } catch (pruneErr) {
+        // Non-blocking — history file is append-only, prune failure is cosmetic
+      }
+    } catch (histErr) {
+      console.warn('⚠️ Tag history write failed (non-blocking):', histErr.message);
     }
 
     // AGG-COMPANY-2: Discovery diagnostic — auto-detect companies needing overrides.
@@ -1046,6 +1082,20 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
 
     // Tag statistics (Phase 1)
     tag_stats: tagStats,
+
+    // TAG-SELF-2: Tag monitoring snapshots for metrics pipeline.
+    tag_drift: tagDriftReport ? {
+      drift_rate: tagDriftReport.drift_rate,
+      sample_size: tagDriftReport.sample_size,
+      drifted: tagDriftReport.drifted,
+      warnings: tagDriftReport.warnings,
+    } : null,
+    tag_precision: tagPrecisionReport ? {
+      domains: Object.fromEntries(
+        Object.entries(tagPrecisionReport.domains).map(([d, r]) => [d, { total: r.total, fps: r.fps, fp_rate: r.fp_rate }])
+      ),
+      warnings: tagPrecisionReport.warnings,
+    } : null,
 
     // Freshness — jobs posted within last N hours (entry-level pool)
     freshness,
