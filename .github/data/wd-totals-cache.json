@@ -39,6 +39,7 @@
   "Cisco": 0,
   "Citi": 2000,
   "Cognex": 0,
+  "Comcast": 0,
   "Copart": 0,
   "CrowdStrike": 0,
   "Curtiss-Wright": 0,
@@ -145,6 +146,5 @@
   "Yahoo": 0,
   "Zayo": 0,
   "Zendesk": 0,
-  "Zoom": 0,
-  "Comcast": 0
+  "Zoom": 0
 }
