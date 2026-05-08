@@ -34,6 +34,7 @@
   "Carrier Global": 0,
   "Caterpillar": 0,
   "Cboe": 0,
+  "Ciena": 0,
   "Cigna": 0,
   "Cisco": 0,
   "Citi": 2000,
@@ -145,6 +146,5 @@
   "Yahoo": 0,
   "Zayo": 0,
   "Zendesk": 0,
-  "Zoom": 0,
-  "Ciena": 0
+  "Zoom": 0
 }
