@@ -1158,6 +1158,7 @@ async function gitCommit(jobCount) {
     execSync('git add .github/data/filtered-samples.jsonl 2>/dev/null || true'); // AGG-DATA-8: sampled filtered jobs for FP spot-check
     // archive/ is NOT staged here — pushed separately to jobs-archive-private repo via workflow
     execSync('git add .github/data/descriptions-*.jsonl 2>/dev/null || true'); // per-source description sidecars (published)
+    execSync('git add .github/data/tag-history.jsonl 2>/dev/null || true'); // TAG-SELF-2: tag drift/precision trend data
     // descriptions.jsonl is Workday fetch cache — NOT staged (local state only, managed by Step 1b)
 
     // Check if there are changes
