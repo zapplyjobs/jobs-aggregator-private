@@ -1,19 +1,19 @@
 {
-  "generated": "2026-05-08T10:51:27.674Z",
-  "total_senior_filtered": 25033,
+  "generated": "2026-05-08T11:06:18.216Z",
+  "total_senior_filtered": 25031,
   "by_source": {
-    "greenhouse": 16996,
+    "greenhouse": 16992,
     "lever": 1617,
     "ashby": 3023,
     "smartrecruiters": 1302,
     "amazon": 432,
-    "eightfold": 67,
+    "eightfold": 66,
     "apple": 199,
     "twosigma": 3,
     "uber": 276,
-    "google": 443,
+    "google": 444,
     "simplify": 1,
-    "microsoft": 259,
+    "microsoft": 261,
     "oracle": 163,
     "amd": 252
   }
