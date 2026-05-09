@@ -1033,8 +1033,9 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     // Count by source
     bySource[job.source] = (bySource[job.source] || 0) + 1;
 
-    // Count by employment type (handle null/missing/non-array)
-    const types = job.employment_types || [];
+    // Count by employment type (AGG-DATA-13: normalize to canonical forms)
+    const _EMP_NORM = {'FULL-TIME':'FULL_TIME','FULLTIME':'FULL_TIME','PART-TIME':'PART_TIME','PARTTIME':'PART_TIME','INTERNSHIP':'INTERN','TEMPORARY':'CONTRACT'};
+    const types = (job.employment_types || []).map(t => _EMP_NORM[t] || t);
     if (Array.isArray(types)) {
       for (const type of types) {
         byEmploymentType[type] = (byEmploymentType[type] || 0) + 1;
