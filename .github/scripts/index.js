@@ -900,6 +900,16 @@ async function main() {
       console.log('📦 No expiring jobs this run');
     }
 
+    // AGG-PIPE-10: Filter senior-tagged jobs before writing output.
+    // Step 4 (senior-filter) runs before Step 5 (tag-engine), so tag-engine independently
+    // tags seniors that the filter missed. This write-step filter catches them at the output boundary.
+    const preFilterCount = publicJobs.length;
+    publicJobs = publicJobs.filter(job => job.tags?.employment !== 'senior');
+    const seniorLeaked = preFilterCount - publicJobs.length;
+    if (seniorLeaked > 0) {
+      console.log(`🛡️  AGG-PIPE-10: Filtered ${seniorLeaked} senior-tagged jobs from output (passed senior-filter but tagged senior by tag-engine)`);
+    }
+
     // Write jobs (JSONL format)
     await writeJobsJSONL(publicJobs, JOBS_OUTPUT_FILE);
 
