@@ -370,26 +370,25 @@ async function main() {
         job.fingerprint = helpers.generateFingerprint(job);
       }
 
-      // Normalize employment_type/employment_types to canonical array (AGG-DATA-13)
+      // AGG-DATA-13: Normalize employment_type/employment_types to canonical array
+      // Always normalize (carry-forward jobs have stale variants from prior runs)
+      const EMPLOYMENT_MAP = {
+        'FULL-TIME': 'FULL_TIME', 'FULLTIME': 'FULL_TIME',
+        'PART-TIME': 'PART_TIME', 'PARTTIME': 'PART_TIME',
+        'INTERNSHIP': 'INTERN', 'TEMPORARY': 'CONTRACT',
+      };
       if (!job.employment_types) {
-        const types = job.employment_type || job.employment_types || [];
-        let arr;
+        const types = job.employment_type || [];
         if (Array.isArray(types)) {
-          arr = types.map(t => String(t).toUpperCase());
+          job.employment_types = types.map(t => EMPLOYMENT_MAP[String(t).toUpperCase()] || String(t).toUpperCase());
         } else if (typeof types === 'string') {
-          arr = types.split(',').map(t => t.trim().toUpperCase());
-        } else if (types === null || types === undefined) {
-          arr = [];
+          job.employment_types = types.split(',').map(t => EMPLOYMENT_MAP[t.trim().toUpperCase()] || t.trim().toUpperCase());
         } else {
-          arr = [String(types).toUpperCase()];
+          job.employment_types = [];
         }
-        // AGG-DATA-13: normalize variants to 5 canonical forms
-        const EMPLOYMENT_MAP = {
-          'FULL-TIME': 'FULL_TIME', 'FULLTIME': 'FULL_TIME',
-          'PART-TIME': 'PART_TIME', 'PARTTIME': 'PART_TIME',
-          'INTERNSHIP': 'INTERN', 'TEMPORARY': 'CONTRACT',
-        };
-        job.employment_types = arr.map(t => EMPLOYMENT_MAP[t] || t);
+      } else {
+        // Carry-forward: re-normalize existing array
+        job.employment_types = job.employment_types.map(t => EMPLOYMENT_MAP[t] || t);
       }
 
       return job;
