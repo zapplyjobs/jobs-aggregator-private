@@ -136,6 +136,11 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
       if (isSeniorJob(job)) continue;
       const strippedJob = { ...job };
       for (const field of stripFields) delete strippedJob[field];
+      // AGG-DATA-13: normalize employment types on carry-forward jobs
+      if (Array.isArray(strippedJob.employment_types)) {
+        const MAP = {'FULL-TIME':'FULL_TIME','FULLTIME':'FULL_TIME','PART-TIME':'PART_TIME','PARTTIME':'PART_TIME','INTERNSHIP':'INTERN','TEMPORARY':'CONTRACT'};
+        strippedJob.employment_types = strippedJob.employment_types.map(t => MAP[t] || t);
+      }
       publicJobs.push(strippedJob);
       mergedCount++;
     } catch { /* skip malformed lines */ }
