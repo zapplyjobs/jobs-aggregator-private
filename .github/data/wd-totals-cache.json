@@ -42,9 +42,11 @@
   "Comcast": 970,
   "Copart": 345,
   "CrowdStrike": 488,
+  "Curtiss-Wright": 292,
   "Dell Technologies": 0,
   "Disney": 612,
   "Elanco": 361,
+  "Entegris": 470,
   "Entrust": 61,
   "Etsy": 42,
   "Exact Sciences": 150,
@@ -81,7 +83,7 @@
   "KLA": 730,
   "Leidos": 1982,
   "Logitech": 226,
-  "Lowe's": 20749,
+  "Lowe's": 20750,
   "LPL Financial": 4,
   "Lumentum": 190,
   "Manhattan Associates": 31,
@@ -144,7 +146,5 @@
   "Yahoo": 93,
   "Zayo": 79,
   "Zendesk": 210,
-  "Zoom": 129,
-  "Curtiss-Wright": 292,
-  "Entegris": 470
+  "Zoom": 129
 }
