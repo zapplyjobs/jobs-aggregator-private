@@ -990,6 +990,16 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
       }
     }
 
+    // AGG-SR-NAME-1: Build slug set for SR name mismatch.
+    // SR API returns legal names (e.g. "RE/SPEC Inc.") that differ from config names (e.g. "RESPEC").
+    // Matching by slug resolves 6 false positives per run.
+    const slugsWithJobs = new Set();
+    if (Array.isArray(atsResult.jobs)) {
+      for (const job of atsResult.jobs) {
+        if (job.company_slug) slugsWithJobs.add(job.company_slug);
+      }
+    }
+
     // Build set of configured company names per ATS source
     const zeroYield = [];
     const sources = [
@@ -1004,7 +1014,10 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
       if (!Array.isArray(entries)) continue;
       for (const entry of entries) {
         const name = entry.name;
-        if (name && !companiesWithJobs.has(name)) {
+        const slug = entry.slug;
+        const hasName = name && companiesWithJobs.has(name);
+        const hasSlug = slug && slugsWithJobs.has(slug);
+        if (!hasName && !hasSlug) {
           zeroYield.push(`${name} (${key})`);
         }
       }
