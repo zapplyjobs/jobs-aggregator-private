@@ -38,7 +38,7 @@ const { validateAndNormalizeJobs, printValidationSummary, normalizeJob } = requi
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
 const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS } = require(`${SHARED}/processors/deduplicator`);
 const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap, TAG_ENGINE_VERSION, getKeywordMap } = require(`${SHARED}/processors/tag-engine`);
-const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport, checkKeywordHealth } = require(`${SHARED}/processors/tag-monitor`);
+const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport, checkKeywordHealth, checkKeywordOverlap } = require(`${SHARED}/processors/tag-monitor`);
 
 // Import utils
 const { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);
@@ -781,6 +781,20 @@ async function main() {
       }
     } catch (kwErr) {
       console.warn('⚠️ Keyword health check failed (non-blocking):', kwErr.message);
+
+    // TAG-SELF-9: Cross-domain keyword overlap check for novel FP detection.
+    let keywordOverlapReport = null;
+    try {
+      const keywordMap2 = getKeywordMap();
+      if (Object.keys(keywordMap2).length > 0) {
+        keywordOverlapReport = checkKeywordOverlap(publicJobs, keywordMap2);
+        if (keywordOverlapReport.warnings.length > 0) {
+          console.log(`⚠️  KEYWORD OVERLAP WARNING — ${keywordOverlapReport.warnings.length} cross-domain overlaps detected`);
+        }
+      }
+    } catch (overlapErr) {
+      console.warn('⚠️ Keyword overlap check failed (non-blocking):', overlapErr.message);
+    }
     }
 
     // TAG-SELF-2: Append tag monitoring history to JSONL for trend analysis.
@@ -808,6 +822,7 @@ async function main() {
             top_3: r.top_contributors.slice(0, 3).map(tc => ({ keyword: tc.keyword, matches: tc.matches })),
           }])
         ) : null,
+        keyword_overlap_warnings: keywordOverlapReport ? keywordOverlapReport.warnings.length : 0,
         tag_engine_version: TAG_ENGINE_VERSION,
       };
       fs.appendFileSync(HISTORY_FILE, JSON.stringify(entry) + '\n');
@@ -928,7 +943,7 @@ async function main() {
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
     const duration = Date.now() - startTime;
     stageTimings.step9_write_ms = Date.now() - _stepStart;
-    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport);
+    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
@@ -1051,7 +1066,7 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport) {
+function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -1181,6 +1196,7 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
         keywords_with_matches: r.keywords_with_matches,
         top_5: r.top_contributors.slice(0, 5).map(tc => ({ keyword: tc.keyword, matches: tc.matches, rate_pct: tc.rate_pct })),
         high_volume: r.high_volume,
+      }])    ) : null,    keyword_overlap: keywordOverlapReport ? Object.fromEntries(      Object.entries(keywordOverlapReport.domains).filter(([, r]) => r.foreign_keyword_overlaps > 0).map(([d, r]) => [d, {        total_jobs: r.total_jobs,        overlap_count: r.foreign_keyword_overlaps,        top_overlaps: r.top_overlaps.slice(0, 3),      }])    ) : null,
       }])
     ) : null,
 
