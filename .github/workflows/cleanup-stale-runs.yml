@@ -53,12 +53,12 @@ jobs:
           });
         }
 
-        function cancelRun(repo, runId) {
+        function apiCall(method, path) {
           return new Promise((resolve) => {
             const opts = {
               hostname: 'api.github.com',
-              path: '/repos/' + repo + '/actions/runs/' + runId + '/cancel',
-              method: 'POST',
+              path: path,
+              method: method,
               headers: {
                 'Authorization': 'token ' + process.env.GH_PAT,
                 'User-Agent': 'ZJP-Stale-Cleanup',
@@ -72,6 +72,17 @@ jobs:
             req.on('error', () => resolve(0));
             req.end();
           });
+        }
+
+        async function cancelRun(repo, runId) {
+          const code = await apiCall('POST', '/repos/' + repo + '/actions/runs/' + runId + '/cancel');
+          if (code === 500) {
+            // Zombie run — cancel API returns 500 for runs stuck in queued/in_progress
+            // that GitHub can't actually cancel. Try deleting instead.
+            const delCode = await apiCall('DELETE', '/repos/' + repo + '/actions/runs/' + runId);
+            return delCode === 204 ? 'deleted' : 'failed:' + delCode;
+          }
+          return code;
         }
 
         async function main() {
