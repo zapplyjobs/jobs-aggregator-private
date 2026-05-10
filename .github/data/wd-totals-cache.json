@@ -33,6 +33,7 @@
   "Capital One": 1527,
   "Carrier Global": 1128,
   "Caterpillar": 960,
+  "Cboe": 45,
   "Ciena": 166,
   "Cigna": 625,
   "Cisco": 989,
@@ -145,6 +146,5 @@
   "Yahoo": 93,
   "Zayo": 79,
   "Zendesk": 210,
-  "Zoom": 129,
-  "Cboe": 45
+  "Zoom": 129
 }
