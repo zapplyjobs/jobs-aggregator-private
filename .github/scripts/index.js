@@ -163,16 +163,16 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
         job.tags.employment = newEmp;
         empRetagged++;
       }
-      if (!job.tags?.tag_engine_version || job.tags.tag_engine_version < TAG_ENGINE_VERSION) {
-        const freshDomains = tagDomains(job);
-        const oldDomains = (job.tags?.domains || []).slice().sort().join(',');
-        const newDomains = (freshDomains || []).slice().sort().join(',');
-        if (oldDomains !== newDomains) {
-          job.tags.domains = freshDomains;
-          domainRetagged++;
-        }
-        job.tags.tag_engine_version = TAG_ENGINE_VERSION;
+      // AGG-PIPE-12: Always re-tag domains (not just on version change).
+      // Between version bumps, keyword/guard changes silently miss carry-forward jobs.
+      const freshDomains = tagDomains(job);
+      const oldDomains = (job.tags?.domains || []).slice().sort().join(',');
+      const newDomains = (freshDomains || []).slice().sort().join(',');
+      if (oldDomains !== newDomains) {
+        job.tags.domains = freshDomains;
+        domainRetagged++;
       }
+      job.tags.tag_engine_version = TAG_ENGINE_VERSION;
       if ((!job.job_state || job.job_state === '') || (!job.job_city || job.job_city === '')) {
         const hadState = job.job_state && job.job_state !== '';
         const hadCity = job.job_city && job.job_city !== '';
