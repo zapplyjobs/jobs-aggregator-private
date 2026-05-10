@@ -52,13 +52,12 @@
   "Exact Sciences": 150,
   "Expedia Group": 216,
   "F5": 313,
-  "Fidelity Investments": 554,
   "FIS": 583,
   "FLIR Systems": 551,
   "Franklin Templeton": 173,
   "Freddie Mac": 91,
   "GE Aerospace": 728,
-  "GE Vernova": 2310,
+  "GE Vernova": 2312,
   "Genentech": 9,
   "Generac": 371,
   "General Motors": 809,
@@ -146,5 +145,6 @@
   "Yahoo": 93,
   "Zayo": 79,
   "Zendesk": 210,
-  "Zoom": 129
+  "Zoom": 129,
+  "Fidelity Investments": 554
 }
