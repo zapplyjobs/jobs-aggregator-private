@@ -449,11 +449,10 @@ async function main() {
     fs.writeFileSync(FILTERED_OUTPUT_FILE, JSON.stringify(filteredSummary, null, 2), 'utf8');
     console.log(`📋 Step 4b: Senior-filter summary → filtered_jobs.json (${seniorJobs.length} total)`);
 
-    // AGG-DATA-8: Sample 50 filtered jobs for false-positive spot-check.
-    // Enables measuring FP rate without storing all ~53K filtered jobs.
-    // File is append-only JSONL, rotated weekly by the pipeline (keep last 7 days).
+    // AGG-DATA-8 / AGG-PIPE-11: Sample 500 filtered jobs for false-positive measurement.
+    // 500 jobs gives ±4.3pp CI (vs ±14pp with 50). File rotated weekly (7-day TTL).
     {
-      const SAMPLE_SIZE = 50;
+      const SAMPLE_SIZE = 500;
       const SAMPLES_FILE = path.join(DATA_DIR, 'filtered-samples.jsonl');
       const now = new Date();
 
@@ -478,8 +477,14 @@ async function main() {
         }
       }
 
+      // AGG-PIPE-11: Flag potential FPs — jobs where title has no senior keyword.
+      // Not definitive (could be filtered by experience in description), but surfaces
+      // likely FPs for review. A high potential_fp rate warrants investigation.
+      const SENIOR_TITLE_RE = /\b(senior|sr\.?|lead|principal|staff|director|vp|vice president|head of|chief|manager|mgr\.?)\b/i;
+
       const newSamples = sampleIndices.map(idx => {
         const job = seniorJobs[idx];
+        const hasSeniorKeyword = SENIOR_TITLE_RE.test(job.title || '');
         return {
           sampled_at: now.toISOString(),
           id: job.id,
@@ -488,8 +493,13 @@ async function main() {
           source: job.source,
           location: job.location || null,
           filter_reason: job._filter_reason || 'unknown',
+          potential_fp: !hasSeniorKeyword,
         };
       });
+
+      const fpCount = newSamples.filter(s => s.potential_fp).length;
+      const fpRate = newSamples.length > 0 ? (fpCount / newSamples.length * 100).toFixed(1) : '0.0';
+      console.log(`📋 FP estimate: ${fpCount}/${newSamples.length} (${fpRate}%) potential false positives in sample`);
 
       const allLines = [...existingLines, ...newSamples.map(s => JSON.stringify(s))];
       fs.writeFileSync(SAMPLES_FILE, allLines.join('\n') + '\n', 'utf8');
@@ -918,7 +928,7 @@ async function main() {
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
     const duration = Date.now() - startTime;
     stageTimings.step9_write_ms = Date.now() - _stepStart;
-    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport);
+    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
@@ -1041,7 +1051,7 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport) {
+function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -1164,15 +1174,6 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
       ),
       warnings: tagPrecisionReport.warnings,
     } : null,
-    keyword_health: keywordHealthReport ? Object.fromEntries(
-      Object.entries(keywordHealthReport.domains).map(([d, r]) => [d, {
-        total_jobs: r.total_jobs,
-        keyword_count: r.keyword_count,
-        keywords_with_matches: r.keywords_with_matches,
-        top_5: r.top_contributors.slice(0, 5).map(tc => ({ keyword: tc.keyword, matches: tc.matches, rate_pct: tc.rate_pct })),
-        high_volume: r.high_volume,
-      }])
-    ) : null,
 
     // Freshness — jobs posted within last N hours (entry-level pool)
     freshness,
