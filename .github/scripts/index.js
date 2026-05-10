@@ -1196,7 +1196,13 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
         keywords_with_matches: r.keywords_with_matches,
         top_5: r.top_contributors.slice(0, 5).map(tc => ({ keyword: tc.keyword, matches: tc.matches, rate_pct: tc.rate_pct })),
         high_volume: r.high_volume,
-      }])    ) : null,    keyword_overlap: keywordOverlapReport ? Object.fromEntries(      Object.entries(keywordOverlapReport.domains).filter(([, r]) => r.foreign_keyword_overlaps > 0).map(([d, r]) => [d, {        total_jobs: r.total_jobs,        overlap_count: r.foreign_keyword_overlaps,        top_overlaps: r.top_overlaps.slice(0, 3),      }])    ) : null,
+      }])
+    ) : null,
+    keyword_overlap: keywordOverlapReport ? Object.fromEntries(
+      Object.entries(keywordOverlapReport.domains).filter(([, r]) => r.foreign_keyword_overlaps > 0).map(([d, r]) => [d, {
+        total_jobs: r.total_jobs,
+        overlap_count: r.foreign_keyword_overlaps,
+        top_overlaps: r.top_overlaps.slice(0, 3),
       }])
     ) : null,
 
