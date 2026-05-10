@@ -9,7 +9,7 @@
   "Allison Transmission": 65,
   "Ameriprise Financial": 244,
   "Analog Devices": 936,
-  "Applied Materials": 1890,
+  "Applied Materials": 1889,
   "Aptiv": 797,
   "Arrow Electronics": 515,
   "ASML": 537,
@@ -52,6 +52,7 @@
   "Exact Sciences": 150,
   "Expedia Group": 216,
   "F5": 313,
+  "Fidelity Investments": 554,
   "FIS": 583,
   "FLIR Systems": 551,
   "Franklin Templeton": 173,
@@ -115,7 +116,7 @@
   "ResMed": 312,
   "Rockwell Automation": 3,
   "RTX": 4401,
-  "S&P Global": 538,
+  "S&P Global": 537,
   "Salesforce": 1371,
   "SEL": 247,
   "Sierra Nevada Corporation": 249,
@@ -145,6 +146,5 @@
   "Yahoo": 93,
   "Zayo": 79,
   "Zendesk": 210,
-  "Zoom": 129,
-  "Fidelity Investments": 554
+  "Zoom": 129
 }
