@@ -781,6 +781,7 @@ async function main() {
       }
     } catch (kwErr) {
       console.warn('⚠️ Keyword health check failed (non-blocking):', kwErr.message);
+    }
 
     // TAG-SELF-9: Cross-domain keyword overlap check for novel FP detection.
     let keywordOverlapReport = null;
@@ -794,7 +795,6 @@ async function main() {
       }
     } catch (overlapErr) {
       console.warn('⚠️ Keyword overlap check failed (non-blocking):', overlapErr.message);
-    }
     }
 
     // TAG-SELF-2: Append tag monitoring history to JSONL for trend analysis.
