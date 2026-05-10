@@ -918,7 +918,7 @@ async function main() {
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
     const duration = Date.now() - startTime;
     stageTimings.step9_write_ms = Date.now() - _stepStart;
-    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport);
+    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport);
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
@@ -1041,7 +1041,7 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport) {
+function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -1164,6 +1164,15 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
       ),
       warnings: tagPrecisionReport.warnings,
     } : null,
+    keyword_health: keywordHealthReport ? Object.fromEntries(
+      Object.entries(keywordHealthReport.domains).map(([d, r]) => [d, {
+        total_jobs: r.total_jobs,
+        keyword_count: r.keyword_count,
+        keywords_with_matches: r.keywords_with_matches,
+        top_5: r.top_contributors.slice(0, 5).map(tc => ({ keyword: tc.keyword, matches: tc.matches, rate_pct: tc.rate_pct })),
+        high_volume: r.high_volume,
+      }])
+    ) : null,
 
     // Freshness — jobs posted within last N hours (entry-level pool)
     freshness,
