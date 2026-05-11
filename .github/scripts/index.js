@@ -42,6 +42,9 @@ const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecis
 
 // Import utils
 const { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);
+const { EMPLOYMENT_NORMALIZE_MAP } = require(`${SHARED}/utils/helpers`);
+const { writeSidecars } = require(`${SHARED}/utils/sidecar-writer`);
+const { runTagMonitoring } = require(`${SHARED}/utils/monitoring`);
 
 // AGG-36: Company override map (populated by loadCompanyOverrides)
 const COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');
@@ -136,10 +139,9 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
       if (isSeniorJob(job)) continue;
       const strippedJob = { ...job };
       for (const field of stripFields) delete strippedJob[field];
-      // AGG-DATA-13: normalize employment types on carry-forward jobs
+      // AGG-DATA-13: normalize employment types on carry-forward jobs (AGG-PIPE-13: shared constant)
       if (Array.isArray(strippedJob.employment_types)) {
-        const MAP = {'FULL-TIME':'FULL_TIME','FULLTIME':'FULL_TIME','PART-TIME':'PART_TIME','PARTTIME':'PART_TIME','INTERNSHIP':'INTERN','TEMPORARY':'CONTRACT'};
-        strippedJob.employment_types = strippedJob.employment_types.map(t => MAP[t] || t);
+        strippedJob.employment_types = strippedJob.employment_types.map(t => EMPLOYMENT_NORMALIZE_MAP[t] || t);
       }
       publicJobs.push(strippedJob);
       mergedCount++;
@@ -391,25 +393,19 @@ async function main() {
         job.fingerprint = helpers.generateFingerprint(job);
       }
 
-      // AGG-DATA-13: Normalize employment_type/employment_types to canonical array
-      // Always normalize (carry-forward jobs have stale variants from prior runs)
-      const EMPLOYMENT_MAP = {
-        'FULL-TIME': 'FULL_TIME', 'FULLTIME': 'FULL_TIME',
-        'PART-TIME': 'PART_TIME', 'PARTTIME': 'PART_TIME',
-        'INTERNSHIP': 'INTERN', 'TEMPORARY': 'CONTRACT',
-      };
+      // AGG-DATA-13: Normalize employment_type/employment_types to canonical array (AGG-PIPE-13: shared constant)
       if (!job.employment_types) {
         const types = job.employment_type || [];
         if (Array.isArray(types)) {
-          job.employment_types = types.map(t => EMPLOYMENT_MAP[String(t).toUpperCase()] || String(t).toUpperCase());
+          job.employment_types = types.map(t => EMPLOYMENT_NORMALIZE_MAP[String(t).toUpperCase()] || String(t).toUpperCase());
         } else if (typeof types === 'string') {
-          job.employment_types = types.split(',').map(t => EMPLOYMENT_MAP[t.trim().toUpperCase()] || t.trim().toUpperCase());
+          job.employment_types = types.split(',').map(t => EMPLOYMENT_NORMALIZE_MAP[t.trim().toUpperCase()] || t.trim().toUpperCase());
         } else {
           job.employment_types = [];
         }
       } else {
         // Carry-forward: re-normalize existing array
-        job.employment_types = job.employment_types.map(t => EMPLOYMENT_MAP[t] || t);
+        job.employment_types = job.employment_types.map(t => EMPLOYMENT_NORMALIZE_MAP[t] || t);
       }
 
       return job;
@@ -608,128 +604,10 @@ async function main() {
     stageTimings.step8_sort_ms = Date.now() - _stepStart;
     console.log('');
 
-    // Step 8b: Write per-source description sidecars
-    //
-    // One file per source: descriptions-{source}.jsonl
-    // Each file is rewritten atomically each run.
-    // Non-Workday sources: pruned to liveJobIds (entry-level survivors).
-    // Workday: pruned to allWorkdayIds (full pre-filter pool, all seniorities) — see PIPELINE-3-FIX.
-    //
-    // Chunking: if a source exceeds SIDECAR_CHUNK_LIMIT_BYTES, split into
-    //   descriptions-{source}-1.jsonl, descriptions-{source}-2.jsonl, etc.
-    // This keeps every file well under GitHub's 100 MB hard limit.
-    //
-    // Stale file cleanup: when chunk count changes (1→2 or 2→1), old filenames are orphaned.
-    // After writing, we scan DATA_DIR for any descriptions-{src}*.jsonl files not written
-    // this run and delete them from disk + unstage from git. This handles both directions.
-    //
-    // Workday: descriptions were fetched live in Step 1b and injected as job.description.
-    // All other sources: descriptions are inline on job objects from their respective fetchers.
-    // After this step, all descriptions are in sidecar files. Step 9 strips description from publicJobs.
-    //
-    // enrich-jobs.js reads all files matching descriptions-*.jsonl — auto-picks up new chunks.
-
-    const SIDECAR_CHUNK_LIMIT_BYTES = 40 * 1024 * 1024; // 40 MB per file
-    const { execSync } = require('child_process');
-
-    // Group jobs by source, collect id + description for each
-    const bySource = {};
-    for (const job of sortedJobs) {
-      const src = job.source;
-      if (!src) continue;
-      if (!bySource[src]) bySource[src] = [];
-      if (job.description) {
-        bySource[src].push({ id: job.id, description_text: job.description });
-      }
-    }
-
-    // WD sidecar REMOVED (DESC-MIGRATE-1): WD descriptions now owned by enrichment workflow.
-    delete bySource['workday'];
-    // SR sidecar REMOVED (DESC-MIGRATE-1): SR descriptions now owned by enrichment workflow.
-    delete bySource['smartrecruiters'];
-
-    // ENR-2 description accumulation fix (S229): accumulate descriptions across runs for ALL sources.
-    // Without this, sidecars are rewritten from scratch each run — carried-forward jobs in the
-    // rolling window lose their descriptions. GH lost 713, Ashby 194, Lever 174 per run.
-    // Fix: load prior sidecar entries, overlay current-run data, write merged result.
-    // Size is bounded by the 7-day pool TTL — old jobs expire from all_jobs.json and their
-    // descriptions are no longer needed. Chunking (40MB limit) handles large sources.
-    // Pattern originally applied to early sources — now generalized to all sources.
-    for (const src of Object.keys(bySource)) {
-      // Load ALL prior sidecar files for this source (handles chunked files too)
-      const priorMap = new Map();
-      const priorFiles = fs.readdirSync(DATA_DIR)
-        .filter(f => f.startsWith(`descriptions-${src}`) && f.endsWith('.jsonl'));
-      for (const fname of priorFiles) {
-        const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
-        for (const line of lines) {
-          try {
-            const { id, description_text } = JSON.parse(line);
-            if (id && description_text) priorMap.set(id, description_text);
-          } catch (_) {}
-        }
-      }
-
-      // Merge: prior entries as base, current-run entries win on conflict
-      const merged = new Map(priorMap);
-      for (const entry of bySource[src]) {
-        if (entry.description_text) merged.set(entry.id, entry.description_text);
-      }
-
-      const priorCount = priorMap.size;
-      const newCount = merged.size - priorCount;
-      if (priorCount > 0 && newCount !== 0) {
-        console.log(`   📎 ${src}: accumulated ${priorCount} prior + ${bySource[src].length} current → ${merged.size} total`);
-      }
-
-      bySource[src] = Array.from(merged, ([id, description_text]) => ({ id, description_text }));
-    }
-
-    // Write per-source files (chunked if needed)
-    const writtenFiles = new Set(); // track filenames written this run for stale-file cleanup
-    for (const [src, entries] of Object.entries(bySource)) {
-      if (entries.length === 0) continue;
-
-      // Estimate total bytes for this source
-      const totalBytes = entries.reduce((sum, e) => sum + Buffer.byteLength(JSON.stringify(e), 'utf8') + 1, 0);
-      const numChunks = Math.ceil(totalBytes / SIDECAR_CHUNK_LIMIT_BYTES);
-
-      if (numChunks === 1) {
-        const fname = `descriptions-${src}.jsonl`;
-        fs.writeFileSync(path.join(DATA_DIR, fname), entries.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
-        writtenFiles.add(fname);
-        console.log(`📄 ${fname}: ${entries.length} entries (${(totalBytes / 1024 / 1024).toFixed(1)} MB)`);
-      } else {
-        const perChunk = Math.ceil(entries.length / numChunks);
-        for (let i = 0; i < numChunks; i++) {
-          const chunk = entries.slice(i * perChunk, (i + 1) * perChunk);
-          const fname = `descriptions-${src}-${i + 1}.jsonl`;
-          const chunkBytes = chunk.reduce((sum, e) => sum + Buffer.byteLength(JSON.stringify(e), 'utf8') + 1, 0);
-          fs.writeFileSync(path.join(DATA_DIR, fname), chunk.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
-          writtenFiles.add(fname);
-          console.log(`📄 ${fname}: ${chunk.length} entries (${(chunkBytes / 1024 / 1024).toFixed(1)} MB)`);
-        }
-      }
-    }
-
-    // Stale file cleanup: remove any descriptions-*.jsonl files on disk (and in git) that
-    // were not written this run. Covers both chunk-count transitions (1→2 and 2→1).
-    // descriptions.jsonl (no dash-source suffix) is the Workday fetch cache — never touched here.
-    const existingSidecarFiles = fs.readdirSync(DATA_DIR)
-      .filter(f => /^descriptions-.+\.jsonl$/.test(f) && !f.startsWith('descriptions-enriched') && !f.startsWith('descriptions-workday') && !f.startsWith('descriptions-smartrecruiters')); // skip enrichment-owned + legacy WD/SR files (incl. chunks)
-    for (const fname of existingSidecarFiles) {
-      if (!writtenFiles.has(fname)) {
-        fs.unlinkSync(path.join(DATA_DIR, fname));
-        execSync(`git rm --cached ".github/data/${fname}" 2>/dev/null || true`);
-        console.log(`🗑️  Removed stale sidecar: ${fname}`);
-      }
-    }
-
-    // NOTE: do NOT delete descriptions.jsonl — it is the Workday incremental fetch cache.
-    // Step 1b reads it to know which Workday IDs are already fetched, avoiding redundant HTTP calls.
-    // descriptions-workday.jsonl (written above) is the published sidecar for enrich-jobs.js.
-    // descriptions.jsonl remains local state only — it is NOT staged for git push.
-
+    // Step 8b: Write per-source description sidecars (AGG-PIPE-13: extracted to sidecar-writer.js)
+    console.log('📄 Step 8b: Writing description sidecars...');
+    _stepStart = Date.now();
+    const { writtenFiles: sidecarFiles, stats: sidecarStats } = writeSidecars(sortedJobs, DATA_DIR);
     console.log('');
 
     // Step 9: Write output files
@@ -767,175 +645,16 @@ async function main() {
     // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
     tagStats = computeFullPoolTagStats(publicJobs);
 
-    // TAG-AUDIT-4: Pipeline-code drift detection.
-    // TAG-SELF-2: Persist drift + precision reports for trend analysis.
-    let tagDriftReport = null;
-    let tagPrecisionReport = null;
-    try {
-      tagDriftReport = checkTagDrift(publicJobs, tagDomains, 500);
-      printDriftReport(tagDriftReport);
-      if (tagDriftReport.warnings.length > 0) {
-        console.log('⚠️  TAG DRIFT WARNING — consider re-tagging carry-forward jobs');
-      }
-    } catch (driftErr) {
-      console.warn('⚠️ Drift check failed (non-blocking):', driftErr.message);
-    }
-
-    // TAG-AUDIT-5: Per-domain precision monitoring.
-    try {
-      tagPrecisionReport = checkDomainPrecision(publicJobs);
-      printPrecisionReport(tagPrecisionReport);
-      if (tagPrecisionReport.warnings.length > 0) {
-        console.log('⚠️  PRECISION WARNING — FP rate exceeds threshold in one or more domains');
-      }
-    } catch (precErr) {
-      console.warn('⚠️ Precision check failed (non-blocking):', precErr.message);
-    }
-
-    // TAG-SELF-3: Per-keyword health monitoring.
-    let keywordHealthReport = null;
-    try {
-      const keywordMap = getKeywordMap();
-      if (Object.keys(keywordMap).length > 0) {
-        keywordHealthReport = checkKeywordHealth(publicJobs, keywordMap);
-        if (keywordHealthReport.warnings.length > 0) {
-          console.log('⚠️  KEYWORD HEALTH WARNING — keyword over-match detected');
-        }
-      }
-    } catch (kwErr) {
-      console.warn('⚠️ Keyword health check failed (non-blocking):', kwErr.message);
-    }
-
-    // TAG-SELF-9: Cross-domain keyword overlap check for novel FP detection.
-    let keywordOverlapReport = null;
-    try {
-      const keywordMap2 = getKeywordMap();
-      if (Object.keys(keywordMap2).length > 0) {
-        keywordOverlapReport = checkKeywordOverlap(publicJobs, keywordMap2);
-        if (keywordOverlapReport.warnings.length > 0) {
-          console.log(`⚠️  KEYWORD OVERLAP WARNING — ${keywordOverlapReport.warnings.length} cross-domain overlaps detected`);
-        }
-      }
-    } catch (overlapErr) {
-      console.warn('⚠️ Keyword overlap check failed (non-blocking):', overlapErr.message);
-    }
-
-    // TAG-SELF-2: Append tag monitoring history to JSONL for trend analysis.
-    // One line per pipeline run. Auto-prunes to 30 days.
-    try {
-      const HISTORY_FILE = path.join(DATA_DIR, 'tag-history.jsonl');
-      const MAX_AGE_DAYS = 30;
-      const entry = {
-        timestamp: new Date().toISOString(),
-        g1: tagStats?.g1 || null,
-        drift: tagDriftReport ? {
-          drift_rate: tagDriftReport.drift_rate,
-          sample_size: tagDriftReport.sample_size,
-          drifted: tagDriftReport.drifted,
-        } : null,
-        precision: tagPrecisionReport ? Object.fromEntries(
-          Object.entries(tagPrecisionReport.domains).map(([d, r]) => [d, { total: r.total, fps: r.fps, fp_rate: r.fp_rate }])
-        ) : null,
-        // TAG-SELF-3: Per-keyword volume summary for drift detection.
-        keyword_health: keywordHealthReport ? Object.fromEntries(
-          Object.entries(keywordHealthReport.domains).map(([d, r]) => [d, {
-            total_jobs: r.total_jobs,
-            keywords_with_matches: r.keywords_with_matches,
-            keyword_count: r.keyword_count,
-            top_3: r.top_contributors.slice(0, 3).map(tc => ({ keyword: tc.keyword, matches: tc.matches })),
-          }])
-        ) : null,
-        keyword_overlap_warnings: keywordOverlapReport ? keywordOverlapReport.warnings.length : 0,
-        tag_engine_version: TAG_ENGINE_VERSION,
-      };
-      fs.appendFileSync(HISTORY_FILE, JSON.stringify(entry) + '\n');
-      // Prune entries older than MAX_AGE_DAYS
-      try {
-        const lines = fs.readFileSync(HISTORY_FILE, 'utf8').trim().split('\n');
-        const cutoff = Date.now() - MAX_AGE_DAYS * 86400000;
-        const kept = lines.filter(line => {
-          try { return new Date(JSON.parse(line).timestamp).getTime() >= cutoff; } catch { return true; }
-        });
-        if (kept.length < lines.length) {
-          fs.writeFileSync(HISTORY_FILE, kept.join('\n') + '\n');
-          console.log(`📊 Tag history pruned: ${lines.length} → ${kept.length} entries`);
-        }
-      } catch (pruneErr) {
-        // Non-blocking — history file is append-only, prune failure is cosmetic
-      }
-    } catch (histErr) {
-      console.warn('⚠️ Tag history write failed (non-blocking):', histErr.message);
-    }
-
-    // AGG-COMPANY-2: Discovery diagnostic — auto-detect companies needing overrides.
-    // Compares senior-filter decisions vs tag-engine employment classification per company.
-    // Flags companies where the filter rate is high AND most filtering is title-based (not experience).
-    // Non-blocking: errors logged but never stop the pipeline.
-    try {
-      const OVERRIDE_CANDIDATES_FILE = path.join(DATA_DIR, 'override-candidates.json');
-      const MIN_JOBS_THRESHOLD = 10;
-      const HIGH_FILTER_RATE = 0.80;
-      const TITLE_FILTER_SHARE = 0.70;
-
-      const companyFiltered = {};
-      for (const job of seniorJobs) {
-        const c = job.company_name || 'unknown';
-        if (!companyFiltered[c]) companyFiltered[c] = { total: 0, senior_title: 0, senior_experience: 0, both: 0 };
-        companyFiltered[c].total++;
-        const reason = job._filter_reason || 'unknown';
-        if (reason === 'senior_title' || reason === 'both') companyFiltered[c].senior_title++;
-        if (reason === 'senior_experience' || reason === 'both') companyFiltered[c].senior_experience++;
-        if (reason === 'both') companyFiltered[c].both++;
-      }
-
-      const companyPool = {};
-      for (const job of publicJobs) {
-        const c = job.company_name || 'unknown';
-        if (!companyPool[c]) companyPool[c] = { total: 0, senior_tagged: 0, mid_tagged: 0, entry_tagged: 0 };
-        companyPool[c].total++;
-        const emp = job.tags?.employment;
-        if (emp === 'senior') companyPool[c].senior_tagged++;
-        else if (emp === 'mid_level') companyPool[c].mid_tagged++;
-        else if (emp === 'entry_level') companyPool[c].entry_tagged++;
-      }
-
-      const candidates = [];
-      for (const [company, filtered] of Object.entries(companyFiltered)) {
-        const pool = companyPool[company] || { total: 0 };
-        const totalForCompany = filtered.total + pool.total;
-        if (totalForCompany < MIN_JOBS_THRESHOLD) continue;
-
-        const filterRate = filtered.total / totalForCompany;
-        if (filterRate < HIGH_FILTER_RATE) continue;
-
-        const titleShare = filtered.senior_title / (filtered.total || 1);
-        if (titleShare < TITLE_FILTER_SHARE) continue;
-
-        const hasOverride = companyOverrideMap.has(company);
-        candidates.push({
-          company,
-          total_fetched: totalForCompany,
-          senior_filtered: filtered.total,
-          in_pool: pool.total,
-          filter_rate: +(filterRate * 100).toFixed(1),
-          title_filter_pct: +(titleShare * 100).toFixed(1),
-          senior_tagged_in_pool: pool.senior_tagged || 0,
-          has_override: hasOverride,
-          recommendation: hasOverride ? 'existing_override_check_accuracy' : 'add_override',
-        });
-      }
-
-      candidates.sort((a, b) => b.senior_filtered - a.senior_filtered);
-      fs.writeFileSync(OVERRIDE_CANDIDATES_FILE, JSON.stringify({ generated: new Date().toISOString(), candidates, threshold: { min_jobs: MIN_JOBS_THRESHOLD, filter_rate: HIGH_FILTER_RATE, title_share: TITLE_FILTER_SHARE } }, null, 2), 'utf8');
-      console.log(`🔍 AGG-COMPANY-2: ${candidates.length} override candidates → override-candidates.json`);
-      if (candidates.length > 0 && candidates.length <= 10) {
-        for (const c of candidates) {
-          console.log(`   ${c.has_override ? '🔄' : '🆕'} ${c.company}: ${c.senior_filtered}/${c.total_fetched} filtered (${c.filter_rate}%)`);
-        }
-      }
-    } catch (e) {
-      console.warn(`⚠️ AGG-COMPANY-2: Diagnostic failed (non-critical): ${e.message}`);
-    }
+    // Tag monitoring diagnostics (AGG-PIPE-13: extracted to monitoring.js)
+    const monitoringReports = runTagMonitoring(publicJobs, tagStats, {
+      dataDir: DATA_DIR,
+      checkTagDrift, printDriftReport,
+      checkDomainPrecision, printPrecisionReport,
+      checkKeywordHealth, checkKeywordOverlap,
+      getKeywordMap, tagEngineVersion: TAG_ENGINE_VERSION,
+      seniorJobs, companyOverrideMap,
+    });
+    ({ tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport } = monitoringReports);
 
     // Archive expiring jobs BEFORE overwriting all_jobs.json
     const { getExpiringJobs, appendToWeeklyArchive } = require(`${SHARED}/utils/archiver`);
@@ -1105,8 +824,8 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     bySource[job.source] = (bySource[job.source] || 0) + 1;
 
     // Count by employment type (AGG-DATA-13: normalize to canonical forms)
-    const _EMP_NORM = {'FULL-TIME':'FULL_TIME','FULLTIME':'FULL_TIME','PART-TIME':'PART_TIME','PARTTIME':'PART_TIME','INTERNSHIP':'INTERN','TEMPORARY':'CONTRACT','FULL-TIME AND INTERNSHIP':'FULL_TIME,INTERN','FULL-TIME AND PART-TIME':'FULL_TIME,PART_TIME'};
-    const types = (job.employment_types || []).map(t => _EMP_NORM[t] || t);
+    // AGG-PIPE-13: shared EMPLOYMENT_NORMALIZE_MAP (includes compound types)
+    const types = (job.employment_types || []).map(t => EMPLOYMENT_NORMALIZE_MAP[t] || t);
     if (Array.isArray(types)) {
       for (const type of types) {
         byEmploymentType[type] = (byEmploymentType[type] || 0) + 1;
