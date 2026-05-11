@@ -862,7 +862,18 @@ async function main() {
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
     const duration = Date.now() - startTime;
     stageTimings.step9_write_ms = Date.now() - _stepStart;
-    const metadata = generateMetadata(publicJobs, dedupedJobs.length, duplicates, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings);
+    const metadata = generateMetadata({
+      jobs: publicJobs,
+      uniqueCount: dedupedJobs.length,
+      duplicateCount: duplicates,
+      duration,
+      tagStats,
+      validationMetrics,
+      seniorFilterMetrics,
+      seniorJobs,
+      zeroYieldCompanies,
+      stageTimings,
+    });
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     console.log('');
@@ -963,13 +974,13 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath) {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings) {
+function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings }) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
   const byRemote = { remote: 0, onsite: 0 };
   const companyCounts = {};
-  const companyDomains = {};  // DASH-4b: track domain distribution per company
+  const companyDomains = {};
 
   const now = Date.now();
   const freshness = { last_1h: 0, last_6h: 0, last_24h: 0, last_48h: 0 };
