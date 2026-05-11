@@ -290,6 +290,22 @@ async function main() {
       }
     } catch (e) { /* first run */ }
 
+    // AGG-SPEED-4: Load Microsoft description cache from seeded sidecar
+    // IDs are extracted from descriptions-microsoft*.jsonl files in DATA_DIR
+    let microsoftCachedIds = new Set();
+    try {
+      const msSidecarFiles = fs.readdirSync(DATA_DIR)
+        .filter(f => f.startsWith('descriptions-microsoft') && f.endsWith('.jsonl'));
+      for (const fname of msSidecarFiles) {
+        const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
+        for (const line of lines) {
+          try { const { id } = JSON.parse(line); if (id) microsoftCachedIds.add(id); } catch {}
+        }
+      }
+      if (microsoftCachedIds.size > 0) console.log(`  Microsoft description cache: ${microsoftCachedIds.size} IDs`);
+    } catch (e) { /* no cache yet */ }
+
+
     // AGG-SPEED-2: Load WD totals cache from prior run
     const WD_TOTALS_CACHE = path.join(DATA_DIR, 'wd-totals-cache.json');
     try {
@@ -312,7 +328,7 @@ async function main() {
       withTimeout(fetchAllUberJobs(), 60_000, 'Uber'),
       withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), prevGoogleCount === 0 ? 300_000 : 180_000, 'Google'),
       withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs'),
-      withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount }), prevMicrosoftCount === 0 ? 600_000 : 300_000, 'Microsoft'),
+      withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount, cachedDescriptionIds: microsoftCachedIds }), prevMicrosoftCount === 0 ? 600_000 : 300_000, 'Microsoft'),
       withTimeout(fetchAllOracleJobs(), 120_000, 'Oracle'),
       withTimeout(fetchAllAmdJobs(), 120_000, 'AMD'),
     ]);
