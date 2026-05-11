@@ -445,10 +445,13 @@ async function main() {
       generated: new Date().toISOString(),
       total_senior_filtered: seniorJobs.length,
       by_source: seniorBySource,
+      ...fpStats,
     };
     fs.writeFileSync(FILTERED_OUTPUT_FILE, JSON.stringify(filteredSummary, null, 2), 'utf8');
     console.log(`📋 Step 4b: Senior-filter summary → filtered_jobs.json (${seniorJobs.length} total)`);
 
+    // AGG-SELF-4 Check C: FP rate tracking for trend alerting
+    let fpStats = { sample_size: 0, potential_fp_count: 0, fp_rate_pct: '0.0' };
     // AGG-DATA-8 / AGG-PIPE-11: Sample 500 filtered jobs for false-positive measurement.
     // 500 jobs gives ±4.3pp CI (vs ±14pp with 50). File rotated weekly (7-day TTL).
     {
@@ -500,6 +503,7 @@ async function main() {
       const fpCount = newSamples.filter(s => s.potential_fp).length;
       const fpRate = newSamples.length > 0 ? (fpCount / newSamples.length * 100).toFixed(1) : '0.0';
       console.log(`📋 FP estimate: ${fpCount}/${newSamples.length} (${fpRate}%) potential false positives in sample`);
+      fpStats = { sample_size: newSamples.length, potential_fp_count: fpCount, fp_rate_pct: fpRate };
 
       const allLines = [...existingLines, ...newSamples.map(s => JSON.stringify(s))];
       fs.writeFileSync(SAMPLES_FILE, allLines.join('\n') + '\n', 'utf8');
@@ -1171,6 +1175,7 @@ function generateMetadata(jobs, uniqueCount, duplicateCount, duration, tagStats,
     senior_filter_stats: {
       ...seniorFilterMetrics,
       by_source: seniorBySource,
+      ...fpStats,
     },
 
     // Tag statistics (Phase 1)
