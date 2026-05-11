@@ -441,14 +441,6 @@ async function main() {
     for (const job of seniorJobs) {
       seniorBySource[job.source || 'unknown'] = (seniorBySource[job.source || 'unknown'] || 0) + 1;
     }
-    const filteredSummary = {
-      generated: new Date().toISOString(),
-      total_senior_filtered: seniorJobs.length,
-      by_source: seniorBySource,
-      ...fpStats,
-    };
-    fs.writeFileSync(FILTERED_OUTPUT_FILE, JSON.stringify(filteredSummary, null, 2), 'utf8');
-    console.log(`📋 Step 4b: Senior-filter summary → filtered_jobs.json (${seniorJobs.length} total)`);
 
     // AGG-SELF-4 Check C: FP rate tracking for trend alerting
     let fpStats = { sample_size: 0, potential_fp_count: 0, fp_rate_pct: '0.0' };
@@ -509,6 +501,17 @@ async function main() {
       fs.writeFileSync(SAMPLES_FILE, allLines.join('\n') + '\n', 'utf8');
       console.log(`📋 Step 4b-2: Filtered samples → filtered-samples.jsonl (${newSamples.length} sampled, ${allLines.length} total)`);
     }
+
+    // Write summary AFTER fpStats is computed
+    const filteredSummary = {
+      generated: new Date().toISOString(),
+      total_senior_filtered: seniorJobs.length,
+      by_source: seniorBySource,
+      ...fpStats,
+    };
+    fs.writeFileSync(FILTERED_OUTPUT_FILE, JSON.stringify(filteredSummary, null, 2), 'utf8');
+    console.log(`📋 Step 4b: Senior-filter summary → filtered_jobs.json (${seniorJobs.length} total)`);
+
     console.log('');
 
     // Step 4c: Inject descriptions from ALL sidecar files for tag engine's description fallback.
