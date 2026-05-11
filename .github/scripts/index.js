@@ -649,6 +649,7 @@ async function main() {
     const monitoringReports = runTagMonitoring(publicJobs, tagStats, {
       dataDir: DATA_DIR,
       checkTagDrift, printDriftReport,
+      tagDomainsFn: tagDomains,
       checkDomainPrecision, printPrecisionReport,
       checkKeywordHealth, checkKeywordOverlap,
       getKeywordMap, tagEngineVersion: TAG_ENGINE_VERSION,
