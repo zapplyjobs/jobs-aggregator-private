@@ -1,23 +1,23 @@
 {
-  "generated": "2026-05-12T01:54:31.355Z",
-  "total_senior_filtered": 25361,
+  "generated": "2026-05-12T02:09:09.756Z",
+  "total_senior_filtered": 25365,
   "by_source": {
-    "greenhouse": 17346,
+    "greenhouse": 17345,
     "lever": 1618,
-    "ashby": 3016,
+    "ashby": 3014,
     "smartrecruiters": 1252,
-    "amazon": 443,
+    "amazon": 442,
     "eightfold": 64,
     "apple": 212,
     "twosigma": 3,
-    "uber": 253,
+    "uber": 258,
     "google": 421,
     "simplify": 1,
-    "microsoft": 262,
+    "microsoft": 265,
     "oracle": 183,
     "amd": 287
   },
   "sample_size": 500,
-  "potential_fp_count": 53,
-  "fp_rate_pct": "10.6"
+  "potential_fp_count": 49,
+  "fp_rate_pct": "9.8"
 }
