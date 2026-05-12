@@ -1,6 +1,6 @@
 {
-  "generated": "2026-05-12T04:38:32.754Z",
-  "total_senior_filtered": 25357,
+  "generated": "2026-05-12T04:54:07.823Z",
+  "total_senior_filtered": 25356,
   "by_source": {
     "greenhouse": 17349,
     "lever": 1611,
@@ -15,9 +15,9 @@
     "simplify": 3,
     "microsoft": 260,
     "oracle": 186,
-    "amd": 287
+    "amd": 286
   },
   "sample_size": 500,
-  "potential_fp_count": 44,
-  "fp_rate_pct": "8.8"
+  "potential_fp_count": 46,
+  "fp_rate_pct": "9.2"
 }
