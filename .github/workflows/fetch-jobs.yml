@@ -50,53 +50,131 @@ jobs:
     - name: Create logs directory
       run: mkdir -p .github/logs .github/data
 
-    - name: Seed all_jobs.json from jobs-data-2026
+    - name: "Seed all_jobs.json from R2 (fallback: GitHub)"
       run: |
-        echo "📥 Seeding previous all_jobs.json from jobs-data-2026..."
+        echo "📥 Seeding previous all_jobs.json..."
+        node -e "
+        const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+        const fs = require('fs');
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          const raw = await r2.downloadRaw('all_jobs.json');
+          if (raw && raw.length > 0) {
+            fs.writeFileSync('.github/data/all_jobs.json', Buffer.from(raw));
+            const lines = raw.toString().split('\n').filter(l => l.trim()).length;
+            console.log('✅ R2 seed OK: ' + lines + ' jobs');
+          } else {
+            console.log('⚠️ R2 empty — GitHub fallback');
+            process.exit(1);
+          }
+        }
+        main().catch(e => { console.error('R2 error: ' + e.message); process.exit(1); });
+        " || \
         curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/all_jobs.json?t=$(date +%s)" \
           -o .github/data/all_jobs.json && \
-          echo "✅ Seeded $(wc -l < .github/data/all_jobs.json) jobs from jobs-data-2026" || \
+          echo "✅ GitHub fallback: seeded $(wc -l < .github/data/all_jobs.json) jobs" || \
           echo "⚠️ Could not seed all_jobs.json — starting fresh"
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-    - name: Seed descriptions-enriched.jsonl from jobs-data-2026
+    - name: "Seed descriptions-enriched from R2 (fallback: GitHub)"
       run: |
-        echo "📥 Seeding enriched descriptions (WD/SR) from jobs-data-2026..."
+        echo "📥 Seeding enriched descriptions (WD/SR)..."
         # TAG-7: WD/SR descriptions needed before tagging (Step 5) for description fallback.
-        # Enrichment workflow fetches these; aggregator seeds them for classification.
-        # INF-BLOAT-6: Fetch ALL chunks (was hardcoded to 1-2, but pool grew to 19+ chunks).
-        # -f curl flag skips missing chunks gracefully.
+        # INF-BLOAT-6: Fetch ALL chunks (pool uses 19+ chunks).
+        # AGG-PIPE-18 Phase A: R2-first seeding. Falls back to GitHub curl per chunk.
         TOTAL=0
         for CHUNK in $(seq 1 30); do
-          curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-enriched-${CHUNK}.jsonl?t=$(date +%s)" \
-            -o ".github/data/descriptions-enriched-${CHUNK}.jsonl" && \
-            LINES=$(wc -l < ".github/data/descriptions-enriched-${CHUNK}.jsonl") && \
+          CHUNK_FILE="descriptions-enriched-${CHUNK}.jsonl"
+          node -e "
+          const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+          const fs = require('fs');
+          async function main() {
+            const r2 = createR2Client({ prefix: 'data/' });
+            const raw = await r2.downloadRaw('${CHUNK_FILE}');
+            if (raw && raw.length > 0) {
+              fs.writeFileSync('.github/data/${CHUNK_FILE}', Buffer.from(raw));
+              const lines = raw.toString().split('\n').filter(l => l.trim()).length;
+              console.log(lines);
+            } else { process.exit(1); }
+          }
+          main().catch(() => process.exit(1));
+          " 2>/dev/null && \
+            LINES=$(wc -l < ".github/data/${CHUNK_FILE}") && \
             TOTAL=$((TOTAL + LINES)) && \
-            echo "  chunk ${CHUNK}: ${LINES} entries" || \
-            echo "  chunk ${CHUNK}: not found (skipped)"
+            echo "  chunk ${CHUNK}: ${LINES} entries (R2)" || \
+            curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/${CHUNK_FILE}?t=$(date +%s)" \
+              -o ".github/data/${CHUNK_FILE}" 2>/dev/null && \
+              LINES=$(wc -l < ".github/data/${CHUNK_FILE}") && \
+              TOTAL=$((TOTAL + LINES)) && \
+              echo "  chunk ${CHUNK}: ${LINES} entries (GitHub)" || \
+              echo "  chunk ${CHUNK}: not found (skipped)"
         done
         [ $TOTAL -gt 0 ] && echo "✅ Seeded ${TOTAL} enriched descriptions total" || \
           echo "⚠️ No descriptions-enriched chunks found — description fallback will be inactive"
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-    - name: Seed descriptions-jsearch.jsonl from jobs-data-2026
+    - name: "Seed descriptions-jsearch.jsonl from R2 (fallback: GitHub)"
       run: |
-        echo "📥 Seeding JSearch description cache from jobs-data-2026..."
-        # Seed prior descriptions-jsearch.jsonl so the accumulator in Step 8b can merge
-        # existing-pool descriptions. Without this, descriptions-jsearch.jsonl doesn't exist
-        # on the runner at start of each run and the legacy map is always empty.
+        echo "📥 Seeding JSearch description cache..."
+        node -e "
+        const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+        const fs = require('fs');
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          const raw = await r2.downloadRaw('descriptions-jsearch.jsonl');
+          if (raw && raw.length > 0) {
+            fs.writeFileSync('.github/data/descriptions-jsearch.jsonl', Buffer.from(raw));
+            const lines = raw.toString().split('\n').filter(l => l.trim()).length;
+            console.log('✅ R2 seed OK: ' + lines + ' entries');
+          } else { process.exit(1); }
+        }
+        main().catch(() => process.exit(1));
+        " || \
         curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-jsearch.jsonl?t=$(date +%s)" \
           -o .github/data/descriptions-jsearch.jsonl && \
-          echo "✅ Seeded $(wc -l < .github/data/descriptions-jsearch.jsonl) JSearch descriptions from cache" || \
+          echo "✅ GitHub fallback: $(wc -l < .github/data/descriptions-jsearch.jsonl) entries" || \
           echo "⚠️ No descriptions-jsearch.jsonl yet — starting fresh"
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-
-    - name: Seed descriptions-microsoft.jsonl from jobs-data-2026
+    - name: "Seed descriptions-microsoft.jsonl from R2 (fallback: GitHub)"
       run: |
-        echo "📥 Seeding Microsoft description cache from jobs-data-2026..."
+        echo "📥 Seeding Microsoft description cache..."
         # AGG-SPEED-4: Seed prior Microsoft descriptions so the fetcher can skip cached positions.
+        node -e "
+        const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+        const fs = require('fs');
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          const raw = await r2.downloadRaw('descriptions-microsoft.jsonl');
+          if (raw && raw.length > 0) {
+            fs.writeFileSync('.github/data/descriptions-microsoft.jsonl', Buffer.from(raw));
+            const lines = raw.toString().split('\n').filter(l => l.trim()).length;
+            console.log('✅ R2 seed OK: ' + lines + ' entries');
+          } else { process.exit(1); }
+        }
+        main().catch(() => process.exit(1));
+        " || \
         curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-microsoft.jsonl?t=$(date +%s)" \
           -o .github/data/descriptions-microsoft.jsonl && \
-          echo "✅ Seeded $(wc -l < .github/data/descriptions-microsoft.jsonl) Microsoft descriptions from cache" || \
+          echo "✅ GitHub fallback: $(wc -l < .github/data/descriptions-microsoft.jsonl) entries" || \
           echo "⚠️ No descriptions-microsoft.jsonl yet — starting fresh"
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
     - name: Fetch jobs from all sources
       run: set -o pipefail; node .github/scripts/index.js 2>&1 | tee .github/logs/fetch.log
