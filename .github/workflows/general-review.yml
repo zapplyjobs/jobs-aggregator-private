@@ -24,7 +24,7 @@ jobs:
           node-version: '22'
 
       - name: Install shared dependencies
-        run: cd .github/scripts/shared && npm install
+        run: cd .github/scripts/shared && npm install && cd $GITHUB_WORKSPACE/.github/scripts/aggregator && npm install
 
       - name: Download data from jobs-data-2026
         run: |

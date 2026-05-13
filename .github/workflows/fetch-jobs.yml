@@ -266,7 +266,7 @@ jobs:
         # Origin: d06bb81 deleted tag-engine.js, pipeline produced corrupt output for 7h.
 
         # 6. tag-engine.js exists and exports expected functions
-        TAG_ENGINE_PATH=".github/scripts/shared/lib/aggregator/processors/tag-engine.js"
+        TAG_ENGINE_PATH=".github/scripts/aggregator/lib/aggregator/processors/tag-engine.js"
         if [ ! -f "$TAG_ENGINE_PATH" ]; then
           echo "❌ tag-engine.js MISSING — pipeline will produce corrupt output"
           PASS=false
@@ -281,7 +281,7 @@ jobs:
         fi
 
         # 7. company-list.json is parseable with expected platforms
-        CL_PATH=".github/scripts/shared/lib/aggregator/fetchers/company-list.json"
+        CL_PATH=".github/scripts/aggregator/lib/aggregator/fetchers/company-list.json"
         if [ ! -f "$CL_PATH" ]; then
           echo "❌ company-list.json MISSING — fetchers have no tenant list"
           PASS=false
@@ -303,7 +303,7 @@ jobs:
         fi
 
         # 8. deduplicator.js exports DEDUPE_TTL constants
-        DEDUP_PATH=".github/scripts/shared/lib/aggregator/processors/deduplicator.js"
+        DEDUP_PATH=".github/scripts/aggregator/lib/aggregator/processors/deduplicator.js"
         if [ ! -f "$DEDUP_PATH" ]; then
           echo "❌ deduplicator.js MISSING — pipeline cannot deduplicate"
           PASS=false
