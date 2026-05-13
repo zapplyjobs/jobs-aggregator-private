@@ -16,8 +16,8 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 
-// Import from shared submodule (job-board-scripts/lib/aggregator/)
-const SHARED = path.join(__dirname, 'shared', 'lib', 'aggregator');
+// Import from aggregator submodule (job-board-aggregator/lib/)
+const SHARED = path.join(__dirname, 'aggregator', 'lib');
 
 // Import fetchers
 const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
