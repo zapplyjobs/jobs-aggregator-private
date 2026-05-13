@@ -55,7 +55,7 @@ jobs:
       run: |
         echo "📥 Seeding previous all_jobs.json..."
         node -e "
-        const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
         const fs = require('fs');
         async function main() {
           const r2 = createR2Client({ prefix: 'data/' });
@@ -91,7 +91,7 @@ jobs:
         for CHUNK in $(seq 1 30); do
           CHUNK_FILE="descriptions-enriched-${CHUNK}.jsonl"
           node -e "
-          const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
           const fs = require('fs');
           async function main() {
             const r2 = createR2Client({ prefix: 'data/' });
@@ -126,7 +126,7 @@ jobs:
       run: |
         echo "📥 Seeding JSearch description cache..."
         node -e "
-        const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
         const fs = require('fs');
         async function main() {
           const r2 = createR2Client({ prefix: 'data/' });
@@ -154,7 +154,7 @@ jobs:
         echo "📥 Seeding Microsoft description cache..."
         # AGG-SPEED-4: Seed prior Microsoft descriptions so the fetcher can skip cached positions.
         node -e "
-        const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
         const fs = require('fs');
         async function main() {
           const r2 = createR2Client({ prefix: 'data/' });
@@ -181,7 +181,7 @@ jobs:
       run: |
         echo "📥 Seeding WD incremental cache..."
         node -e "
-        const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
         const fs = require('fs');
         async function main() {
           const r2 = createR2Client({ prefix: 'data/' });
@@ -361,7 +361,7 @@ jobs:
       run: |
         echo "📤 Uploading pipeline data to R2 (parallel — AGG-SPEED-9)..."
         node -e "
-        const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
         const fs = require('fs');
         const path = require('path');
 
