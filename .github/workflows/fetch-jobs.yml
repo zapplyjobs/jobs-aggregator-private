@@ -83,70 +83,39 @@ jobs:
 
     - name: "Seed descriptions-enriched from R2 (fallback: GitHub)"
       run: |
-        echo "📥 Seeding enriched descriptions (WD/SR) — parallel download..."
-        # AGG-SPEED-7: Parallel R2 download replaces sequential for-loop.
-        node -e "
-        const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
-        const fs = require('fs');
-        const path = require('path');
-        const https = require('https');
-
-        async function downloadChunk(r2, chunkNum) {
-          const file = 'descriptions-enriched-' + chunkNum + '.jsonl';
-          const fp = path.join('.github/data', file);
-          try {
-            const raw = await r2.downloadRaw(file);
+        echo "📥 Seeding enriched descriptions (WD/SR)..."
+        # TAG-7: WD/SR descriptions needed before tagging (Step 5) for description fallback.
+        # INF-BLOAT-6: Fetch ALL chunks (pool uses 19+ chunks).
+        # AGG-PIPE-18 Phase A: R2-first seeding. Falls back to GitHub curl per chunk.
+        TOTAL=0
+        for CHUNK in $(seq 1 30); do
+          CHUNK_FILE="descriptions-enriched-${CHUNK}.jsonl"
+          node -e "
+          const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+          const fs = require('fs');
+          async function main() {
+            const r2 = createR2Client({ prefix: 'data/' });
+            const raw = await r2.downloadRaw('${CHUNK_FILE}');
             if (raw && raw.length > 0) {
-              fs.writeFileSync(fp, Buffer.from(raw));
+              fs.writeFileSync('.github/data/${CHUNK_FILE}', Buffer.from(raw));
               const lines = raw.toString().split('\n').filter(l => l.trim()).length;
-              return { chunk: chunkNum, lines, source: 'R2' };
-            }
-          } catch {}
-          // GitHub fallback
-          try {
-            const url = 'https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/' + file + '?t=' + Date.now();
-            const data = await new Promise((resolve, reject) => {
-              https.get(url, { timeout: 10000 }, res => {
-                if (res.statusCode !== 200) { res.resume(); reject(new Error('HTTP ' + res.statusCode)); return; }
-                const chunks = [];
-                res.on('data', c => chunks.push(c));
-                res.on('end', () => resolve(Buffer.concat(chunks)));
-              }).on('error', reject);
-            });
-            fs.writeFileSync(fp, data);
-            const lines = data.toString().split('\n').filter(l => l.trim()).length;
-            return { chunk: chunkNum, lines, source: 'GitHub' };
-          } catch {}
-          return { chunk: chunkNum, lines: 0, source: 'skipped' };
-        }
-
-        async function main() {
-          const r2 = createR2Client({ prefix: 'data/' });
-          // Concurrency 5: ~250 MB in memory max (5 × ~50 MB chunks), runner has 7 GB
-          const CONCURRENCY = 5;
-          const chunks = Array.from({ length: 30 }, (_, i) => i + 1);
-          const results = [];
-
-          for (let i = 0; i < chunks.length; i += CONCURRENCY) {
-            const batch = chunks.slice(i, i + CONCURRENCY);
-            const batchResults = await Promise.all(batch.map(n => downloadChunk(r2, n)));
-            for (const r of batchResults) {
-              if (r.source !== 'skipped') {
-                console.log('  chunk ' + r.chunk + ': ' + r.lines + ' entries (' + r.source + ')');
-              }
-              results.push(r);
-            }
+              console.log(lines);
+            } else { process.exit(1); }
           }
-
-          const total = results.reduce((s, r) => s + r.lines, 0);
-          if (total > 0) {
-            console.log('✅ Seeded ' + total + ' enriched descriptions total');
-          } else {
-            console.log('⚠️ No descriptions-enriched chunks found — description fallback will be inactive');
-          }
-        }
-        main().catch(e => { console.error(e.message); process.exit(1); });
-        "
+          main().catch(() => process.exit(1));
+          " 2>/dev/null && \
+            LINES=$(wc -l < ".github/data/${CHUNK_FILE}") && \
+            TOTAL=$((TOTAL + LINES)) && \
+            echo "  chunk ${CHUNK}: ${LINES} entries (R2)" || \
+            curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/${CHUNK_FILE}?t=$(date +%s)" \
+              -o ".github/data/${CHUNK_FILE}" 2>/dev/null && \
+              LINES=$(wc -l < ".github/data/${CHUNK_FILE}") && \
+              TOTAL=$((TOTAL + LINES)) && \
+              echo "  chunk ${CHUNK}: ${LINES} entries (GitHub)" || \
+              echo "  chunk ${CHUNK}: not found (skipped)"
+        done
+        [ $TOTAL -gt 0 ] && echo "✅ Seeded ${TOTAL} enriched descriptions total" || \
+          echo "⚠️ No descriptions-enriched chunks found — description fallback will be inactive"
       env:
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
