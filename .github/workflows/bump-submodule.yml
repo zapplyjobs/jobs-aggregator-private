@@ -3,8 +3,17 @@ name: Bump Submodule
 on:
   workflow_dispatch:
     inputs:
+      submodule_name:
+        description: 'Which submodule to bump'
+        required: true
+        type: choice
+        options:
+          - shared
+          - aggregator
+          - processing
+          - consumer
       target_sha:
-        description: 'Full 40-char SHA from job-board-shared'
+        description: 'Full 40-char SHA of the new submodule commit'
         required: true
         type: string
 
@@ -14,7 +23,7 @@ concurrency:
 
 env:
   GH_TOKEN: ${{ secrets.GH_PAT }}
-  SUBMODULE_PATH: .github/scripts/shared
+  SUBMODULE_NAME: ${{ inputs.submodule_name }}
   TARGET_SHA: ${{ inputs.target_sha }}
 
 jobs:
@@ -30,40 +39,64 @@ jobs:
           echo "Waiting 120s for CDN propagation..."
           sleep 120
 
-      - name: Validate SHA format
+      - name: Validate inputs
         run: |
           if [[ ! "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Invalid SHA format: $TARGET_SHA (expected 40-char hex)"
             exit 1
           fi
           echo "SHA format valid: ${TARGET_SHA:0:12}..."
+          echo "Submodule: $SUBMODULE_NAME"
 
-      - name: Validate SHA exists in job-board-shared
+      - name: Resolve submodule config
+        id: config
         run: |
-          RESPONSE=$(gh api "repos/zapplyjobs/job-board-shared/commits/$TARGET_SHA" \
-            --jq '.sha' 2>&1) || true
+          declare -A SOURCE_REPOS=(
+            ["shared"]="zapplyjobs/job-board-shared"
+            ["aggregator"]="zapplyjobs/job-board-aggregator"
+            ["processing"]="zapplyjobs/job-board-processing"
+            ["consumer"]="zapplyjobs/job-board-consumer"
+          )
+
+          SUBMODULE_PATH=".github/scripts/$SUBMODULE_NAME"
+          echo "submodule_path=$SUBMODULE_PATH" >> "$GITHUB_OUTPUT"
+          echo "source_repo=${SOURCE_REPOS[$SUBMODULE_NAME]}" >> "$GITHUB_OUTPUT"
+
+          case "$SUBMODULE_NAME" in
+            shared)
+              echo "repos=zapplyjobs/jobs-aggregator-private zapplyjobs/jobs-data-2026 zapplyjobs/New-Grad-Jobs-2026 zapplyjobs/Internships-2026 zapplyjobs/New-Grad-Software-Engineering-Jobs-2026 zapplyjobs/New-Grad-Data-Science-Jobs-2026 zapplyjobs/New-Grad-Hardware-Engineering-Jobs-2026 zapplyjobs/New-Grad-Healthcare-Jobs-2026" >> "$GITHUB_OUTPUT"
+              ;;
+            aggregator)
+              echo "repos=zapplyjobs/jobs-aggregator-private" >> "$GITHUB_OUTPUT"
+              ;;
+            processing)
+              echo "repos=zapplyjobs/jobs-data-2026" >> "$GITHUB_OUTPUT"
+              ;;
+            consumer)
+              echo "repos=zapplyjobs/New-Grad-Jobs-2026 zapplyjobs/Internships-2026 zapplyjobs/New-Grad-Software-Engineering-Jobs-2026 zapplyjobs/New-Grad-Data-Science-Jobs-2026 zapplyjobs/New-Grad-Hardware-Engineering-Jobs-2026 zapplyjobs/New-Grad-Healthcare-Jobs-2026" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::Unknown submodule: $SUBMODULE_NAME"
+              exit 1
+              ;;
+          esac
+
+      - name: Validate SHA exists in source repo
+        run: |
+          SOURCE_REPO="${{ steps.config.outputs.source_repo }}"
+          RESPONSE=$(gh api "repos/$SOURCE_REPO/commits/$TARGET_SHA" --jq '.sha' 2>&1) || true
           if [[ "$RESPONSE" != "$TARGET_SHA" ]]; then
-            echo "::error::SHA $TARGET_SHA does NOT exist in job-board-shared."
+            echo "::error::SHA $TARGET_SHA does NOT exist in $SOURCE_REPO."
             echo "API response: $RESPONSE"
-            echo "This is a phantom SHA — aborting before any repos are touched."
             exit 1
           fi
-          echo "SHA existence verified: ${TARGET_SHA:0:12} resolves to commit on job-board-shared"
+          echo "SHA existence verified: ${TARGET_SHA:0:12} on $SOURCE_REPO"
 
       - name: Disable dangerous workflows
         id: disable-workflows
         run: |
-          # Per-workflow disable/enable API works with repo scope.
-          # Repo-level actions/permissions requires admin scope (GH_PAT lacks it).
-          # Only disable workflows that could race with the bump (checkout submodules).
-
-          # Aggregator: Fetch All Jobs (234555372)
-          gh api repos/zapplyjobs/jobs-aggregator-private/actions/workflows/234555372/disable --method PUT --silent && echo "Disabled: aggregator/Fetch All Jobs" || echo "WARN: Could not disable aggregator/Fetch All Jobs"
-
-          # jobs-data-2026: Enrich Jobs (239692001)
-          gh api repos/zapplyjobs/jobs-data-2026/actions/workflows/239692001/disable --method PUT --silent && echo "Disabled: jobs-data/Enrich Jobs" || echo "WARN: Could not disable jobs-data/Enrich Jobs"
-
-          # Consumer repos: Update Jobs from Aggregator
+          gh api repos/zapplyjobs/jobs-aggregator-private/actions/workflows/234555372/disable --method PUT --silent && echo "Disabled: aggregator/Fetch All Jobs" || echo "WARN: Could not disable"
+          gh api repos/zapplyjobs/jobs-data-2026/actions/workflows/239692001/disable --method PUT --silent && echo "Disabled: jobs-data/Enrich Jobs" || echo "WARN: Could not disable"
           declare -A CONSUMER_WORKFLOWS=(
             ["New-Grad-Jobs-2026"]="172507830"
             ["Internships-2026"]="197229424"
@@ -74,74 +107,37 @@ jobs:
           )
           for REPO in "${!CONSUMER_WORKFLOWS[@]}"; do
             WF_ID="${CONSUMER_WORKFLOWS[$REPO]}"
-            gh api "repos/zapplyjobs/$REPO/actions/workflows/$WF_ID/disable" --method PUT --silent && echo "Disabled: $REPO/Update Jobs" || echo "WARN: Could not disable $REPO/Update Jobs"
+            gh api "repos/zapplyjobs/$REPO/actions/workflows/$WF_ID/disable" --method PUT --silent && echo "Disabled: $REPO/Update Jobs" || echo "WARN: Could not disable $REPO"
           done
 
-      - name: Bump all 8 repos
+      - name: Bump target repos
         id: bump
         run: |
-          REPOS=(
-            zapplyjobs/jobs-aggregator-private
-            zapplyjobs/jobs-data-2026
-            zapplyjobs/New-Grad-Jobs-2026
-            zapplyjobs/Internships-2026
-            zapplyjobs/New-Grad-Software-Engineering-Jobs-2026
-            zapplyjobs/New-Grad-Data-Science-Jobs-2026
-            zapplyjobs/New-Grad-Hardware-Engineering-Jobs-2026
-            zapplyjobs/New-Grad-Healthcare-Jobs-2026
-          )
+          SUBMODULE_PATH="${{ steps.config.outputs.submodule_path }}"
+          read -ra REPOS <<< "${{ steps.config.outputs.repos }}"
           SHORT_SHA="${TARGET_SHA:0:7}"
           PASS=0
           FAIL=0
           RESULTS=""
+
+          echo "Bumping $SUBMODULE_NAME ($SUBMODULE_PATH) to ${TARGET_SHA:0:12} in ${#REPOS[@]} repo(s)"
 
           for REPO in "${REPOS[@]}"; do
             REPO_NAME="${REPO#zapplyjobs/}"
             SUCCESS=false
 
             for ATTEMPT in 1 2 3; do
-              # Fetch fresh HEAD
-              HEAD=$(gh api "repos/$REPO/git/ref/heads/main" --jq '.object.sha' 2>/dev/null) || {
-                echo "  [$ATTEMPT/3] $REPO_NAME: Failed to fetch HEAD"
-                sleep 5
-                continue
-              }
+              HEAD=$(gh api "repos/$REPO/git/ref/heads/main" --jq '.object.sha' 2>/dev/null) || { sleep 5; continue; }
+              TREE=$(gh api "repos/$REPO/git/commits/$HEAD" --jq '.tree.sha' 2>/dev/null) || { sleep 5; continue; }
 
-              # Get current tree
-              TREE=$(gh api "repos/$REPO/git/commits/$HEAD" --jq '.tree.sha' 2>/dev/null) || {
-                echo "  [$ATTEMPT/3] $REPO_NAME: Failed to fetch tree"
-                sleep 5
-                continue
-              }
-
-              # Create new tree with updated submodule SHA
               TREE_INPUT=$(printf '{"base_tree":"%s","tree":[{"path":"%s","mode":"160000","type":"commit","sha":"%s"}]}' "$TREE" "$SUBMODULE_PATH" "$TARGET_SHA")
-              NEW_TREE=$(echo "$TREE_INPUT" | gh api "repos/$REPO/git/trees" \
-                --method POST \
-                --input - \
-                --jq '.sha' 2>/dev/null) || {
-                echo "  [$ATTEMPT/3] $REPO_NAME: Failed to create tree"
-                sleep 5
-                continue
-              }
+              NEW_TREE=$(echo "$TREE_INPUT" | gh api "repos/$REPO/git/trees" --method POST --input - --jq '.sha' 2>/dev/null) || { sleep 5; continue; }
 
-              # Create commit
-              COMMIT_INPUT=$(printf '{"message":"chore: bump submodule to %s","tree":"%s","parents":["%s"]}' "$SHORT_SHA" "$NEW_TREE" "$HEAD")
-              NEW_COMMIT=$(echo "$COMMIT_INPUT" | gh api "repos/$REPO/git/commits" \
-                --method POST \
-                --input - \
-                --jq '.sha' 2>/dev/null) || {
-                echo "  [$ATTEMPT/3] $REPO_NAME: Failed to create commit"
-                sleep 5
-                continue
-              }
+              COMMIT_INPUT=$(printf '{"message":"chore: bump %s to %s","tree":"%s","parents":["%s"]}' "$SUBMODULE_NAME" "$SHORT_SHA" "$NEW_TREE" "$HEAD")
+              NEW_COMMIT=$(echo "$COMMIT_INPUT" | gh api "repos/$REPO/git/commits" --method POST --input - --jq '.sha' 2>/dev/null) || { sleep 5; continue; }
 
-              # Update ref
               REF_INPUT=$(printf '{"sha":"%s","force":false}' "$NEW_COMMIT")
-              UPDATE_RESULT=$(echo "$REF_INPUT" | gh api "repos/$REPO/git/refs/heads/main" \
-                --method PATCH \
-                --input - \
-                --jq '.object.sha' 2>/dev/null)
+              UPDATE_RESULT=$(echo "$REF_INPUT" | gh api "repos/$REPO/git/refs/heads/main" --method PATCH --input - --jq '.object.sha' 2>/dev/null)
 
               if [ $? -eq 0 ] && [ -n "$UPDATE_RESULT" ]; then
                 echo "  PASS: $REPO_NAME -> ${UPDATE_RESULT:0:12}"
@@ -150,7 +146,7 @@ jobs:
                 SUCCESS=true
                 break
               else
-                echo "  [$ATTEMPT/3] $REPO_NAME: Non-fast-forward (race), retrying..."
+                echo "  [$ATTEMPT/3] $REPO_NAME: Non-fast-forward, retrying..."
                 sleep 5
               fi
             done
@@ -163,25 +159,16 @@ jobs:
           done
 
           echo -e "$RESULTS" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Bumped: $PASS passed, $FAIL failed" >> "$GITHUB_STEP_SUMMARY"
+          echo "Bumped $SUBMODULE_NAME: $PASS passed, $FAIL failed (${#REPOS[@]} repos)" >> "$GITHUB_STEP_SUMMARY"
           echo "pass_count=$PASS" >> "$GITHUB_OUTPUT"
           echo "fail_count=$FAIL" >> "$GITHUB_OUTPUT"
-
-          if [ "$FAIL" -gt 0 ]; then
-            echo "::warning::$FAIL repo(s) failed to bump. Re-run with same SHA for failed repos."
-          fi
+          [ "$FAIL" -gt 0 ] && echo "::warning::$FAIL repo(s) failed to bump."
 
       - name: Re-enable dangerous workflows
         if: always()
         run: |
-          # Aggregator: Fetch All Jobs (234555372)
-          gh api repos/zapplyjobs/jobs-aggregator-private/actions/workflows/234555372/enable --method PUT --silent && echo "Enabled: aggregator/Fetch All Jobs" || echo "WARN: Could not enable aggregator/Fetch All Jobs"
-
-          # jobs-data-2026: Enrich Jobs (239692001)
-          gh api repos/zapplyjobs/jobs-data-2026/actions/workflows/239692001/enable --method PUT --silent && echo "Enabled: jobs-data/Enrich Jobs" || echo "WARN: Could not enable jobs-data/Enrich Jobs"
-
-          # Consumer repos: Update Jobs from Aggregator
+          gh api repos/zapplyjobs/jobs-aggregator-private/actions/workflows/234555372/enable --method PUT --silent && echo "Enabled: aggregator/Fetch All Jobs" || true
+          gh api repos/zapplyjobs/jobs-data-2026/actions/workflows/239692001/enable --method PUT --silent && echo "Enabled: jobs-data/Enrich Jobs" || true
           declare -A CONSUMER_WORKFLOWS=(
             ["New-Grad-Jobs-2026"]="172507830"
             ["Internships-2026"]="197229424"
@@ -192,24 +179,16 @@ jobs:
           )
           for REPO in "${!CONSUMER_WORKFLOWS[@]}"; do
             WF_ID="${CONSUMER_WORKFLOWS[$REPO]}"
-            gh api "repos/zapplyjobs/$REPO/actions/workflows/$WF_ID/enable" --method PUT --silent && echo "Enabled: $REPO/Update Jobs" || echo "WARN: Could not enable $REPO/Update Jobs"
+            gh api "repos/zapplyjobs/$REPO/actions/workflows/$WF_ID/enable" --method PUT --silent && echo "Enabled: $REPO/Update Jobs" || true
           done
 
-      - name: Verify P-2 alignment
+      - name: Verify alignment
         run: |
-          REPOS=(
-            zapplyjobs/jobs-aggregator-private
-            zapplyjobs/jobs-data-2026
-            zapplyjobs/New-Grad-Jobs-2026
-            zapplyjobs/Internships-2026
-            zapplyjobs/New-Grad-Software-Engineering-Jobs-2026
-            zapplyjobs/New-Grad-Data-Science-Jobs-2026
-            zapplyjobs/New-Grad-Hardware-Engineering-Jobs-2026
-            zapplyjobs/New-Grad-Healthcare-Jobs-2026
-          )
+          SUBMODULE_PATH="${{ steps.config.outputs.submodule_path }}"
+          read -ra REPOS <<< "${{ steps.config.outputs.repos }}"
           P2_FAIL=0
 
-          echo "### P-2 Verification" >> "$GITHUB_STEP_SUMMARY"
+          echo "### P-2 Verification ($SUBMODULE_NAME)" >> "$GITHUB_STEP_SUMMARY"
           echo "Expected: ${TARGET_SHA:0:12}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
@@ -224,7 +203,6 @@ jobs:
               P2_FAIL=$((P2_FAIL + 1))
             fi
 
-            # Empty-tree guard
             HEAD=$(gh api "repos/$REPO/git/ref/heads/main" --jq '.object.sha' 2>/dev/null || echo "")
             if [ -n "$HEAD" ]; then
               FILE_COUNT=$(gh api "repos/$REPO/git/trees/$HEAD" --jq '.tree | length' 2>/dev/null || echo "0")
@@ -239,13 +217,13 @@ jobs:
             echo "::error::P-2 verification failed: $P2_FAIL mismatch(es)"
             exit 1
           fi
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**P-2 PASS** -- all 8 repos aligned at ${TARGET_SHA:0:12}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**P-2 PASS** -- ${#REPOS[@]} repos aligned for $SUBMODULE_NAME at ${TARGET_SHA:0:12}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Final report
         if: always()
         run: |
           echo "### Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Submodule: \`$SUBMODULE_NAME\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Target SHA: \`${TARGET_SHA:0:12}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Bump: ${{ steps.bump.outputs.pass_count }} passed, ${{ steps.bump.outputs.fail_count }} failed" >> "$GITHUB_STEP_SUMMARY"
           echo "- Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"
