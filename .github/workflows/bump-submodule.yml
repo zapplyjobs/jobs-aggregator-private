@@ -162,7 +162,7 @@ jobs:
           echo "Bumped $SUBMODULE_NAME: $PASS passed, $FAIL failed (${#REPOS[@]} repos)" >> "$GITHUB_STEP_SUMMARY"
           echo "pass_count=$PASS" >> "$GITHUB_OUTPUT"
           echo "fail_count=$FAIL" >> "$GITHUB_OUTPUT"
-          [ "$FAIL" -gt 0 ] && echo "::warning::$FAIL repo(s) failed to bump."
+          [ "$FAIL" -gt 0 ] && echo "::warning::$FAIL repo(s) failed to bump." || true
 
       - name: Re-enable dangerous workflows
         if: always()
