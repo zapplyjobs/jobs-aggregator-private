@@ -177,6 +177,33 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
+    - name: "Seed wd-totals-cache.json from R2 (fallback: git checkout)"
+      run: |
+        echo "📥 Seeding WD incremental cache..."
+        node -e "
+        const { createR2Client } = require('./.github/scripts/shared/lib/storage/r2-client');
+        const fs = require('fs');
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          const raw = await r2.downloadRaw('wd-totals-cache.json');
+          if (raw && raw.length > 0) {
+            fs.writeFileSync('.github/data/wd-totals-cache.json', Buffer.from(raw));
+            const tenants = Object.keys(JSON.parse(raw.toString())).length;
+            console.log('✅ R2 seed OK: ' + tenants + ' tenants');
+          } else { process.exit(1); }
+        }
+        main().catch(() => process.exit(1));
+        " || \
+          echo "⚠️ R2 miss — using git checkout version (may be stale)" && \
+          [ -f ".github/data/wd-totals-cache.json" ] && \
+          echo "  Git version: $(python3 -c "import json; print(len(json.load(open('.github/data/wd-totals-cache.json'))))" 2>/dev/null || echo '?') tenants" || \
+          echo "⚠️ No wd-totals-cache.json found — starting fresh"
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
     - name: Fetch jobs from all sources
       run: set -o pipefail; node .github/scripts/index.js 2>&1 | tee .github/logs/fetch.log
       env:
@@ -342,6 +369,7 @@ jobs:
             'all_jobs.json',
             'jobs-metadata.json',
             'dedupe-store.json',
+            'wd-totals-cache.json',
           ];
 
           // Add description sidecars
