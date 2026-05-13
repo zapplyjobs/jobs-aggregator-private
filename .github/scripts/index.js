@@ -16,8 +16,8 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 
-// Import from aggregator submodule (job-board-aggregator/lib/)
-const SHARED = path.join(__dirname, 'aggregator', 'lib');
+// Import from shared submodule (job-board-scripts/lib/aggregator/)
+const SHARED = path.join(__dirname, 'shared', 'lib', 'aggregator');
 
 // Import fetchers
 const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
@@ -36,7 +36,7 @@ const { fetchAllAmdJobs } = require(`${SHARED}/fetchers/amd`);
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary, normalizeJob } = require(`${SHARED}/processors/validator`);
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
-const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS } = require(`${SHARED}/processors/deduplicator`);
+const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS, INTERNSHIP_TTL_MS } = require(`${SHARED}/processors/deduplicator`);
 const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap, TAG_ENGINE_VERSION, getKeywordMap } = require(`${SHARED}/processors/tag-engine`);
 const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport, checkKeywordHealth, checkKeywordOverlap } = require(`${SHARED}/processors/tag-monitor`);
 
@@ -84,8 +84,6 @@ const isVerbose = args.includes('--verbose');
  * lets jobs age naturally and expire via TTL.
  */
 function resolvePostedAt(publicJobs, prevLines) {
-  const cutoffMs = Date.now() - DEDUPE_TTL_MS;
-
   // Collect prior dates for re-fetched jobs
   const priorDates = new Map();
   for (const line of prevLines) {
@@ -96,6 +94,7 @@ function resolvePostedAt(publicJobs, prevLines) {
   }
 
   // AGG-6: Preserve earlier dates; AGG-32: filter stale — single pass
+  // SUP-TTL-1: Internships get wider TTL window (120d vs 14d)
   let datePreservedCount = 0;
   let staleRemoved = 0;
   const filtered = publicJobs.filter(job => {
@@ -105,7 +104,8 @@ function resolvePostedAt(publicJobs, prevLines) {
       datePreservedCount++;
     }
     if (!job.posted_at) { staleRemoved++; return false; }
-    if (new Date(job.posted_at).getTime() < cutoffMs) { staleRemoved++; return false; }
+    const jobTtlMs = job.tags?.employment === 'internship' ? INTERNSHIP_TTL_MS : DEDUPE_TTL_MS;
+    if (new Date(job.posted_at).getTime() < Date.now() - jobTtlMs) { staleRemoved++; return false; }
     return true;
   });
 
@@ -113,7 +113,7 @@ function resolvePostedAt(publicJobs, prevLines) {
     console.log(`📅 Preserved earlier posted_at for ${datePreservedCount} re-fetched jobs`);
   }
   if (staleRemoved > 0) {
-    console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >${DEDUPE_TTL_DAYS}d) from post-merge pool`);
+    console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >${DEDUPE_TTL_DAYS}d regular / 120d internship) from post-merge pool`);
   }
 
   publicJobs.length = 0;
@@ -148,7 +148,7 @@ const FETCHER_NAME_TO_SOURCE = {
  * forward — if the source fetched successfully and the job isn't in the results,
  * the job is genuinely closed. Excludes WD and SR (multi-tenant false-positive risk).
  */
-function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, stripFields, cutoffMs, successfulSources) {
+function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, stripFields, successfulSources) {
   let mergedCount = 0;
   let nullDateCount = 0;
   let fpSkipCount = 0;
@@ -160,7 +160,8 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
       if (job.fingerprint && currentFingerprints.has(job.fingerprint)) { fpSkipCount++; continue; }
       if (!job.posted_at) { nullDateCount++; continue; }
       const postedTs = new Date(job.posted_at).getTime();
-      if (postedTs < cutoffMs) continue;
+      const jobTtlMs = job.tags?.employment === 'internship' ? INTERNSHIP_TTL_MS : DEDUPE_TTL_MS;
+      if (postedTs < Date.now() - jobTtlMs) continue;
       if (isSeniorJob(job)) continue;
       // AGG-PIPE-4: Skip carry-forward for successfully-fetched sources (job is closed)
       if (successfulSources.has(job.source) && !PIPE4_EXCLUDED_SOURCES.has(job.source)) {
@@ -677,7 +678,6 @@ async function main() {
     // Merge previous all_jobs.json into current run (rolling window — TTL from deduplicator)
     // Jobs from prior runs that weren't re-fetched this run are preserved until their TTL expires.
     if (fs.existsSync(JOBS_OUTPUT_FILE)) {
-      const cutoffMs = Date.now() - DEDUPE_TTL_MS;
       const currentIds = new Set(publicJobs.map(j => j.id));
       // Fingerprint guard: prevents re-injection of jobs that changed ID (e.g. WD-ID-BUG fix)
       const currentFingerprints = new Set(publicJobs.map(j => j.fingerprint).filter(Boolean));
@@ -686,7 +686,7 @@ async function main() {
       // AGG-6/AGG-32: Preserve earlier posted_at and filter stale — single pass
       resolvePostedAt(publicJobs, prevLines);
 
-      mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, STRIP_FIELDS, cutoffMs, successfulSources);
+      mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, STRIP_FIELDS, successfulSources);
     }
 
     // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
