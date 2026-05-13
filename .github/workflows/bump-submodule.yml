@@ -158,7 +158,7 @@ jobs:
             fi
           done
 
-          echo -e "$RESULTS" >> "$GITHUB_STEP_SUMMARY"
+          printf '%b' "$RESULTS" >> "$GITHUB_STEP_SUMMARY"
           echo "Bumped $SUBMODULE_NAME: $PASS passed, $FAIL failed (${#REPOS[@]} repos)" >> "$GITHUB_STEP_SUMMARY"
           echo "pass_count=$PASS" >> "$GITHUB_OUTPUT"
           echo "fail_count=$FAIL" >> "$GITHUB_OUTPUT"
