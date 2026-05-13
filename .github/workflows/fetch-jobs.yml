@@ -190,9 +190,12 @@ jobs:
             fs.writeFileSync('.github/data/wd-totals-cache.json', Buffer.from(raw));
             const tenants = Object.keys(JSON.parse(raw.toString())).length;
             console.log('✅ R2 seed OK: ' + tenants + ' tenants');
-          } else { process.exit(1); }
+          } else {
+            console.log('⚠️ R2 returned null or empty for wd-totals-cache.json');
+            process.exit(1);
+          }
         }
-        main().catch(() => process.exit(1));
+        main().catch(e => { console.error('R2 seed error: ' + e.message); process.exit(1); });
         " || \
           echo "⚠️ R2 miss — using git checkout version (may be stale)" && \
           [ -f ".github/data/wd-totals-cache.json" ] && \
