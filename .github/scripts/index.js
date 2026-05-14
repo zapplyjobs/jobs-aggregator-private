@@ -301,7 +301,7 @@ async function main() {
         new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms/1000}s`)), ms))
       ]).catch(err => {
         console.error(`⚠️ ${label}: ${err.message} — continuing with 0 jobs`);
-        return label.includes('ATS') ? { jobs: [] } : [];
+        return label.includes('ATS') ? { jobs: [], stats: { by_source: {}, by_company: {} } } : [];
       });
     }
 
@@ -410,7 +410,7 @@ async function main() {
     // AGG-PIPE-4: Build set of sources that fetched successfully this run.
     // Used by mergeCarryForward to detect closed jobs (source fetched OK, job absent = closed).
     const successfulSources = new Set();
-    for (const [source, count] of Object.entries(atsResult.stats.by_source || {})) {
+    for (const [source, count] of Object.entries((atsResult.stats || {}).by_source || {})) {
       if (count > 0) successfulSources.add(source);
     }
     for (const [fetcherName, jobs] of Object.entries(fetcherResults)) {
@@ -810,7 +810,7 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
     const companyList = JSON.parse(fs.readFileSync(companyListPath, 'utf8'));
 
     // Build set of company names that produced jobs this run (ATS only)
-    const companiesWithJobs = new Set(Object.keys(atsResult.stats.by_company || {}));
+    const companiesWithJobs = new Set(Object.keys((atsResult.stats || {}).by_company || {}));
 
     // AGG-ZEROYIELD-1: Include WD tenants from incremental cache.
     // When the cache skips a tenant, it doesn't appear in atsResult.by_company,
