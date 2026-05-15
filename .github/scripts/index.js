@@ -341,6 +341,34 @@ async function main() {
       if (microsoftCachedIds.size > 0) console.log(`  Microsoft description cache: ${microsoftCachedIds.size} IDs`);
     } catch (e) { /* no cache yet */ }
 
+    // AGG-FETCH-10: Load Google/Apple description cache from sidecar files.
+    // Same pattern as Microsoft — avoids re-fetching detail pages every run.
+    let googleCachedIds = new Set();
+    try {
+      const ggSidecarFiles = fs.readdirSync(DATA_DIR)
+        .filter(f => f.startsWith('descriptions-google') && f.endsWith('.jsonl'));
+      for (const fname of ggSidecarFiles) {
+        const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
+        for (const line of lines) {
+          try { const { id } = JSON.parse(line); if (id) googleCachedIds.add(id); } catch {}
+        }
+      }
+      if (googleCachedIds.size > 0) console.log(`  Google description cache: ${googleCachedIds.size} IDs`);
+    } catch (e) { /* no cache yet */ }
+
+    let appleCachedIds = new Set();
+    try {
+      const apSidecarFiles = fs.readdirSync(DATA_DIR)
+        .filter(f => f.startsWith('descriptions-apple') && f.endsWith('.jsonl'));
+      for (const fname of apSidecarFiles) {
+        const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
+        for (const line of lines) {
+          try { const { id } = JSON.parse(line); if (id) appleCachedIds.add(id); } catch {}
+        }
+      }
+      if (appleCachedIds.size > 0) console.log(`  Apple description cache: ${appleCachedIds.size} IDs`);
+    } catch (e) { /* no cache yet */ }
+
 
     // AGG-SPEED-2: Load WD totals cache from prior run
     const WD_TOTALS_CACHE = path.join(DATA_DIR, 'wd-totals-cache.json');
@@ -359,10 +387,10 @@ async function main() {
       withTimeout(fetchFromAllATS({ wdPreviousTotals }), 720_000, 'ATS'),
       withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon'),
       withTimeout(fetchAllNetflixJobs(), 300_000, 'Netflix'),
-      withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds }), prevAppleCount === 0 ? 300_000 : 180_000, 'Apple'),
+      withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds, cachedDescriptionIds: appleCachedIds }), prevAppleCount === 0 ? 300_000 : 180_000, 'Apple'),
       withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma'),
       withTimeout(fetchAllUberJobs(), 60_000, 'Uber'),
-      withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), prevGoogleCount === 0 ? 300_000 : 180_000, 'Google'),
+      withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount, cachedDescriptionIds: googleCachedIds }), prevGoogleCount === 0 ? 300_000 : 180_000, 'Google'),
       withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs'),
       withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount, cachedDescriptionIds: microsoftCachedIds }), prevMicrosoftCount === 0 ? 600_000 : 300_000, 'Microsoft'),
       withTimeout(fetchAllOracleJobs(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).oracle || undefined), 120_000, 'Oracle'),
