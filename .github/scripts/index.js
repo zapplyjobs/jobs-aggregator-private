@@ -365,7 +365,7 @@ async function main() {
       withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount }), prevGoogleCount === 0 ? 300_000 : 180_000, 'Google'),
       withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs'),
       withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount, cachedDescriptionIds: microsoftCachedIds }), prevMicrosoftCount === 0 ? 600_000 : 300_000, 'Microsoft'),
-      withTimeout(fetchAllOracleJobs(), 120_000, 'Oracle'),
+      withTimeout(fetchAllOracleJobs(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).oracle || undefined), 120_000, 'Oracle'),
       withTimeout(fetchAllAmdJobs(), 120_000, 'AMD'),
     ]);
 
