@@ -207,6 +207,36 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
+    - name: "Seed descriptions-workday.jsonl from R2 (fallback: GitHub)"
+      run: |
+        echo "📥 Seeding WD description cache (AGG-FETCH-11)..."
+        node -e "
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        const fs = require('fs');
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          const raw = await r2.downloadRaw('descriptions-workday.jsonl');
+          if (raw && raw.length > 0) {
+            fs.writeFileSync('.github/data/descriptions-workday.jsonl', Buffer.from(raw));
+            const lines = raw.toString().trim().split('\\n').filter(Boolean).length;
+            console.log('✅ R2 seed OK: ' + lines + ' descriptions');
+          } else {
+            console.log('⚠️ R2 returned null or empty — starting fresh');
+            process.exit(1);
+          }
+        }
+        main().catch(e => { console.error('R2 seed error: ' + e.message); process.exit(1); });
+        " || \
+          curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-workday.jsonl?t=$(date +%s)" \
+            -o .github/data/descriptions-workday.jsonl && \
+          echo "✅ GitHub fallback: $(wc -l < .github/data/descriptions-workday.jsonl 2>/dev/null || echo 0) entries" || \
+          echo "⚠️ No descriptions-workday.jsonl yet — starting fresh (first run will build it)"
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
     - name: Fetch jobs from all sources
       run: set -o pipefail; node .github/scripts/index.js 2>&1 | tee .github/logs/fetch.log
       env:
