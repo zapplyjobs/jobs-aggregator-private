@@ -32,6 +32,7 @@ const { fetchAllSimplifyJobs } = require(`${SHARED}/fetchers/simplify`);
 const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
 const { fetchAllOracleJobs } = require(`${SHARED}/fetchers/oracle`);
 const { fetchAllAmdJobs } = require(`${SHARED}/fetchers/amd`);
+const { fetchAllTiktokJobs } = require(`${SHARED}/fetchers/tiktok`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary, normalizeJob } = require(`${SHARED}/processors/validator`);
@@ -119,6 +120,7 @@ const FETCHER_NAME_TO_SOURCE = {
   'Microsoft': 'microsoft',
   'Oracle': 'oracle',
   'AMD': 'amd',
+  'TikTok': 'tiktok',
 };
 
 /**
@@ -386,6 +388,7 @@ async function main() {
       withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount, cachedDescriptionIds: microsoftCachedIds }), prevMicrosoftCount === 0 ? 600_000 : 300_000, 'Microsoft'),
       withTimeout(fetchAllOracleJobs(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).oracle || undefined), 120_000, 'Oracle'),
       withTimeout(fetchAllAmdJobs(), 120_000, 'AMD'),
+      withTimeout(fetchAllTiktokJobs(), 120_000, 'TikTok'),
     ]);
 
     // Collect ATS results
@@ -400,7 +403,7 @@ async function main() {
     }
 
     // Collect custom fetcher results
-    const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Microsoft', 'Oracle', 'AMD'];
+    const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Microsoft', 'Oracle', 'AMD', 'TikTok'];
     const fetcherResults = {};
     phaseBSettled.forEach((result, i) => {
       const name = fetcherNames[i];
