@@ -237,6 +237,63 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
+    - name: Pre-pipeline integrity check
+      run: |
+        echo "🔍 Pre-pipeline integrity check (TAG-AUDIT-4)..."
+        FAIL=false
+
+        # Count files in aggregator submodule (should be ~46)
+        AGG_DIR=".github/scripts/aggregator"
+        if [ -d "$AGG_DIR" ]; then
+          FILE_COUNT=$(find "$AGG_DIR" -type f | wc -l)
+          if [ "$FILE_COUNT" -lt 30 ]; then
+            echo "❌ Aggregator submodule has only $FILE_COUNT files (expected ~46) — incomplete tree!"
+            FAIL=true
+          else
+            echo "✅ Aggregator submodule: $FILE_COUNT files"
+          fi
+        else
+          echo "❌ Aggregator submodule directory missing!"
+          FAIL=true
+        fi
+
+        # Critical file checks (must exist with reasonable size)
+        declare -A CRITICAL_FILES=(
+          ["$AGG_DIR/lib/processors/tag-engine.js"]=3000
+          ["$AGG_DIR/lib/processors/tag-monitor.js"]=500
+          ["$AGG_DIR/lib/processors/senior-filter.js"]=100
+          ["$AGG_DIR/lib/processors/deduplicator.js"]=100
+          ["$AGG_DIR/lib/fetchers/company-list.json"]=50000
+          ["$AGG_DIR/lib/fetchers/workday.js"]=200
+          ["$AGG_DIR/lib/fetchers/greenhouse.js"]=200
+          ["$AGG_DIR/lib/fetchers/ashby.js"]=200
+          ["$AGG_DIR/lib/fetchers/lever.js"]=200
+          ["$AGG_DIR/lib/storage/r2-client.js"]=100
+        )
+
+        for file in "${!CRITICAL_FILES[@]}"; do
+          min_size=${CRITICAL_FILES[$file]}
+          basename=$(basename "$file")
+          if [ ! -f "$file" ]; then
+            echo "❌ $basename MISSING"
+            FAIL=true
+          else
+            size=$(wc -c < "$file")
+            if [ "$size" -lt "$min_size" ]; then
+              echo "❌ $basename: $size bytes (expected >$min_size) — likely truncated"
+              FAIL=true
+            else
+              echo "✅ $basename: $size bytes"
+            fi
+          fi
+        done
+
+        if [ "$FAIL" = "true" ]; then
+          echo "❌ Pre-pipeline integrity check FAILED — aborting to prevent corrupt output"
+          exit 1
+        fi
+        echo "✅ All integrity checks passed"
+
     - name: Fetch jobs from all sources
       run: set -o pipefail; node .github/scripts/index.js 2>&1 | tee .github/logs/fetch.log
       env:
