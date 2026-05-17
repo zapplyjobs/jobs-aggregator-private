@@ -155,6 +155,16 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
       if (Array.isArray(strippedJob.employment_types)) {
         strippedJob.employment_types = strippedJob.employment_types.map(t => EMPLOYMENT_NORMALIZE_MAP[t] || t);
       }
+      // A86: Restore posted_at from first_published for carry-forward jobs.
+      // Pre-A86 runs used FRESHNESS-2 which inflated posted_at to Date.now() when source date >7d.
+      // This one-time correction restores the real source date where first_published is available.
+      if (strippedJob.first_published && strippedJob.posted_at) {
+        const fpTs = new Date(strippedJob.first_published).getTime();
+        const paTs = new Date(strippedJob.posted_at).getTime();
+        if (!isNaN(fpTs) && !isNaN(paTs) && paTs > fpTs) {
+          strippedJob.posted_at = strippedJob.first_published;
+        }
+      }
       publicJobs.push(strippedJob);
       mergedCount++;
     } catch { /* skip malformed lines */ }
