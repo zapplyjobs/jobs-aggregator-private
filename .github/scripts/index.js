@@ -79,39 +79,20 @@ const isVerbose = args.includes('--verbose');
 // Named functions make accidental removal structurally harder.
 
 /**
- * AGG-6: Preserve earliest posted_at for re-fetched jobs.
- * Workday "Posted 30+ Days Ago" resets each run — preserving the earlier date
- * lets jobs age naturally and expire via TTL.
+ * AGG-32: Filter stale jobs by posted_at TTL.
+ * AGG-6 date overwrite disabled A86 — jobs keep their source-reported posted_at.
  */
 function resolvePostedAt(publicJobs, prevLines) {
-  // Collect prior dates for re-fetched jobs
-  const priorDates = new Map();
-  for (const line of prevLines) {
-    try {
-      const job = JSON.parse(line);
-      if (job.id && job.posted_at) priorDates.set(job.id, job.posted_at);
-    } catch { /* skip malformed */ }
-  }
-
-  // AGG-6: Preserve earlier dates; AGG-32: filter stale — single pass
+  // AGG-32: filter stale — single pass
   // SUP-TTL-1: Internships get wider TTL window (120d vs 14d)
-  let datePreservedCount = 0;
   let staleRemoved = 0;
   const filtered = publicJobs.filter(job => {
-    const prior = priorDates.get(job.id);
-    if (prior && new Date(prior) < new Date(job.posted_at)) {
-      job.posted_at = prior;
-      datePreservedCount++;
-    }
     if (!job.posted_at) { staleRemoved++; return false; }
     const jobTtlMs = job.tags?.employment === 'internship' ? INTERNSHIP_TTL_MS : DEDUPE_TTL_MS;
     if (new Date(job.posted_at).getTime() < Date.now() - jobTtlMs) { staleRemoved++; return false; }
     return true;
   });
 
-  if (datePreservedCount > 0) {
-    console.log(`📅 Preserved earlier posted_at for ${datePreservedCount} re-fetched jobs`);
-  }
   if (staleRemoved > 0) {
     console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >${DEDUPE_TTL_DAYS}d regular / 120d internship) from post-merge pool`);
   }
@@ -722,7 +703,7 @@ async function main() {
       const currentFingerprints = new Set(publicJobs.map(j => j.fingerprint).filter(Boolean));
       const prevLines = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8').trim().split('\n').filter(Boolean);
 
-      // AGG-6/AGG-32: Preserve earlier posted_at and filter stale — single pass
+      // AGG-32: Filter stale jobs by posted_at TTL
       resolvePostedAt(publicJobs, prevLines);
 
       mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, STRIP_FIELDS, successfulSources);
