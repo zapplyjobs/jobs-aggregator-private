@@ -766,6 +766,18 @@ async function main() {
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
     const duration = Date.now() - startTime;
     stageTimings.step9_write_ms = Date.now() - _stepStart;
+    // Build fetch_results: per-source counts from current fetch (before carry-forward).
+    // This enables alert checks to detect when a source fetches 0 jobs despite having
+    // pool entries from carry-forward (the Google/Apple blind spot from A91).
+    const fetchResults = {};
+    for (const [source, count] of Object.entries((atsResult.stats || {}).by_source || {})) {
+      if (count > 0) fetchResults[source] = (fetchResults[source] || 0) + count;
+    }
+    for (const [fetcherName, jobs] of Object.entries(fetcherResults)) {
+      const sourceKey = FETCHER_NAME_TO_SOURCE[fetcherName] || fetcherName.toLowerCase();
+      fetchResults[sourceKey] = Array.isArray(jobs) ? jobs.length : 0;
+    }
+
     const metadata = generateMetadata({
       jobs: publicJobs,
       uniqueCount: dedupedJobs.length,
@@ -782,6 +794,7 @@ async function main() {
       keywordHealthReport,
       keywordOverlapReport,
       fpStats,
+      fetchResults,
     });
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
@@ -905,7 +918,7 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats }) {
+function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults }) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -1058,6 +1071,10 @@ function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStat
 
     // INF-OBSERV-3: Per-stage timing breakdown (ms)
     stage_timings: stageTimings || {},
+
+    // A91: Per-source fetch counts from current run (before carry-forward merge).
+    // Enables alert checks to detect source fetch failures masked by carry-forward.
+    fetch_results: fetchResults || {},
   };
 }
 
