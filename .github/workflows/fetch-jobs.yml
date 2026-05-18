@@ -59,21 +59,16 @@ jobs:
         echo "📥 Seeding previous all_jobs.json..."
         node -e "
         const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-        const fs = require('fs');
         async function main() {
           const r2 = createR2Client({ prefix: 'data/' });
-          const raw = await r2.downloadRaw('all_jobs.json');
-          if (raw && raw.length > 0) {
-            fs.writeFileSync('.github/data/all_jobs.json', Buffer.from(raw));
-            const lines = raw.toString().split('\n').filter(l => l.trim()).length;
-            console.log('✅ R2 seed OK: ' + lines + ' jobs');
-          } else {
-            console.log('⚠️ R2 empty — GitHub fallback');
-            process.exit(1);
-          }
+          const result = await r2.downloadToFile('all_jobs.json', '.github/data/all_jobs.json');
+          if (result) {
+            console.log('R2_OK:' + Math.round(result.size/1024) + 'KB');
+          } else { process.exit(1); }
         }
         main().catch(e => { console.error('R2 error: ' + e.message); process.exit(1); });
-        " || \
+        " && \
+          echo "✅ R2 seed OK: $(wc -l < .github/data/all_jobs.json) jobs" || \
         curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/all_jobs.json?t=$(date +%s)" \
           -o .github/data/all_jobs.json && \
           echo "✅ GitHub fallback: seeded $(wc -l < .github/data/all_jobs.json) jobs" || \
@@ -95,15 +90,10 @@ jobs:
           CHUNK_FILE="descriptions-enriched-${CHUNK}.jsonl"
           node -e "
           const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-          const fs = require('fs');
           async function main() {
             const r2 = createR2Client({ prefix: 'data/' });
-            const raw = await r2.downloadRaw('${CHUNK_FILE}');
-            if (raw && raw.length > 0) {
-              fs.writeFileSync('.github/data/${CHUNK_FILE}', Buffer.from(raw));
-              const lines = raw.toString().split('\n').filter(l => l.trim()).length;
-              console.log(lines);
-            } else { process.exit(1); }
+            const result = await r2.downloadToFile('${CHUNK_FILE}', '.github/data/${CHUNK_FILE}');
+            if (result) { console.log('OK'); } else { process.exit(1); }
           }
           main().catch(() => process.exit(1));
           " 2>/dev/null && \
@@ -130,18 +120,13 @@ jobs:
         echo "📥 Seeding JSearch description cache..."
         node -e "
         const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-        const fs = require('fs');
         async function main() {
           const r2 = createR2Client({ prefix: 'data/' });
-          const raw = await r2.downloadRaw('descriptions-jsearch.jsonl');
-          if (raw && raw.length > 0) {
-            fs.writeFileSync('.github/data/descriptions-jsearch.jsonl', Buffer.from(raw));
-            const lines = raw.toString().split('\n').filter(l => l.trim()).length;
-            console.log('✅ R2 seed OK: ' + lines + ' entries');
-          } else { process.exit(1); }
+          const result = await r2.downloadToFile('descriptions-jsearch.jsonl', '.github/data/descriptions-jsearch.jsonl');
+          if (result) { console.log('R2_OK'); } else { process.exit(1); }
         }
         main().catch(() => process.exit(1));
-        " || \
+        " && echo "✅ R2 seed OK: $(wc -l < .github/data/descriptions-jsearch.jsonl) entries" || \
         curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-jsearch.jsonl?t=$(date +%s)" \
           -o .github/data/descriptions-jsearch.jsonl && \
           echo "✅ GitHub fallback: $(wc -l < .github/data/descriptions-jsearch.jsonl) entries" || \
@@ -158,18 +143,13 @@ jobs:
         # AGG-SPEED-4: Seed prior Microsoft descriptions so the fetcher can skip cached positions.
         node -e "
         const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-        const fs = require('fs');
         async function main() {
           const r2 = createR2Client({ prefix: 'data/' });
-          const raw = await r2.downloadRaw('descriptions-microsoft.jsonl');
-          if (raw && raw.length > 0) {
-            fs.writeFileSync('.github/data/descriptions-microsoft.jsonl', Buffer.from(raw));
-            const lines = raw.toString().split('\n').filter(l => l.trim()).length;
-            console.log('✅ R2 seed OK: ' + lines + ' entries');
-          } else { process.exit(1); }
+          const result = await r2.downloadToFile('descriptions-microsoft.jsonl', '.github/data/descriptions-microsoft.jsonl');
+          if (result) { console.log('R2_OK'); } else { process.exit(1); }
         }
         main().catch(() => process.exit(1));
-        " || \
+        " && echo "✅ R2 seed OK: $(wc -l < .github/data/descriptions-microsoft.jsonl) entries" || \
         curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-microsoft.jsonl?t=$(date +%s)" \
           -o .github/data/descriptions-microsoft.jsonl && \
           echo "✅ GitHub fallback: $(wc -l < .github/data/descriptions-microsoft.jsonl) entries" || \
@@ -188,10 +168,10 @@ jobs:
         const fs = require('fs');
         async function main() {
           const r2 = createR2Client({ prefix: 'data/' });
-          const raw = await r2.downloadRaw('wd-totals-cache.json');
-          if (raw && raw.length > 0) {
-            fs.writeFileSync('.github/data/wd-totals-cache.json', Buffer.from(raw));
-            const tenants = Object.keys(JSON.parse(raw.toString())).length;
+          const result = await r2.downloadToFile('wd-totals-cache.json', '.github/data/wd-totals-cache.json');
+          if (result) {
+            const { readFileSync } = require('fs');
+            const tenants = Object.keys(JSON.parse(readFileSync('.github/data/wd-totals-cache.json', 'utf8'))).length;
             console.log('✅ R2 seed OK: ' + tenants + ' tenants');
           } else {
             console.log('⚠️ R2 returned null or empty for wd-totals-cache.json');
@@ -215,21 +195,19 @@ jobs:
         echo "📥 Seeding WD description cache (AGG-FETCH-11)..."
         node -e "
         const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-        const fs = require('fs');
         async function main() {
           const r2 = createR2Client({ prefix: 'data/' });
-          const raw = await r2.downloadRaw('descriptions-workday.jsonl');
-          if (raw && raw.length > 0) {
-            fs.writeFileSync('.github/data/descriptions-workday.jsonl', Buffer.from(raw));
-            const lines = raw.toString().trim().split('\\n').filter(Boolean).length;
-            console.log('✅ R2 seed OK: ' + lines + ' descriptions');
+          const result = await r2.downloadToFile('descriptions-workday.jsonl', '.github/data/descriptions-workday.jsonl');
+          if (result) {
+            console.log('R2_OK:' + Math.round(result.size/1024) + 'KB');
           } else {
             console.log('⚠️ R2 returned null or empty — starting fresh');
             process.exit(1);
           }
         }
         main().catch(e => { console.error('R2 seed error: ' + e.message); process.exit(1); });
-        " || \
+        " && \
+          echo "✅ R2 seed OK: $(wc -l < .github/data/descriptions-workday.jsonl) descriptions" || \
           curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-workday.jsonl?t=$(date +%s)" \
             -o .github/data/descriptions-workday.jsonl && \
           echo "✅ GitHub fallback: $(wc -l < .github/data/descriptions-workday.jsonl 2>/dev/null || echo 0) entries" || \
