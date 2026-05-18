@@ -778,6 +778,30 @@ async function main() {
       fetchResults[sourceKey] = Array.isArray(jobs) ? jobs.length : 0;
     }
 
+    // AGG-FETCH-14: Build fetcher_health from ATS + custom fetcher results.
+    // Enables check-19 to classify zero-yield companies without HTTP probing.
+    const fetcherHealth = {};
+    const healthNow = new Date().toISOString();
+    // ATS health (from ats-fetcher.js)
+    if (atsResult.health) {
+      Object.assign(fetcherHealth, atsResult.health);
+    }
+    // Custom fetcher health
+    for (let i = 0; i < fetcherNames.length; i++) {
+      const name = fetcherNames[i];
+      const result = phaseBSettled[i];
+      if (!result) continue;
+      const jobs = result.status === 'fulfilled' ? result.value : [];
+      const count = Array.isArray(jobs) ? jobs.length : 0;
+      fetcherHealth[name] = {
+        status: result.status === 'rejected' ? 'error' : count > 0 ? 'alive' : 'zero',
+        source: FETCHER_NAME_TO_SOURCE[name] || name.toLowerCase(),
+        jobs: count,
+        timestamp: healthNow,
+        ...(result.status === 'rejected' ? { detail: result.reason?.message } : {}),
+      };
+    }
+
     const metadata = generateMetadata({
       jobs: publicJobs,
       uniqueCount: dedupedJobs.length,
@@ -795,6 +819,7 @@ async function main() {
       keywordOverlapReport,
       fpStats,
       fetchResults,
+      fetcherHealth,
     });
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
@@ -918,7 +943,7 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults }) {
+function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth }) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -1075,6 +1100,11 @@ function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStat
     // A91: Per-source fetch counts from current run (before carry-forward merge).
     // Enables alert checks to detect source fetch failures masked by carry-forward.
     fetch_results: fetchResults || {},
+
+    // AGG-FETCH-14: Per-company fetcher health from current run.
+    // status: 'alive' (has jobs), 'zero' (fetched ok but 0 jobs), 'error' (fetch failed).
+    // Enables check-19 to classify without HTTP probing.
+    fetcher_health: fetcherHealth || {},
   };
 }
 
