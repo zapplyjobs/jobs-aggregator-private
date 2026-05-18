@@ -380,7 +380,7 @@ async function main() {
       withTimeout(fetchFromAllATS({ wdPreviousTotals }), 720_000, 'ATS'),
       withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon'),
       withTimeout(fetchAllNetflixJobs(), 60_000, 'Netflix'),
-      withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds, cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 600_000, 'Apple'),
+      withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds, cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 900_000, 'Apple'),
       withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma'),
       withTimeout(fetchAllUberJobs(), 60_000, 'Uber'),
       withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount, cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
