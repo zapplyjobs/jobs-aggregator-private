@@ -580,7 +580,32 @@ jobs:
 
     - name: Notify on failure
       if: failure()
+      env:
+        DISCORD_TOKEN: ${{ secrets.DISCORD_TEAM_TOKEN }}
+        CHANNEL_ID: ${{ secrets.DISCORD_PIPELINE_ALERT_CHANNEL_ID }}
       run: |
         echo "❌ Workflow failed - check logs above"
         echo "Last 30 lines of fetch log:"
         tail -30 .github/logs/fetch.log || echo "No log file"
+
+        # Send Discord alert (INF-ALERT-5)
+        RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        DETAIL=""
+        if [ -d ".github/scripts/aggregator" ]; then
+          FC=$(find .github/scripts/aggregator -type f | wc -l)
+          if [ "$FC" -lt 30 ]; then DETAIL="Aggregator submodule: only $FC files."; fi
+          for f in company-list.json tag-engine.js workday.js; do
+            if ! find .github/scripts/aggregator -name "$f" -type f -print -quit | grep -q .; then
+              DETAIL="${DETAIL} Missing: $f."
+            fi
+          done
+        else
+          DETAIL="Aggregator submodule directory MISSING."
+        fi
+        MSG="🚨 **Pipeline Failure**\n${DETAIL:-Check logs.}\n• Run: ${RUN_URL}\n• Time: ${TS}"
+        PAYLOAD=$(printf '{"content":"%s"}' "$MSG")
+        curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
+          -H "Authorization: Bot ${DISCORD_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "$PAYLOAD" || echo "Discord alert failed (non-blocking)"
