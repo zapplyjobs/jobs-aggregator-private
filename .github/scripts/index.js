@@ -738,12 +738,13 @@ async function main() {
     ({ tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport } = monitoringReports);
 
     // Archive expiring jobs BEFORE overwriting all_jobs.json
-    const { getExpiringJobs, appendToWeeklyArchive } = require(`${SHARED}/utils/archiver`);
+    const { getExpiringJobs, appendToWeeklyArchive, appendToDailyArchive } = require(`${SHARED}/utils/archiver`);
     const ARCHIVE_DIR = path.join(DATA_DIR, 'archive');
     const expiringJobs = getExpiringJobs(JOBS_OUTPUT_FILE, publicJobs);
     if (expiringJobs.length > 0) {
-      const archiveFile = appendToWeeklyArchive(expiringJobs, ARCHIVE_DIR);
-      console.log(`📦 Archived ${expiringJobs.length} expiring jobs → ${path.basename(archiveFile)}`);
+      const weeklyFile = appendToWeeklyArchive(expiringJobs, ARCHIVE_DIR);
+      const dailyFile = appendToDailyArchive(expiringJobs, ARCHIVE_DIR);
+      console.log(`📦 Archived ${expiringJobs.length} expiring jobs → weekly: ${path.basename(weeklyFile)}, daily: ${path.basename(dailyFile)}`);
     } else {
       console.log('📦 No expiring jobs this run');
     }
