@@ -13,7 +13,7 @@ on:
           - processing
           - consumer
       target_sha:
-        description: 'Full 40-char SHA of the new submodule commit'
+        description: 'SHA of the new submodule commit (short or full hex accepted)'
         required: true
         type: string
 
@@ -40,12 +40,29 @@ jobs:
           sleep 120
 
       - name: Validate inputs
+        id: resolve-sha
         run: |
-          if [[ ! "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Invalid SHA format: $TARGET_SHA (expected 40-char hex)"
+          if [[ ! "$TARGET_SHA" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "::error::Invalid SHA format: $TARGET_SHA (expected 7-40 char hex)"
             exit 1
           fi
-          echo "SHA format valid: ${TARGET_SHA:0:12}..."
+          if [[ ${#TARGET_SHA} -lt 40 ]]; then
+            declare -A SOURCE_REPOS=(
+              ["shared"]="zapplyjobs/job-board-shared"
+              ["aggregator"]="zapplyjobs/job-board-aggregator"
+              ["processing"]="zapplyjobs/job-board-processing"
+              ["consumer"]="zapplyjobs/job-board-consumer"
+            )
+            REPO="${SOURCE_REPOS[$SUBMODULE_NAME]}"
+            FULL_SHA=$(gh api "repos/$REPO/commits/$TARGET_SHA" --jq '.sha' 2>/dev/null)
+            if [[ -z "$FULL_SHA" || ${#FULL_SHA} -ne 40 ]]; then
+              echo "::error::Short SHA $TARGET_SHA could not be resolved in $REPO"
+              exit 1
+            fi
+            echo "::warning::Auto-resolved short SHA $TARGET_SHA -> $FULL_SHA"
+            echo "TARGET_SHA=$FULL_SHA" >> "$GITHUB_ENV"
+          fi
+          echo "SHA resolved: ${TARGET_SHA:0:12}..."
           echo "Submodule: $SUBMODULE_NAME"
 
       - name: Resolve submodule config
