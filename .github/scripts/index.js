@@ -384,7 +384,7 @@ async function main() {
       // withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds, cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 1200_000, 'Apple'),
       withTimeout(fetchAllTwoSigmaJobs(), 60_000, 'Two Sigma'),
       withTimeout(fetchAllUberJobs(), 60_000, 'Uber'),
-      // withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount, cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
+      withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount, cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
       withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs'),
       // withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount, cachedDescriptionIds: microsoftCachedIds }), 600_000, 'Microsoft'),
       withTimeout(fetchAllOracleJobs(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).oracle || undefined), 900_000, 'Oracle'),
@@ -404,7 +404,7 @@ async function main() {
     }
 
     // Collect custom fetcher results
-    const fetcherNames = ['Amazon', 'Netflix', 'Two Sigma', 'Uber', 'SimplifyJobs', 'Oracle', 'AMD', 'TikTok'];
+    const fetcherNames = ['Amazon', 'Netflix', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Oracle', 'AMD', 'TikTok'];
     const fetcherResults = {};
     phaseBSettled.forEach((result, i) => {
       const name = fetcherNames[i];
