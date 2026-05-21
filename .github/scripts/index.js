@@ -377,7 +377,7 @@ async function main() {
     // ~5.5 min savings: max(PhaseA, PhaseB) instead of PhaseA + PhaseB
     console.log('  Phase A+B: ATS + custom fetchers (parallel)...');
     const [phaseAResult, ...phaseBSettled] = await Promise.allSettled([
-      withTimeout(fetchFromAllATS({ wdPreviousTotals }), 720_000, 'ATS'),
+      withTimeout(fetchFromAllATS({ wdPreviousTotals }), 1200_000, 'ATS'),
       withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon'),
       withTimeout(fetchAllNetflixJobs(), 60_000, 'Netflix'),
       // DISABLED A101: Apple/Microsoft/Oracle/Google detail fetchers cause 15+ min runtime. Re-enable after architectural fix.
