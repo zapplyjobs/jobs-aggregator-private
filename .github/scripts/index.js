@@ -830,6 +830,31 @@ async function main() {
     console.log(`✅ Step 9 complete: Output files written`);
     console.log('');
 
+    // Step 9c: Refresh WD family cache if expired (AGG-SPEED-10).
+    // Runs AFTER output is written — does not delay data delivery to consumers.
+    // Cache TTL: 6 hours. Only ~1 in 24 runs triggers a refresh.
+    // Consumers (R2 upload, git push) happen in parallel after this.
+    if (!isDryRun && allJobs.length > 0) {
+      const cachePath = path.join(DATA_DIR, 'wd-family-cache.json');
+      let cacheNeedsRefresh = true;
+      try {
+        if (fs.existsSync(cachePath)) {
+          const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+          const age = Date.now() - new Date(cache.generated_at).getTime();
+          if (age < 6 * 60 * 60 * 1000) cacheNeedsRefresh = false;
+        }
+      } catch (_) {}
+      if (cacheNeedsRefresh) {
+        console.log('📦 Step 9c: Refreshing WD family cache (runs every 6h)...');
+        const wdTenants = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [];
+        const { buildFamilyCache: buildCache } = require(`${SHARED}/fetchers/workday`);
+        const cacheResult = await buildCache(wdTenants, DATA_DIR);
+        console.log(`   ✅ Cache refreshed: ${cacheResult.tenants} tenants in ${(cacheResult.durationMs/1000).toFixed(1)}s`);
+      } else {
+        console.log('📦 Step 9c: Family cache fresh — skipping refresh');
+      }
+    }
+
     // Step 10: Print summary
     printSummary(sortedJobs, dedupedJobs.length, duplicates, duration);
 
