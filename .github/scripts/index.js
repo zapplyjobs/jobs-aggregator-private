@@ -23,7 +23,7 @@ const SHARED = path.join(__dirname, 'aggregator', 'lib');
 const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
 const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
 const { fetchAllNetflixJobs } = require(`${SHARED}/fetchers/netflix`);
-const { fetchWorkdayDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
+// fetchWorkdayDescriptions removed AGG-SPEED-11 — WD descriptions now fetched by enrichment pipeline only
 const { annotateFamilyDepartments } = require(`${SHARED}/fetchers/workday`);
 const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
 const { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);
@@ -458,21 +458,11 @@ async function main() {
       console.log(`   📊 Family mapping step: ${famResult.annotated}/${famResult.total} in ${(famResult.durationMs/1000).toFixed(1)}s`);
     }
 
-    // Step 1b: Fetch Workday job descriptions (AGG-FETCH-11).
-    // WD fetcher produces jobs with no description body. This step fetches detail pages
-    // incrementally and stores in descriptions-workday.jsonl. Step 4c injects these into
-    // job.description for the tag engine's description-fallback layer (layer 4).
-    // MAX_PER_RUN=200 caps per-run cost at ~80s. Initial backfill takes multiple runs.
-    const wdJobs = allJobs.filter(j => j.source === 'workday');
-    if (wdJobs.length > 0) {
-      console.log(`📄 Step 1b: Fetching WD descriptions (${wdJobs.length} WD jobs)...`);
-      const _wdDescStart = Date.now();
-      await fetchWorkdayDescriptions(wdJobs, DATA_DIR);
-      console.log(`   ✅ Step 1b complete (${((Date.now() - _wdDescStart) / 1000).toFixed(1)}s)`);
-    } else {
-      console.log('📄 Step 1b: No WD jobs this run — skipping description fetch');
-    }
-    console.log('');
+    // Step 1b removed AGG-SPEED-11: WD descriptions now fetched by enrichment pipeline (enrich-jobs.yml).
+    // Tag engine Layer 4 (description fallback) uses sidecar files seeded from R2 at workflow start.
+    // New WD jobs may lack descriptions for one enrichment cycle (~15 min) — acceptable since
+    // Layers 1-3 (title, O*NET, department regex) classify most jobs without descriptions.
+
 
     // Step 2: Enhance jobs (add fingerprints, employment_types arrays, etc.)
     console.log('🔄 Step 2: Enhancing jobs with required fields...');
