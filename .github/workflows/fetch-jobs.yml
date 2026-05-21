@@ -218,6 +218,29 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
+    - name: "Seed wd-family-cache.json from R2 (AGG-SPEED-10)"
+      run: |
+        echo "📥 Seeding WD family cache..."
+        node -e "
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          const result = await r2.downloadToFile('wd-family-cache.json', '.github/data/wd-family-cache.json');
+          if (result) {
+            console.log('R2_OK:' + Math.round(result.size/1024) + 'KB');
+          } else {
+            process.exit(1);
+          }
+        }
+        main().catch(e => { console.error('R2 seed error: ' + e.message); process.exit(1); });
+        " && echo "✅ WD family cache seeded from R2" || \
+          echo "⚠️ No WD family cache yet — first run will build it via live mapping"
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
     - name: Pre-pipeline integrity check
       run: |
         echo "🔍 Pre-pipeline integrity check (TAG-AUDIT-4)..."
@@ -441,6 +464,7 @@ jobs:
             'jobs-metadata.json',
             'dedupe-store.json',
             'wd-totals-cache.json',
+            'wd-family-cache.json',
           ];
 
           // Add description sidecars
