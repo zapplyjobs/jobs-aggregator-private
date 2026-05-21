@@ -24,6 +24,7 @@ const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/
 const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
 const { fetchAllNetflixJobs } = require(`${SHARED}/fetchers/netflix`);
 const { fetchWorkdayDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
+const { annotateFamilyDepartments } = require(`${SHARED}/fetchers/workday`);
 const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
 const { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);
 const { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);
@@ -445,6 +446,17 @@ async function main() {
     }
 
     console.log('');
+
+    // AGG-WD-DEPT-1: Family mapping runs outside ATS timeout for timeout isolation.
+    // WD fetch completes in ~5.5 min; family mapping takes ~15 min with ~15K HTTP requests.
+    // Running it inside fetchAllWorkdayJobs() caused ATS to timeout and lose all 55K jobs.
+    if (allJobs.length > 0) {
+      const _famStart = Date.now();
+      const wdTenants = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [];
+      const famResult = await annotateFamilyDepartments(allJobs, wdTenants);
+      stageTimings.wd_family_mapping_ms = Date.now() - _famStart;
+      console.log(`   📊 Family mapping step: ${famResult.annotated}/${famResult.total} in ${(famResult.durationMs/1000).toFixed(1)}s`);
+    }
 
     // Step 1b: Fetch Workday job descriptions (AGG-FETCH-11).
     // WD fetcher produces jobs with no description body. This step fetches detail pages
