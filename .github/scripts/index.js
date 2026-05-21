@@ -24,7 +24,7 @@ const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/
 const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
 const { fetchAllNetflixJobs } = require(`${SHARED}/fetchers/netflix`);
 // fetchWorkdayDescriptions removed AGG-SPEED-11 — WD descriptions now fetched by enrichment pipeline only
-const { annotateFamilyDepartments } = require(`${SHARED}/fetchers/workday`);
+const { applyFamilyCache } = require(`${SHARED}/fetchers/workday`);
 const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
 const { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);
 const { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);
@@ -447,15 +447,14 @@ async function main() {
 
     console.log('');
 
-    // AGG-WD-DEPT-1: Family mapping runs outside ATS timeout for timeout isolation.
-    // WD fetch completes in ~5.5 min; family mapping takes ~15 min with ~15K HTTP requests.
-    // Running it inside fetchAllWorkdayJobs() caused ATS to timeout and lose all 55K jobs.
+    // AGG-SPEED-10: Family mapping now reads from cache (instant, no HTTP requests).
+    // Cache is built by enrichment pipeline or first run. Falls back to live mapping if cache missing.
     if (allJobs.length > 0) {
       const _famStart = Date.now();
       const wdTenants = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [];
-      const famResult = await annotateFamilyDepartments(allJobs, wdTenants);
+      const famResult = await applyFamilyCache(allJobs, wdTenants, DATA_DIR);
       stageTimings.wd_family_mapping_ms = Date.now() - _famStart;
-      console.log(`   📊 Family mapping step: ${famResult.annotated}/${famResult.total} in ${(famResult.durationMs/1000).toFixed(1)}s`);
+      console.log(`   📊 Family mapping: ${famResult.annotated}/${famResult.total} in ${(famResult.durationMs/1000).toFixed(1)}s (cache: ${famResult.fromCache})`);
     }
 
     // Step 1b removed AGG-SPEED-11: WD descriptions now fetched by enrichment pipeline (enrich-jobs.yml).
