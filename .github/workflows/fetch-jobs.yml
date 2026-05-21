@@ -9,7 +9,7 @@ on:
 
 # Prevent concurrent runs
 concurrency:
-  group: job-fetch
+  group: job-fetch-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
