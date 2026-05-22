@@ -833,9 +833,11 @@ async function main() {
     // Step 9c: Refresh WD family cache if expired (AGG-SPEED-10).
     // Runs AFTER output is written — does not delay data delivery to consumers.
     // Cache TTL: 6 hours. Only ~1 in 24 runs triggers a refresh.
-    // Consumers (R2 upload, git push) happen in parallel after this.
+    // Time-budgeted: skips if pipeline already used >40 min to prevent workflow timeout.
+    // Uploads cache to R2 immediately after build so next run can use it.
     if (!isDryRun && allJobs.length > 0) {
       const cachePath = path.join(DATA_DIR, 'wd-family-cache.json');
+      const elapsedMin = (Date.now() - startTime) / 60000;
       let cacheNeedsRefresh = false;
       try {
         if (fs.existsSync(cachePath)) {
@@ -843,15 +845,30 @@ async function main() {
           const age = Date.now() - new Date(cache.generated_at).getTime();
           cacheNeedsRefresh = age >= 6 * 60 * 60 * 1000;
         } else {
-          console.log('📦 Step 9c: No family cache file — skipping (bootstrap needed via separate workflow)');
+          cacheNeedsRefresh = true; // Bootstrap: no cache file exists
         }
-      } catch (_) {}
+      } catch (_) {
+        cacheNeedsRefresh = true; // Corrupt cache — rebuild
+      }
+      if (cacheNeedsRefresh && elapsedMin > 40) {
+        console.log(`📦 Step 9c: SKIP cache refresh — pipeline at ${elapsedMin.toFixed(1)} min (>40 min budget)`);
+        cacheNeedsRefresh = false;
+      }
       if (cacheNeedsRefresh) {
-        console.log('📦 Step 9c: Refreshing WD family cache (runs every 6h)...');
+        console.log(`📦 Step 9c: Refreshing WD family cache (pipeline ${elapsedMin.toFixed(1)} min elapsed)...`);
         const wdTenants = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [];
         const { buildFamilyCache: buildCache } = require(`${SHARED}/fetchers/workday`);
         const cacheResult = await buildCache(wdTenants, DATA_DIR);
         console.log(`   ✅ Cache refreshed: ${cacheResult.tenants} tenants in ${(cacheResult.durationMs/1000).toFixed(1)}s`);
+        // Upload cache to R2 immediately so next run can use it even if workflow times out later
+        try {
+          const { createR2Client } = require(`${SHARED}/storage/r2-client`);
+          const r2 = createR2Client({ prefix: 'data/' });
+          await r2.uploadFromFile(cachePath, 'wd-family-cache.json');
+          console.log('   📤 Family cache uploaded to R2');
+        } catch (r2Err) {
+          console.log(`   ⚠️ R2 cache upload failed (non-fatal): ${r2Err.message}`);
+        }
       } else {
         console.log('📦 Step 9c: Family cache fresh — skipping refresh');
       }
