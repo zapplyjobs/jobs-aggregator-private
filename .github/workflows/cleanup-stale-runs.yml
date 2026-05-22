@@ -29,7 +29,8 @@ jobs:
           'zapplyjobs/New-Grad-Healthcare-Jobs-2026',
         ];
 
-        const STALE_MINUTES = 25;
+        const STALE_MINUTES = 45;
+        const PROTECTED_WORKFLOWS = new Set(['Fetch All Jobs', 'Enrich Jobs']);
         const cutoff = Date.now() - STALE_MINUTES * 60 * 1000;
 
         function apiFetch(path) {
@@ -93,6 +94,10 @@ jobs:
                 const result = await apiFetch('/repos/' + repo + '/actions/runs?status=' + status + '&per_page=10');
                 const runs = result.workflow_runs || [];
                 for (const run of runs) {
+                  if (PROTECTED_WORKFLOWS.has(run.name)) {
+                    console.log('SKIP: ' + repo + ' run #' + run.id + ' (' + run.name + ') — protected workflow');
+                    continue;
+                  }
                   const created = new Date(run.created_at).getTime();
                   const ageMinutes = Math.round((Date.now() - created) / 60000);
                   if (created < cutoff) {
