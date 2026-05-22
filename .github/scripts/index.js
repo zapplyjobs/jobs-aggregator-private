@@ -836,12 +836,14 @@ async function main() {
     // Consumers (R2 upload, git push) happen in parallel after this.
     if (!isDryRun && allJobs.length > 0) {
       const cachePath = path.join(DATA_DIR, 'wd-family-cache.json');
-      let cacheNeedsRefresh = true;
+      let cacheNeedsRefresh = false;
       try {
         if (fs.existsSync(cachePath)) {
           const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
           const age = Date.now() - new Date(cache.generated_at).getTime();
-          if (age < 6 * 60 * 60 * 1000) cacheNeedsRefresh = false;
+          cacheNeedsRefresh = age >= 6 * 60 * 60 * 1000;
+        } else {
+          console.log('📦 Step 9c: No family cache file — skipping (bootstrap needed via separate workflow)');
         }
       } catch (_) {}
       if (cacheNeedsRefresh) {
