@@ -54,8 +54,8 @@ jobs:
 
       - name: Generate general-review.json
         run: |
-          cd .github/scripts/shared
-          node tools/prepare-general-review.js --json /tmp/review-data/all_jobs.json > /tmp/review-data/general-review.json 2>/tmp/review-data/review-stderr.log
+          cd .github/scripts/aggregator
+          node lib/tools/prepare-general-review.js --json /tmp/review-data/all_jobs.json > /tmp/review-data/general-review.json 2>/tmp/review-data/review-stderr.log
           cat /tmp/review-data/review-stderr.log
           echo "Generated: $(wc -c < /tmp/review-data/general-review.json) bytes"
           # Sanity check
