@@ -23,8 +23,7 @@ const SHARED = path.join(__dirname, 'aggregator', 'lib');
 const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
 const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
 const { fetchAllNetflixJobs } = require(`${SHARED}/fetchers/netflix`);
-// fetchWorkdayDescriptions removed AGG-SPEED-11 — WD descriptions now fetched by enrichment pipeline only
-const { applyFamilyCache } = require(`${SHARED}/fetchers/workday`);
+const { fetchWorkdayDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
 const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
 const { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);
 const { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);
@@ -302,7 +301,7 @@ async function main() {
     let allJobs = [];
 
     // Read previous counts (needed for initial-population detection) before fetch
-    let prevAppleCount = 0, prevGoogleCount = 0, prevMicrosoftCount = 0;
+    let prevAppleCount = 0, prevGoogleCount = 0, prevMicrosoftCount = 0, prevOracleCount = 0;
     let prevAppleIds = new Set();
     let wdPreviousTotals = null;
     try {
@@ -311,12 +310,14 @@ async function main() {
         prevAppleCount = (content.match(/"source":"apple"/g) || []).length;
         prevGoogleCount = (content.match(/"source":"google"/g) || []).length;
         prevMicrosoftCount = (content.match(/"source":"microsoft"/g) || []).length;
+        prevOracleCount = (content.match(/"source":"oracle"/g) || []).length;
         if (prevAppleCount > 0) {
           prevAppleIds = new Set((content.match(/"id":"apple-[^"]+"/g) || []).map(m => m.slice(6, -1)));
           console.log(`  Previous Apple count: ${prevAppleCount} (${prevAppleIds.size} IDs)`);
         }
         if (prevGoogleCount > 0) console.log(`  Previous Google count: ${prevGoogleCount}`);
         if (prevMicrosoftCount > 0) console.log(`  Previous Microsoft count: ${prevMicrosoftCount}`);
+        if (prevOracleCount > 0) console.log(`  Previous Oracle count: ${prevOracleCount}`);
       }
     } catch (e) { /* first run */ }
 
@@ -364,6 +365,19 @@ async function main() {
     } catch (e) { /* no cache yet */ }
 
 
+    let oracleCachedIds = new Set();
+    try {
+      const orSidecarFiles = fs.readdirSync(DATA_DIR)
+        .filter(f => f.startsWith('descriptions-oracle') && f.endsWith('.jsonl'));
+      for (const fname of orSidecarFiles) {
+        const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
+        for (const line of lines) {
+          try { const { id } = JSON.parse(line); if (id) oracleCachedIds.add(id); } catch {}
+        }
+      }
+      if (oracleCachedIds.size > 0) console.log(`  Oracle description cache: ${oracleCachedIds.size} IDs`);
+    } catch (e) { /* no cache yet */ }
+
     // AGG-SPEED-2: Load WD totals cache from prior run
     const WD_TOTALS_CACHE = path.join(DATA_DIR, 'wd-totals-cache.json');
     try {
@@ -378,17 +392,16 @@ async function main() {
     // ~5.5 min savings: max(PhaseA, PhaseB) instead of PhaseA + PhaseB
     console.log('  Phase A+B: ATS + custom fetchers (parallel)...');
     const [phaseAResult, ...phaseBSettled] = await Promise.allSettled([
-      withTimeout(fetchFromAllATS({ wdPreviousTotals }), 1200_000, 'ATS'),
+      withTimeout(fetchFromAllATS({ wdPreviousTotals }), 720_000, 'ATS'),
       withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon'),
       withTimeout(fetchAllNetflixJobs(), 60_000, 'Netflix'),
-      // DISABLED A101: Apple/Microsoft/Oracle/Google detail fetchers cause 15+ min runtime. Re-enable after architectural fix.
-      // withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds, cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 1200_000, 'Apple'),
-      withTimeout(fetchAllTwoSigmaJobs(), 60_000, 'Two Sigma'),
+      withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds, cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 1200_000, 'Apple'),
+      withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma'),
       withTimeout(fetchAllUberJobs(), 60_000, 'Uber'),
       withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount, cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
       withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs'),
-      // withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount, cachedDescriptionIds: microsoftCachedIds }), 600_000, 'Microsoft'),
-      withTimeout(fetchAllOracleJobs(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).oracle || undefined), 900_000, 'Oracle'),
+      withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount, cachedDescriptionIds: microsoftCachedIds }), 600_000, 'Microsoft'),
+      withTimeout(fetchAllOracleJobs(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).oracle || undefined, { previousJobCount: prevOracleCount, cachedDescriptionIds: oracleCachedIds }), 600_000, 'Oracle'),
       withTimeout(fetchAllAmdJobs(), 120_000, 'AMD'),
       withTimeout(fetchAllTiktokJobs(), 120_000, 'TikTok'),
     ]);
@@ -405,7 +418,7 @@ async function main() {
     }
 
     // Collect custom fetcher results
-    const fetcherNames = ['Amazon', 'Netflix', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Oracle', 'AMD', 'TikTok'];
+    const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Microsoft', 'Oracle', 'AMD', 'TikTok'];
     const fetcherResults = {};
     phaseBSettled.forEach((result, i) => {
       const name = fetcherNames[i];
@@ -447,21 +460,21 @@ async function main() {
 
     console.log('');
 
-    // AGG-SPEED-10: Family mapping now reads from cache (instant, no HTTP requests).
-    // Cache is built by enrichment pipeline or first run. Falls back to live mapping if cache missing.
-    if (allJobs.length > 0) {
-      const _famStart = Date.now();
-      const wdTenants = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [];
-      const famResult = await applyFamilyCache(allJobs, wdTenants, DATA_DIR);
-      stageTimings.wd_family_mapping_ms = Date.now() - _famStart;
-      console.log(`   📊 Family mapping: ${famResult.annotated}/${famResult.total} in ${(famResult.durationMs/1000).toFixed(1)}s (cache: ${famResult.fromCache})`);
+    // Step 1b: Fetch Workday job descriptions (AGG-FETCH-11).
+    // WD fetcher produces jobs with no description body. This step fetches detail pages
+    // incrementally and stores in descriptions-workday.jsonl. Step 4c injects these into
+    // job.description for the tag engine's description-fallback layer (layer 4).
+    // MAX_PER_RUN=200 caps per-run cost at ~80s. Initial backfill takes multiple runs.
+    const wdJobs = allJobs.filter(j => j.source === 'workday');
+    if (wdJobs.length > 0) {
+      console.log(`📄 Step 1b: Fetching WD descriptions (${wdJobs.length} WD jobs)...`);
+      const _wdDescStart = Date.now();
+      await fetchWorkdayDescriptions(wdJobs, DATA_DIR);
+      console.log(`   ✅ Step 1b complete (${((Date.now() - _wdDescStart) / 1000).toFixed(1)}s)`);
+    } else {
+      console.log('📄 Step 1b: No WD jobs this run — skipping description fetch');
     }
-
-    // Step 1b removed AGG-SPEED-11: WD descriptions now fetched by enrichment pipeline (enrich-jobs.yml).
-    // Tag engine Layer 4 (description fallback) uses sidecar files seeded from R2 at workflow start.
-    // New WD jobs may lack descriptions for one enrichment cycle (~15 min) — acceptable since
-    // Layers 1-3 (title, O*NET, department regex) classify most jobs without descriptions.
-
+    console.log('');
 
     // Step 2: Enhance jobs (add fingerprints, employment_types arrays, etc.)
     console.log('🔄 Step 2: Enhancing jobs with required fields...');
@@ -829,50 +842,6 @@ async function main() {
     console.log('');
     console.log(`✅ Step 9 complete: Output files written`);
     console.log('');
-
-    // Step 9c: Refresh WD family cache if expired (AGG-SPEED-10).
-    // Runs AFTER output is written — does not delay data delivery to consumers.
-    // Cache TTL: 6 hours. Only ~1 in 24 runs triggers a refresh.
-    // Time-budgeted: skips if pipeline already used >40 min to prevent workflow timeout.
-    // Uploads cache to R2 immediately after build so next run can use it.
-    if (!isDryRun && allJobs.length > 0) {
-      const cachePath = path.join(DATA_DIR, 'wd-family-cache.json');
-      const elapsedMin = (Date.now() - startTime) / 60000;
-      let cacheNeedsRefresh = false;
-      try {
-        if (fs.existsSync(cachePath)) {
-          const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
-          const age = Date.now() - new Date(cache.generated_at).getTime();
-          cacheNeedsRefresh = age >= 6 * 60 * 60 * 1000;
-        } else {
-          cacheNeedsRefresh = true; // Bootstrap: no cache file exists
-        }
-      } catch (_) {
-        cacheNeedsRefresh = true; // Corrupt cache — rebuild
-      }
-      if (cacheNeedsRefresh && elapsedMin > 40) {
-        console.log(`📦 Step 9c: SKIP cache refresh — pipeline at ${elapsedMin.toFixed(1)} min (>40 min budget)`);
-        cacheNeedsRefresh = false;
-      }
-      if (cacheNeedsRefresh) {
-        console.log(`📦 Step 9c: Refreshing WD family cache (pipeline ${elapsedMin.toFixed(1)} min elapsed)...`);
-        const wdTenants = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [];
-        const { buildFamilyCache: buildCache } = require(`${SHARED}/fetchers/workday`);
-        const cacheResult = await buildCache(wdTenants, DATA_DIR);
-        console.log(`   ✅ Cache refreshed: ${cacheResult.tenants} tenants in ${(cacheResult.durationMs/1000).toFixed(1)}s`);
-        // Upload cache to R2 immediately so next run can use it even if workflow times out later
-        try {
-          const { createR2Client } = require(`${SHARED}/storage/r2-client`);
-          const r2 = createR2Client({ prefix: 'data/' });
-          await r2.uploadFromFile(cachePath, 'wd-family-cache.json');
-          console.log('   📤 Family cache uploaded to R2');
-        } catch (r2Err) {
-          console.log(`   ⚠️ R2 cache upload failed (non-fatal): ${r2Err.message}`);
-        }
-      } else {
-        console.log('📦 Step 9c: Family cache fresh — skipping refresh');
-      }
-    }
 
     // Step 10: Print summary
     printSummary(sortedJobs, dedupedJobs.length, duplicates, duration);
