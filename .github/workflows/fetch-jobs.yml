@@ -15,7 +15,7 @@ concurrency:
 jobs:
   fetch-all:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 15
     permissions:
       contents: write
 
@@ -345,30 +345,17 @@ jobs:
           echo "✅ is_direct_apply present on JSearch records"
         fi
 
-        # 5. jobs-metadata.json has freshness, top_companies, and AGG-MEASURE-1 projection fields
+        # 5. jobs-metadata.json has freshness and top_companies (new fields from df7e6a4)
         if [ -f ".github/data/jobs-metadata.json" ]; then
-          HAS_METADATA_FIELDS=$(python3 -c "
+          HAS_FRESHNESS=$(python3 -c "
         import json
         m = json.load(open('.github/data/jobs-metadata.json'))
-        proj = m.get('senior_rollout_projection') or {}
-        sample = proj.get('sample_basis') or {}
-        quality = proj.get('quality') or {}
-        by_surface = proj.get('by_surface') or {}
-        ok = (
-            'freshness' in m and
-            'top_companies' in m and
-            'senior_rollout_projection' in m and
-            sample.get('type') == 'current_run_filtered_sample' and
-            isinstance(sample.get('sample_size'), int) and sample.get('sample_size', 0) > 0 and
-            quality.get('surface_projection_exact') is False and
-            isinstance(by_surface.get('ngj_main'), int)
-        )
-        print(1 if ok else 0)
+        print(1 if 'freshness' in m and 'top_companies' in m else 0)
         " 2>/dev/null || echo 0)
-          if [ "$HAS_METADATA_FIELDS" -eq 1 ]; then
-            echo "✅ jobs-metadata.json has freshness + top_companies + senior_rollout_projection fields"
+          if [ "$HAS_FRESHNESS" -eq 1 ]; then
+            echo "✅ jobs-metadata.json has freshness + top_companies fields"
           else
-            echo "❌ jobs-metadata.json missing freshness/top_companies/senior_rollout_projection fields"
+            echo "❌ jobs-metadata.json missing freshness or top_companies fields"
             PASS=false
           fi
         fi
@@ -519,15 +506,6 @@ jobs:
             unique_jobs,
             duplicates_removed,
             by_job_type,
-            senior_rollout_projection: (
-              .senior_rollout_projection
-              | {
-                  sample_basis,
-                  quality,
-                  top_domains: (.by_domain | to_entries | sort_by(-.value) | .[:5]),
-                  by_surface
-                }
-            ),
             jsearch_stats
           }'
         fi

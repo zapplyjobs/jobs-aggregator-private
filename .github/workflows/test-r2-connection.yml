@@ -5,6 +5,7 @@ on:
 jobs:
   test-r2:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/setup-node@v5
         with:
