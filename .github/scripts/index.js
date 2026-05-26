@@ -23,7 +23,7 @@ const SHARED = path.join(__dirname, 'aggregator', 'lib');
 const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
 const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
 const { fetchAllNetflixJobs } = require(`${SHARED}/fetchers/netflix`);
-const { fetchWorkdayDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
+// AGG-HOTPATH-1: WD descriptions are no longer fetched in the hot publish path.
 const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
 const { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);
 const { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);
@@ -465,17 +465,12 @@ async function main() {
 
     console.log('');
 
-    // Step 1b: Fetch Workday job descriptions (AGG-FETCH-11).
-    // WD fetcher produces jobs with no description body. This step fetches detail pages
-    // incrementally and stores in descriptions-workday.jsonl. Step 4c injects these into
-    // job.description for the tag engine's description-fallback layer (layer 4).
-    // MAX_PER_RUN=200 caps per-run cost at ~80s. Initial backfill takes multiple runs.
+    // AGG-HOTPATH-1: Workday description fetch is removed from the hot publish path.
+    // Enrichment/sidecar lanes own this slower detail work; the fast publish path must
+    // preserve Tier A freshness under the 15-minute hard cap.
     const wdJobs = allJobs.filter(j => j.source === 'workday');
     if (wdJobs.length > 0) {
-      console.log(`📄 Step 1b: Fetching WD descriptions (${wdJobs.length} WD jobs)...`);
-      const _wdDescStart = Date.now();
-      await fetchWorkdayDescriptions(wdJobs, DATA_DIR);
-      console.log(`   ✅ Step 1b complete (${((Date.now() - _wdDescStart) / 1000).toFixed(1)}s)`);
+      console.log(`📄 Step 1b: Skipping WD descriptions in hot path (${wdJobs.length} WD jobs)`);
     } else {
       console.log('📄 Step 1b: No WD jobs this run — skipping description fetch');
     }
