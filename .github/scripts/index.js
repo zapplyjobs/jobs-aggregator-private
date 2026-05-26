@@ -38,7 +38,7 @@ const { fetchAllTiktokJobs } = require(`${SHARED}/fetchers/tiktok`);
 const { validateAndNormalizeJobs, printValidationSummary, normalizeJob } = require(`${SHARED}/processors/validator`);
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
 const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS, INTERNSHIP_TTL_MS } = require(`${SHARED}/processors/deduplicator`);
-const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap, TAG_ENGINE_VERSION, getKeywordMap } = require(`${SHARED}/processors/tag-engine`);
+const { tagJobs, generateTagStats, tagEmployment, tagDomains, tagLocations, setCompanyOverrideMap, TAG_ENGINE_VERSION, getKeywordMap } = require(`${SHARED}/processors/tag-engine`);
 const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport, checkKeywordHealth, checkKeywordOverlap } = require(`${SHARED}/processors/tag-monitor`);
 
 // Import utils
@@ -226,6 +226,74 @@ function computeFullPoolTagStats(publicJobs) {
 }
 
 /**
+ * AGG-MEASURE-1 Phase 1: Project filtered-senior rollout impact from the current-run sample.
+ * Source counts are exact from the full filtered population. Domain counts are directional
+ * projections from the current-run filtered sample after US-only filtering.
+ */
+function buildSeniorRolloutProjection({ seniorJobs, seniorBySource, sampledSeniorJobs }) {
+  if (!Array.isArray(seniorJobs) || seniorJobs.length === 0) return null;
+  if (!Array.isArray(sampledSeniorJobs) || sampledSeniorJobs.length === 0) return null;
+
+  let usSubset = 0;
+  const sampledByDomain = {};
+
+  for (const sample of sampledSeniorJobs) {
+    const pseudoJob = {
+      title: sample.title || '',
+      description: '',
+      employment_type: '',
+      location: sample.location || '',
+      company_name: sample.company_name || '',
+      source: sample.source || 'unknown',
+      departments: [],
+    };
+
+    const locations = tagLocations(pseudoJob) || [];
+    if (!locations.includes('us')) continue;
+    usSubset++;
+
+    const domains = tagDomains(pseudoJob) || [];
+    for (const domain of domains) {
+      sampledByDomain[domain] = (sampledByDomain[domain] || 0) + 1;
+    }
+  }
+
+  const sampleSize = sampledSeniorJobs.length;
+  const estimatedUsFiltered = sampleSize > 0
+    ? Math.round(seniorJobs.length * (usSubset / sampleSize))
+    : 0;
+
+  const projectedByDomain = {};
+  if (usSubset > 0 && estimatedUsFiltered > 0) {
+    for (const [domain, count] of Object.entries(sampledByDomain)) {
+      projectedByDomain[domain] = Math.round(estimatedUsFiltered * (count / usSubset));
+    }
+  }
+
+  const bySource = {};
+  for (const [source, filtered] of Object.entries(seniorBySource || {})) {
+    bySource[source] = { filtered };
+  }
+
+  return {
+    generated_at: new Date().toISOString(),
+    sample_basis: {
+      type: 'current_run_filtered_sample',
+      sample_size: sampleSize,
+      us_subset: usSubset,
+      total_filtered: seniorJobs.length,
+      estimated_us_filtered: estimatedUsFiltered,
+    },
+    by_source: bySource,
+    by_domain: projectedByDomain,
+    quality: {
+      surface_projection_exact: false,
+      notes: 'Source counts are exact filtered counts. Domain counts are directional projections from the current-run filtered sample after US-only filtering.',
+    },
+  };
+}
+
+/**
  * Main execution function
  */
 async function main() {
@@ -301,7 +369,7 @@ async function main() {
     let allJobs = [];
 
     // Read previous counts (needed for initial-population detection) before fetch
-    let prevAppleCount = 0, prevGoogleCount = 0, prevMicrosoftCount = 0, prevOracleCount = 0;
+    let prevAppleCount = 0, prevGoogleCount = 0, prevMicrosoftCount = 0;
     let prevAppleIds = new Set();
     let wdPreviousTotals = null;
     try {
@@ -310,14 +378,12 @@ async function main() {
         prevAppleCount = (content.match(/"source":"apple"/g) || []).length;
         prevGoogleCount = (content.match(/"source":"google"/g) || []).length;
         prevMicrosoftCount = (content.match(/"source":"microsoft"/g) || []).length;
-        prevOracleCount = (content.match(/"source":"oracle"/g) || []).length;
         if (prevAppleCount > 0) {
           prevAppleIds = new Set((content.match(/"id":"apple-[^"]+"/g) || []).map(m => m.slice(6, -1)));
           console.log(`  Previous Apple count: ${prevAppleCount} (${prevAppleIds.size} IDs)`);
         }
         if (prevGoogleCount > 0) console.log(`  Previous Google count: ${prevGoogleCount}`);
         if (prevMicrosoftCount > 0) console.log(`  Previous Microsoft count: ${prevMicrosoftCount}`);
-        if (prevOracleCount > 0) console.log(`  Previous Oracle count: ${prevOracleCount}`);
       }
     } catch (e) { /* first run */ }
 
@@ -365,19 +431,6 @@ async function main() {
     } catch (e) { /* no cache yet */ }
 
 
-    let oracleCachedIds = new Set();
-    try {
-      const orSidecarFiles = fs.readdirSync(DATA_DIR)
-        .filter(f => f.startsWith('descriptions-oracle') && f.endsWith('.jsonl'));
-      for (const fname of orSidecarFiles) {
-        const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
-        for (const line of lines) {
-          try { const { id } = JSON.parse(line); if (id) oracleCachedIds.add(id); } catch {}
-        }
-      }
-      if (oracleCachedIds.size > 0) console.log(`  Oracle description cache: ${oracleCachedIds.size} IDs`);
-    } catch (e) { /* no cache yet */ }
-
     // AGG-SPEED-2: Load WD totals cache from prior run
     const WD_TOTALS_CACHE = path.join(DATA_DIR, 'wd-totals-cache.json');
     try {
@@ -401,7 +454,7 @@ async function main() {
       withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount, cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
       withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs'),
       withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount, cachedDescriptionIds: microsoftCachedIds }), 600_000, 'Microsoft'),
-      withTimeout(fetchAllOracleJobs(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).oracle || undefined, { previousJobCount: prevOracleCount, cachedDescriptionIds: oracleCachedIds }), 600_000, 'Oracle'),
+      withTimeout(fetchAllOracleJobs(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).oracle || undefined), 600_000, 'Oracle'),
       withTimeout(fetchAllAmdJobs(), 120_000, 'AMD'),
       withTimeout(fetchAllTiktokJobs(), 120_000, 'TikTok'),
     ]);
@@ -552,6 +605,7 @@ async function main() {
 
     // AGG-SELF-4 Check C: FP rate tracking for trend alerting
     let fpStats = { sample_size: 0, potential_fp_count: 0, fp_rate_pct: '0.0' };
+    let seniorRolloutProjection = null;
     // AGG-DATA-8 / AGG-PIPE-11: Sample 500 filtered jobs for false-positive measurement.
     // 500 jobs gives ±4.3pp CI (vs ±14pp with 50). File rotated weekly (7-day TTL).
     {
@@ -604,6 +658,12 @@ async function main() {
       const fpRate = newSamples.length > 0 ? (fpCount / newSamples.length * 100).toFixed(1) : '0.0';
       console.log(`📋 FP estimate: ${fpCount}/${newSamples.length} (${fpRate}%) potential false positives in sample`);
       fpStats = { sample_size: newSamples.length, potential_fp_count: fpCount, fp_rate_pct: fpRate };
+
+      seniorRolloutProjection = buildSeniorRolloutProjection({
+        seniorJobs,
+        seniorBySource,
+        sampledSeniorJobs: newSamples,
+      });
 
       const allLines = [...existingLines, ...newSamples.map(s => JSON.stringify(s))];
       fs.writeFileSync(SAMPLES_FILE, allLines.join('\n') + '\n', 'utf8');
@@ -834,6 +894,7 @@ async function main() {
       keywordHealthReport,
       keywordOverlapReport,
       fpStats,
+      seniorRolloutProjection,
       fetchResults,
       fetcherHealth,
     });
@@ -959,7 +1020,7 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth }) {
+function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, seniorRolloutProjection, fetchResults, fetcherHealth }) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -1066,6 +1127,8 @@ function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStat
       by_source: seniorBySource,
       ...(fpStats || {}),
     },
+
+    senior_rollout_projection: seniorRolloutProjection,
 
     // Tag statistics (Phase 1)
     tag_stats: tagStats,
