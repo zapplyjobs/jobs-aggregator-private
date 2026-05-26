@@ -353,13 +353,15 @@ jobs:
         proj = m.get('senior_rollout_projection') or {}
         sample = proj.get('sample_basis') or {}
         quality = proj.get('quality') or {}
+        by_surface = proj.get('by_surface') or {}
         ok = (
             'freshness' in m and
             'top_companies' in m and
             'senior_rollout_projection' in m and
             sample.get('type') == 'current_run_filtered_sample' and
             isinstance(sample.get('sample_size'), int) and sample.get('sample_size', 0) > 0 and
-            quality.get('surface_projection_exact') is False
+            quality.get('surface_projection_exact') is False and
+            isinstance(by_surface.get('ngj_main'), int)
         )
         print(1 if ok else 0)
         " 2>/dev/null || echo 0)
@@ -519,7 +521,12 @@ jobs:
             by_job_type,
             senior_rollout_projection: (
               .senior_rollout_projection
-              | {sample_basis, quality, top_domains: (.by_domain | to_entries | sort_by(-.value) | .[:5])}
+              | {
+                  sample_basis,
+                  quality,
+                  top_domains: (.by_domain | to_entries | sort_by(-.value) | .[:5]),
+                  by_surface
+                }
             ),
             jsearch_stats
           }'
