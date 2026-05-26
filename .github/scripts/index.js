@@ -226,9 +226,9 @@ function computeFullPoolTagStats(publicJobs) {
 }
 
 /**
- * AGG-MEASURE-1 Phase 1: Project filtered-senior rollout impact from the current-run sample.
- * Source counts are exact from the full filtered population. Domain counts are directional
- * projections from the current-run filtered sample after US-only filtering.
+ * AGG-MEASURE-1: Project filtered-senior rollout impact from the current-run sample.
+ * Source counts are exact from the full filtered population. Domain and surface counts are
+ * directional projections from the current-run filtered sample after US-only filtering.
  */
 function buildSeniorRolloutProjection({ seniorJobs, seniorBySource, sampledSeniorJobs }) {
   if (!Array.isArray(seniorJobs) || seniorJobs.length === 0) return null;
@@ -236,7 +236,13 @@ function buildSeniorRolloutProjection({ seniorJobs, seniorBySource, sampledSenio
 
   let usSubset = 0;
   const sampledByDomain = {};
-
+  const sampledBySurface = {
+    ngj_main: 0,
+    software: 0,
+    data_science: 0,
+    hardware: 0,
+    healthcare: 0,
+  };
   for (const sample of sampledSeniorJobs) {
     const pseudoJob = {
       title: sample.title || '',
@@ -252,10 +258,16 @@ function buildSeniorRolloutProjection({ seniorJobs, seniorBySource, sampledSenio
     if (!locations.includes('us')) continue;
     usSubset++;
 
+    sampledBySurface.ngj_main++;
+
     const domains = tagDomains(pseudoJob) || [];
     for (const domain of domains) {
       sampledByDomain[domain] = (sampledByDomain[domain] || 0) + 1;
     }
+    if (domains.includes('software')) sampledBySurface.software++;
+    if (domains.includes('data_science')) sampledBySurface.data_science++;
+    if (domains.includes('hardware')) sampledBySurface.hardware++;
+    if (domains.includes('healthcare')) sampledBySurface.healthcare++;
   }
 
   const sampleSize = sampledSeniorJobs.length;
@@ -267,6 +279,12 @@ function buildSeniorRolloutProjection({ seniorJobs, seniorBySource, sampledSenio
   if (usSubset > 0 && estimatedUsFiltered > 0) {
     for (const [domain, count] of Object.entries(sampledByDomain)) {
       projectedByDomain[domain] = Math.round(estimatedUsFiltered * (count / usSubset));
+    }
+  }
+  const projectedBySurface = {};
+  if (usSubset > 0 && estimatedUsFiltered > 0) {
+    for (const [surface, count] of Object.entries(sampledBySurface)) {
+      projectedBySurface[surface] = Math.round(estimatedUsFiltered * (count / usSubset));
     }
   }
 
@@ -286,9 +304,10 @@ function buildSeniorRolloutProjection({ seniorJobs, seniorBySource, sampledSenio
     },
     by_source: bySource,
     by_domain: projectedByDomain,
+    by_surface: projectedBySurface,
     quality: {
       surface_projection_exact: false,
-      notes: 'Source counts are exact filtered counts. Domain counts are directional projections from the current-run filtered sample after US-only filtering.',
+      notes: 'Source counts are exact filtered counts. Domain and surface counts are directional projections from the current-run filtered sample after US-only filtering. Internship surface is excluded because current expansion framing targets non-internship level broadening.',
     },
   };
 }
