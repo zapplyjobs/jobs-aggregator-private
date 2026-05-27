@@ -519,8 +519,7 @@ jobs:
       if: success()
       run: |
         rm -rf /tmp/jobs-data-2026
-        git clone --depth=1 --filter=blob:none --sparse "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-data-2026.git" /tmp/jobs-data-2026
-        git -C /tmp/jobs-data-2026 sparse-checkout set .github/data
+        git clone --depth=1 "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-data-2026.git" /tmp/jobs-data-2026
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
 
