@@ -29,3 +29,7 @@ Thumbs.db
 # Legacy enriched descriptions — superseded by chunked files seeded from jobs-data-2026
 # INF-7: aggregator only uses -1/-2 chunks (seed step). Legacy file must not be committed.
 .github/data/descriptions-enriched.jsonl
+
+# Enriched description chunks are seeded from R2/jobs-data at runtime.
+# Keeping them tracked in aggregator HEAD bloats checkout without improving recovery.
+.github/data/descriptions-enriched-*.jsonl
