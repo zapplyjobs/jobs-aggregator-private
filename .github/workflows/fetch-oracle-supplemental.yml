@@ -1,0 +1,68 @@
+name: Fetch Oracle Supplemental
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fetch-oracle-supplemental:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 1
+          submodules: recursive
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Fix submodule index
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --force --recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create data directory
+        run: mkdir -p .github/data
+
+      - name: Fetch Oracle supplemental lane
+        run: node .github/scripts/fetch-supplemental-oracle.js
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
+      - name: Verify output files
+        run: |
+          test -f .github/data/supplemental-oracle-jobs.json
+          test -f .github/data/supplemental-oracle-metadata.json
+          python3 - <<'PY'
+          import json
+          jobs = json.load(open('.github/data/supplemental-oracle-jobs.json'))
+          meta = json.load(open('.github/data/supplemental-oracle-metadata.json'))
+          assert isinstance(jobs, list)
+          assert isinstance(meta.get('jobs_fetched'), int)
+          assert meta.get('source') == 'oracle'
+          print('jobs', len(jobs))
+          print('meta_jobs', meta['jobs_fetched'])
+          PY
+
+      - name: Display Oracle supplemental summary
+        if: always()
+        run: |
+          cat .github/data/supplemental-oracle-metadata.json | jq .
