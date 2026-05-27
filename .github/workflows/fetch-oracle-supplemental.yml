@@ -2,6 +2,12 @@ name: Fetch Oracle Supplemental
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+
+concurrency:
+  group: fetch-oracle-supplemental
+  cancel-in-progress: false
 
 jobs:
   fetch-oracle-supplemental:
