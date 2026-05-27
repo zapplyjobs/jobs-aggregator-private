@@ -536,7 +536,7 @@ jobs:
         cd /tmp/jobs-data-2026
         git config user.email "bot@zapplyjobs.com"
         git config user.name "Data Bot"
-        git add .github/data/ZJP_SNAPSHOT.json .github/data/zjp-public-snapshot.json .github/data/ZJP_CONTEXT.md
+        git add .github/data/zjp-public-snapshot.json
         if [ -n "$(git status --porcelain)" ]; then
           git commit -m "data: refresh zjp snapshot"
           for i in 1 2 3; do
