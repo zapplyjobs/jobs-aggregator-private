@@ -107,8 +107,8 @@ function readEnrichmentStats() {
 }
 
 function readPreviousSnapshot() {
-  // Read from aggregator DATA_DIR — snapshot is persisted here between runs (not jobs-data-2026, which is public)
-  const p = path.join(DATA_DIR, 'ZJP_SNAPSHOT.json');
+  // Read from jobs-data clone — snapshot is persisted there between runs.
+  const p = path.join(JOBS_DATA_DIR, 'ZJP_SNAPSHOT.json');
   if (!fs.existsSync(p)) return null;
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); }
   catch { return null; }

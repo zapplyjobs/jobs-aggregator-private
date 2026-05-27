@@ -515,6 +515,43 @@ jobs:
         GITHUB_RUN_ID: ${{ github.run_id }}
 
 
+    - name: Clone jobs-data workspace for snapshot publish
+      if: success()
+      run: |
+        rm -rf /tmp/jobs-data-2026
+        git clone --depth=1 "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-data-2026.git" /tmp/jobs-data-2026
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+
+    - name: Generate ZJP snapshot
+      if: success()
+      run: node .github/scripts/generate-snapshot.js
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+        GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+
+    - name: Publish snapshot to jobs-data-2026
+      if: success()
+      run: |
+        cd /tmp/jobs-data-2026
+        git config user.email "bot@zapplyjobs.com"
+        git config user.name "Data Bot"
+        git add .github/data/ZJP_SNAPSHOT.json .github/data/zjp-public-snapshot.json .github/data/ZJP_CONTEXT.md
+        if [ -n "$(git status --porcelain)" ]; then
+          git commit -m "data: refresh zjp snapshot"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin main && break
+            echo "Snapshot push attempt $i failed, retrying in 5s..."
+            sleep 5
+          done
+          echo "✅ Snapshot pushed to jobs-data-2026"
+        else
+          echo "ℹ️ No snapshot changes to push"
+        fi
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+
+
     - name: Display logs (always run)
       if: always()
       run: |
