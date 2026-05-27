@@ -28,15 +28,14 @@ jobs:
       with:
         ref: ${{ github.ref_name }}
         fetch-depth: 1  # Shallow clone — rebase fetches missing objects on demand
-        submodules: recursive
+        submodules: false
         token: ${{ secrets.GH_PAT }}
 
     - name: Fix submodule index
       run: |
-        # Workaround for GitHub Actions submodule checkout caching issue
-        # Force git to recompute submodule index from the tree
+        # Shallow-init only the two required submodules.
         git submodule sync --recursive
-        git submodule update --init --force --recursive
+        git submodule update --init --force --depth 1 .github/scripts/shared .github/scripts/aggregator
 
     - name: Setup Node.js
       uses: actions/setup-node@v5
