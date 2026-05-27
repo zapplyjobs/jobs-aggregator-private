@@ -86,8 +86,8 @@ async function main() {
     try {
       const { createR2Client } = require(`${SHARED}/storage/r2-client`);
       const r2 = createR2Client({ prefix: 'data/' });
-      await r2.uploadFile('supplemental-custom-jobs.json', JOBS_FILE, 'application/json');
-      await r2.uploadFile('supplemental-custom-metadata.json', META_FILE, 'application/json');
+      await r2.uploadRaw('supplemental-custom-jobs.json', fs.readFileSync(JOBS_FILE, 'utf8'), 'application/json');
+      await r2.uploadRaw('supplemental-custom-metadata.json', fs.readFileSync(META_FILE, 'utf8'), 'application/json');
       console.log('☁️ Uploaded custom supplemental artifacts to R2');
     } catch (err) {
       console.log(`⚠️ R2 upload unavailable locally — skipped (${err.message})`);
