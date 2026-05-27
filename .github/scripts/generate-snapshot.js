@@ -232,6 +232,7 @@ async function buildSnapshot(meta, repoStats) {
   // Enrichment / supplemental lane visibility
   const jsearchSidecarLines = readDescriptionSidecarLines('jsearch');
   const oracleSupplemental = readSupplementalMetadata('oracle');
+  const customSupplemental = readSupplementalMetadata('custom');
   const enrichment = enrichStats ? {
     total_enriched: enrichStats.total_enriched ?? null,
     total_has_description: enrichStats.total_has_description ?? null,
@@ -282,6 +283,12 @@ async function buildSnapshot(meta, repoStats) {
           generated_at: oracleSupplemental.generated_at ?? null,
           jobs_fetched: oracleSupplemental.jobs_fetched ?? null,
           duration_ms: oracleSupplemental.duration_ms ?? null,
+        } : null,
+        custom: customSupplemental ? {
+          generated_at: customSupplemental.generated_at ?? null,
+          jobs_fetched: customSupplemental.jobs_fetched ?? null,
+          duration_ms: customSupplemental.duration_ms ?? null,
+          sources: customSupplemental.sources ?? null,
         } : null,
       },
     },
