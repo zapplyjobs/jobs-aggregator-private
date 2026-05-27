@@ -127,6 +127,10 @@ const FETCHER_NAME_TO_SOURCE = {
 // They may return via separate workflowing or slower lanes later, but they must not
 // consume Tier A runtime budget inside the main 15-minute-capped workflow.
 const HOTPATH_DEMOTED_FETCHERS = new Set(['Apple', 'Google', 'Microsoft', 'Oracle', 'TikTok']);
+const HOTPATH_DEMOTED_SOURCES = new Set(
+  [...HOTPATH_DEMOTED_FETCHERS].map(name => FETCHER_NAME_TO_SOURCE[name] || name.toLowerCase())
+);
+
 
 
 /**
@@ -782,14 +786,15 @@ async function main() {
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
     const duration = Date.now() - startTime;
     stageTimings.step9_write_ms = Date.now() - _stepStart;
-    // Build fetch_results: per-source counts from current fetch (before carry-forward).
-    // This enables alert checks to detect when a source fetches 0 jobs despite having
-    // pool entries from carry-forward (the Google/Apple blind spot from A91).
+    // Build fetch_results: per-source counts from current fetch attempts (before carry-forward).
+    // Demoted hot-path sources are intentionally absent: they were not attempted in this
+    // workflow, so reporting 0 would create a false "source fetch failure" alert.
     const fetchResults = {};
     for (const [source, count] of Object.entries((atsResult.stats || {}).by_source || {})) {
       if (count > 0) fetchResults[source] = (fetchResults[source] || 0) + count;
     }
     for (const [fetcherName, jobs] of Object.entries(fetcherResults)) {
+      if (HOTPATH_DEMOTED_FETCHERS.has(fetcherName)) continue;
       const sourceKey = FETCHER_NAME_TO_SOURCE[fetcherName] || fetcherName.toLowerCase();
       fetchResults[sourceKey] = Array.isArray(jobs) ? jobs.length : 0;
     }
@@ -802,16 +807,28 @@ async function main() {
     if (atsResult.health) {
       Object.assign(fetcherHealth, atsResult.health);
     }
-    // Custom fetcher health
+    // Custom fetcher health. Demoted sources are marked as skipped, not zero:
+    // "zero" means attempted successfully and returned no jobs.
     for (let i = 0; i < fetcherNames.length; i++) {
       const name = fetcherNames[i];
+      const source = FETCHER_NAME_TO_SOURCE[name] || name.toLowerCase();
+      if (HOTPATH_DEMOTED_FETCHERS.has(name)) {
+        fetcherHealth[name] = {
+          status: 'skipped',
+          source,
+          jobs: null,
+          reason: 'hot_path_demoted',
+          timestamp: healthNow,
+        };
+        continue;
+      }
       const result = phaseBSettled[i];
       if (!result) continue;
       const jobs = result.status === 'fulfilled' ? result.value : [];
       const count = Array.isArray(jobs) ? jobs.length : 0;
       fetcherHealth[name] = {
         status: result.status === 'rejected' ? 'error' : count > 0 ? 'alive' : 'zero',
-        source: FETCHER_NAME_TO_SOURCE[name] || name.toLowerCase(),
+        source,
         jobs: count,
         timestamp: healthNow,
         ...(result.status === 'rejected' ? { detail: result.reason?.message } : {}),
@@ -1112,6 +1129,10 @@ function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStat
 
     // INF-OBSERV-3: Per-stage timing breakdown (ms)
     stage_timings: stageTimings || {},
+
+    // AGG-HOTPATH-1: Sources intentionally excluded from the fast publish workflow.
+    // Alerting must distinguish "not attempted here" from "attempted and fetched 0".
+    hot_path_demoted_sources: [...HOTPATH_DEMOTED_SOURCES],
 
     // A91: Per-source fetch counts from current run (before carry-forward merge).
     // Enables alert checks to detect source fetch failures masked by carry-forward.
