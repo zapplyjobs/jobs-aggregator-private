@@ -134,6 +134,17 @@ function readDescriptionSidecarLines(source) {
   } catch { return 0; }
 }
 
+function readSupplementalMetadata(source) {
+  const p = path.join(JOBS_DATA_DIR, `supplemental-${source}-metadata.json`);
+  if (!fs.existsSync(p)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+
 // ─── Computation helpers ───────────────────────────────────────────────────
 
 const TECH_DOMAINS = new Set(['software', 'data_science', 'hardware', 'ai']);
@@ -218,8 +229,9 @@ async function buildSnapshot(meta, repoStats) {
     ats_stats: metadata?.ats_stats || null,
   };
 
-  // Enrichment
+  // Enrichment / supplemental lane visibility
   const jsearchSidecarLines = readDescriptionSidecarLines('jsearch');
+  const oracleSupplemental = readSupplementalMetadata('oracle');
   const enrichment = enrichStats ? {
     total_enriched: enrichStats.total_enriched ?? null,
     total_has_description: enrichStats.total_has_description ?? null,
@@ -265,6 +277,13 @@ async function buildSnapshot(meta, repoStats) {
       last_run_at: meta.generatedAt,
       last_run_id: RUN_ID,
       ttl_expiring_7d: ttlExpiring7d,
+      supplemental_lanes: {
+        oracle: oracleSupplemental ? {
+          generated_at: oracleSupplemental.generated_at ?? null,
+          jobs_fetched: oracleSupplemental.jobs_fetched ?? null,
+          duration_ms: oracleSupplemental.duration_ms ?? null,
+        } : null,
+      },
     },
     repos: repoStats.repos,
     open_decisions: openDecisions,
@@ -483,6 +502,7 @@ async function main() {
       submodule_head: snapshot.pipeline.submodule_head,
       last_run_status: snapshot.pipeline.last_run_status,
       last_run_at: snapshot.pipeline.last_run_at,
+      supplemental_lanes: snapshot.pipeline.supplemental_lanes,
     },
     repos: snapshot.repos,
     tag_history: snapshot.tag_history,
