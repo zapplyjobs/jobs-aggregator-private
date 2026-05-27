@@ -131,6 +131,52 @@ const HOTPATH_DEMOTED_SOURCES = new Set(
   [...HOTPATH_DEMOTED_FETCHERS].map(name => FETCHER_NAME_TO_SOURCE[name] || name.toLowerCase())
 );
 
+const SUPPLEMENTAL_LANE_FILES = [
+  {
+    lane: 'oracle',
+    jobsFile: path.join(DATA_DIR, 'supplemental-oracle-jobs.json'),
+    metaFile: path.join(DATA_DIR, 'supplemental-oracle-metadata.json'),
+  },
+  {
+    lane: 'custom',
+    jobsFile: path.join(DATA_DIR, 'supplemental-custom-jobs.json'),
+    metaFile: path.join(DATA_DIR, 'supplemental-custom-metadata.json'),
+  },
+];
+
+function loadSupplementalInputs() {
+  const jobs = [];
+  const inputs = {};
+  const sourcesUsed = new Set();
+  for (const lane of SUPPLEMENTAL_LANE_FILES) {
+    if (!fs.existsSync(lane.jobsFile) || !fs.existsSync(lane.metaFile)) continue;
+    try {
+      const laneJobs = JSON.parse(fs.readFileSync(lane.jobsFile, 'utf8'));
+      const laneMeta = JSON.parse(fs.readFileSync(lane.metaFile, 'utf8'));
+      if (!Array.isArray(laneJobs)) continue;
+      const bySource = {};
+      for (const job of laneJobs) {
+        if (!job || typeof job !== 'object') continue;
+        const source = typeof job.source === 'string' ? job.source.toLowerCase() : null;
+        if (!source) continue;
+        sourcesUsed.add(source);
+        bySource[source] = (bySource[source] || 0) + 1;
+        jobs.push(job);
+      }
+      inputs[lane.lane] = {
+        generated_at: laneMeta.generated_at || null,
+        jobs_loaded: laneJobs.length,
+        by_source: bySource,
+        publish_contract: laneMeta.publish_contract || null,
+      };
+    } catch (e) {
+      console.warn(`⚠️ Supplemental lane ${lane.lane}: could not load artifact (${e.message})`);
+    }
+  }
+  return { jobs, inputs, sourcesUsed };
+}
+
+
 
 
 /**
@@ -436,6 +482,16 @@ async function main() {
       allJobs.push(...fetcherResults[name]);
     });
 
+    const supplementalInputs = loadSupplementalInputs();
+    if (supplementalInputs.jobs.length > 0) {
+      allJobs.push(...supplementalInputs.jobs);
+      console.log(`  Supplemental lanes merged: ${supplementalInputs.jobs.length} jobs`);
+      for (const [lane, info] of Object.entries(supplementalInputs.inputs)) {
+        console.log(`   - ${lane}: ${info.jobs_loaded} jobs from supplemental artifact`);
+      }
+    }
+
+
     console.log('');
     console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
     stageTimings.step1_fetch_ms = Date.now() - _stepStart;
@@ -462,6 +518,9 @@ async function main() {
     for (const [fetcherName, jobs] of Object.entries(fetcherResults)) {
       const sourceKey = FETCHER_NAME_TO_SOURCE[fetcherName] || fetcherName.toLowerCase();
       if (Array.isArray(jobs) && jobs.length > 0) successfulSources.add(sourceKey);
+    }
+    for (const source of supplementalInputs.sourcesUsed) {
+      successfulSources.add(source);
     }
     if (successfulSources.size > 0) {
       console.log(`   🔍 AGG-PIPE-4: ${successfulSources.size} sources fetched successfully: ${[...successfulSources].join(', ')}`);
@@ -853,6 +912,7 @@ async function main() {
       fpStats,
       fetchResults,
       fetcherHealth,
+      supplementalInputs: supplementalInputs.inputs,
     });
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
@@ -976,7 +1036,7 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
-function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth }) {
+function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth, supplementalInputs }) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -1133,6 +1193,9 @@ function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStat
     // AGG-HOTPATH-1: Sources intentionally excluded from the fast publish workflow.
     // Alerting must distinguish "not attempted here" from "attempted and fetched 0".
     hot_path_demoted_sources: [...HOTPATH_DEMOTED_SOURCES],
+
+    supplemental_inputs: supplementalInputs || {},
+
 
     // A91: Per-source fetch counts from current run (before carry-forward merge).
     // Enables alert checks to detect source fetch failures masked by carry-forward.

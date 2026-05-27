@@ -218,6 +218,39 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
+
+    - name: "Seed supplemental lane artifacts from R2"
+      run: |
+        echo "📥 Seeding supplemental lane artifacts..."
+        node -e "
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        const path = require('path');
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          const files = [
+            'supplemental-oracle-jobs.json',
+            'supplemental-oracle-metadata.json',
+            'supplemental-custom-jobs.json',
+            'supplemental-custom-metadata.json',
+          ];
+          let ok = 0;
+          for (const file of files) {
+            try {
+              const result = await r2.downloadToFile(file, path.join('.github/data', file));
+              if (result) ok++;
+            } catch {}
+          }
+          console.log('SEEDED:' + ok);
+          if (ok === 0) process.exit(1);
+        }
+        main().catch(() => process.exit(1));
+        " && echo "✅ Supplemental artifacts seeded from R2" || echo "⚠️ No supplemental artifacts available yet"
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
     - name: Pre-pipeline integrity check
       run: |
         echo "🔍 Pre-pipeline integrity check (TAG-AUDIT-4)..."
