@@ -59,7 +59,15 @@ async function main() {
 
   const durationMs = Date.now() - start;
   const metadata = {
+    schema: 'supplemental-lane-v1',
     generated_at: new Date().toISOString(),
+    lane_name: 'custom',
+    publish_contract: {
+      blocks_fast_publish: false,
+      included_in_main_all_jobs: false,
+      merge_mode: 'separate_artifact',
+      visibility: 'snapshot_only',
+    },
     source: 'custom',
     sources: {
       google: google.length,

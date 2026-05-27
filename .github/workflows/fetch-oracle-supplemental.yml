@@ -58,6 +58,13 @@ jobs:
           assert isinstance(jobs, list)
           assert isinstance(meta.get('jobs_fetched'), int)
           assert meta.get('source') == 'oracle'
+          assert meta.get('schema') == 'supplemental-lane-v1'
+          assert meta.get('lane_name') == 'oracle'
+          contract = meta.get('publish_contract') or {}
+          assert contract.get('blocks_fast_publish') is False
+          assert contract.get('included_in_main_all_jobs') is False
+          assert contract.get('merge_mode') == 'separate_artifact'
+          assert contract.get('visibility') == 'snapshot_only'
           print('jobs', len(jobs))
           print('meta_jobs', meta['jobs_fetched'])
           PY
