@@ -135,7 +135,7 @@ function readDescriptionSidecarLines(source) {
 }
 
 function readSupplementalMetadata(source) {
-  const p = path.join(JOBS_DATA_DIR, `supplemental-${source}-metadata.json`);
+  const p = path.join(DATA_DIR, `supplemental-${source}-metadata.json`);
   if (!fs.existsSync(p)) return null;
   try {
     return JSON.parse(fs.readFileSync(p, 'utf8'));
