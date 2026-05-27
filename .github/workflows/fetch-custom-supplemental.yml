@@ -1,0 +1,85 @@
+name: Fetch Custom Supplemental
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fetch-custom-supplemental:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 1
+          submodules: recursive
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Fix submodule index
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --force --recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create data directory
+        run: mkdir -p .github/data
+
+      - name: Seed descriptions-microsoft.jsonl from R2
+        run: |
+          node -e "
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          async function main() {
+            const r2 = createR2Client({ prefix: 'data/' });
+            const result = await r2.downloadToFile('descriptions-microsoft.jsonl', '.github/data/descriptions-microsoft.jsonl');
+            if (result) { console.log('R2_OK'); } else { process.exit(1); }
+          }
+          main().catch(() => process.exit(1));
+          " && echo "✅ Seeded Microsoft cache" || echo "⚠️ No Microsoft cache yet"
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
+      - name: Fetch custom supplemental lane
+        run: node .github/scripts/fetch-supplemental-custom.js
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
+      - name: Verify output files
+        run: |
+          test -f .github/data/supplemental-custom-jobs.json
+          test -f .github/data/supplemental-custom-metadata.json
+          python3 - <<'PY'
+          import json
+          jobs = json.load(open('.github/data/supplemental-custom-jobs.json'))
+          meta = json.load(open('.github/data/supplemental-custom-metadata.json'))
+          assert isinstance(jobs, list)
+          assert meta.get('source') == 'custom'
+          assert set(meta.get('sources', {}).keys()) == {'google','microsoft','tiktok'}
+          print('jobs', len(jobs))
+          print('sources', meta['sources'])
+          PY
+
+      - name: Display custom supplemental summary
+        if: always()
+        run: |
+          cat .github/data/supplemental-custom-metadata.json | jq .
