@@ -34,6 +34,9 @@ Thumbs.db
 # Keeping them tracked in aggregator HEAD bloats checkout without improving recovery.
 .github/data/descriptions-enriched-*.jsonl
 
+# Tag history is seeded from R2/GitHub at runtime.
+.github/data/tag-history.jsonl
+
 # All description sidecars are runtime-seeded from R2/jobs-data.
 # They are needed locally during runs, but not as tracked source files in AGG HEAD.
 .github/data/descriptions-*.jsonl
