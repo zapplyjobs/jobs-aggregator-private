@@ -1,6 +1,8 @@
 name: Fetch Custom Supplemental
 
 on:
+  schedule:
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 concurrency:
