@@ -520,6 +520,28 @@ jobs:
             echo "❌ jobs-metadata.json missing freshness or top_companies fields"
             PASS=false
           fi
+
+          # AGG-MEASURE-1: rollout projection is an AGG decision contract.
+          # If this disappears, future level/source decisions silently fall back to stale prose.
+          HAS_SENIOR_PROJECTION=$(python3 -c "
+        import json
+        m = json.load(open('.github/data/jobs-metadata.json'))
+        p = m.get('senior_rollout_projection') or {}
+        ok = (
+            isinstance(p.get('sample_basis'), dict)
+            and isinstance(p.get('by_source'), dict)
+            and isinstance(p.get('by_domain'), dict)
+            and isinstance(p.get('by_surface'), dict)
+            and p.get('quality', {}).get('surface_projection_exact') is False
+        )
+        print(1 if ok else 0)
+        " 2>/dev/null || echo 0)
+          if [ "$HAS_SENIOR_PROJECTION" -eq 1 ]; then
+            echo "✅ jobs-metadata.json has senior_rollout_projection contract"
+          else
+            echo "❌ jobs-metadata.json missing valid senior_rollout_projection contract"
+            PASS=false
+          fi
         fi
 
         # AGG-PIPE-8: File-existence checks for critical submodule files.
