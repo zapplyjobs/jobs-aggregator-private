@@ -38,7 +38,7 @@ const { fetchAllTiktokJobs } = require(`${SHARED}/fetchers/tiktok`);
 const { validateAndNormalizeJobs, printValidationSummary, normalizeJob } = require(`${SHARED}/processors/validator`);
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
 const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS, INTERNSHIP_TTL_MS } = require(`${SHARED}/processors/deduplicator`);
-const { tagJobs, generateTagStats, tagEmployment, tagDomains, setCompanyOverrideMap, TAG_ENGINE_VERSION, getKeywordMap } = require(`${SHARED}/processors/tag-engine`);
+const { tagJobs, generateTagStats, tagEmployment, tagDomains, tagLocations, setCompanyOverrideMap, TAG_ENGINE_VERSION, getKeywordMap } = require(`${SHARED}/processors/tag-engine`);
 const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport, checkKeywordHealth, checkKeywordOverlap } = require(`${SHARED}/processors/tag-monitor`);
 
 // Import utils
@@ -1036,6 +1036,54 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
  * @param {Object} seniorFilterMetrics - Senior filter metrics
  * @returns {Object} - Metadata object
  */
+
+function buildSeniorRolloutProjection(seniorJobs, seniorBySource) {
+  const projection = {
+    generated_at: new Date().toISOString(),
+    sample_basis: {
+      type: 'current_run_filtered_senior_jobs',
+      total_senior_filtered: Array.isArray(seniorJobs) ? seniorJobs.length : 0,
+    },
+    by_source: seniorBySource || {},
+    by_domain: {},
+    by_surface: {
+      ngj_main: 0,
+      software: 0,
+      data_science: 0,
+      hardware: 0,
+      healthcare: 0,
+    },
+    quality: {
+      surface_projection_exact: false,
+      surface_projection_method: 'directional_current_run_domain_location_mapping',
+      notes: 'Directional projection for current-run senior-filtered jobs. Source counts are exact; domain and surface counts use tag-engine projection on filtered jobs and should guide rollout decisions, not exact publish counts.',
+    },
+  };
+
+  if (!Array.isArray(seniorJobs) || seniorJobs.length === 0) return projection;
+
+  const mainSurfaceDomains = new Set(['software', 'data_science', 'hardware', 'ai', 'finance']);
+  for (const job of seniorJobs) {
+    const domains = tagDomains(job);
+    const normalizedDomains = domains.length > 0 ? domains : ['general'];
+    for (const domain of normalizedDomains) {
+      projection.by_domain[domain] = (projection.by_domain[domain] || 0) + 1;
+    }
+
+    const locations = tagLocations(job);
+    const isUs = locations.includes('us');
+    if (!isUs) continue;
+
+    if (normalizedDomains.some(domain => mainSurfaceDomains.has(domain))) projection.by_surface.ngj_main++;
+    if (normalizedDomains.includes('software')) projection.by_surface.software++;
+    if (normalizedDomains.includes('data_science') || normalizedDomains.includes('ai')) projection.by_surface.data_science++;
+    if (normalizedDomains.includes('hardware')) projection.by_surface.hardware++;
+    if (normalizedDomains.includes('healthcare')) projection.by_surface.healthcare++;
+  }
+
+  return projection;
+}
+
 function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth, supplementalInputs }) {
   const bySource = {};
   const byEmploymentType = {};
@@ -1143,6 +1191,9 @@ function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStat
       by_source: seniorBySource,
       ...(fpStats || {}),
     },
+
+    // AGG-MEASURE-1: Directional rollout projection for filtered senior jobs.
+    senior_rollout_projection: buildSeniorRolloutProjection(seniorJobs, seniorBySource),
 
     // Tag statistics (Phase 1)
     tag_stats: tagStats,
