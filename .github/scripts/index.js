@@ -108,6 +108,11 @@ function resolvePostedAt(publicJobs, prevLines) {
 // SmartRecruiters: owned by enrichment workflow (DESC-MIGRATE-1), not main pipeline.
 const PIPE4_EXCLUDED_SOURCES = new Set(['workday', 'smartrecruiters']);
 
+// Sources that are no longer fetched by any active lane must not survive through
+// the internship 120-day rolling window. If a retired source is absent from the
+// current run, carry-forward would otherwise preserve stale skeleton listings.
+const RETIRED_CARRY_FORWARD_SOURCES = new Set(['jsearch']);
+
 // AGG-PIPE-4: Map Phase B fetcher display names to job source field values.
 const FETCHER_NAME_TO_SOURCE = {
   'Amazon': 'amazon',
@@ -192,6 +197,7 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
   let nullDateCount = 0;
   let fpSkipCount = 0;
   let closedDetected = 0;
+  let retiredSourceDropped = 0;
   for (const line of prevLines) {
     try {
       const job = JSON.parse(line);
@@ -202,6 +208,10 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
       const jobTtlMs = job.tags?.employment === 'internship' ? INTERNSHIP_TTL_MS : DEDUPE_TTL_MS;
       if (postedTs < Date.now() - jobTtlMs) continue;
       if (isSeniorJob(job)) continue;
+      if (RETIRED_CARRY_FORWARD_SOURCES.has((job.source || '').toLowerCase())) {
+        retiredSourceDropped++;
+        continue;
+      }
       // AGG-PIPE-4: Skip carry-forward for successfully-fetched sources (job is closed)
       if (successfulSources.has(job.source) && !PIPE4_EXCLUDED_SOURCES.has(job.source)) {
         closedDetected++;
@@ -235,6 +245,9 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
   }
   if (closedDetected > 0) {
     console.log(`🔍 AGG-PIPE-4: ${closedDetected} carry-forward jobs detected as closed (source fetched successfully, job absent)`);
+  }
+  if (retiredSourceDropped > 0) {
+    console.log(`🧹 Retired sources: dropped ${retiredSourceDropped} prior-run jobs from disabled sources (${[...RETIRED_CARRY_FORWARD_SOURCES].join(', ')})`);
   }
   if (mergedCount > 0) {
     publicJobs.sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0));
@@ -1339,4 +1352,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main };
+module.exports = { main, mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES };
