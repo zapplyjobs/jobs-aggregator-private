@@ -711,11 +711,19 @@ jobs:
         if [ -n "$(git status --porcelain)" ]; then
           WEEK=$(ls data/*.jsonl 2>/dev/null | tail -1 | xargs basename 2>/dev/null || echo "unknown")
           git commit -m "archive: update ${WEEK} - $(date -u +%Y-%m-%d)"
+          PUSHED=false
           for i in 1 2 3; do
-            git pull --rebase origin main && git push origin main && break
+            if git pull --rebase origin main && git push origin main; then
+              PUSHED=true
+              break
+            fi
             echo "Archive push attempt $i failed, retrying in 5s..."
             sleep 5
           done
+          if [ "$PUSHED" != "true" ]; then
+            echo "::error::Archive push failed after 3 attempts"
+            exit 1
+          fi
           echo "✅ Archive pushed to jobs-archive-private"
         else
           echo "ℹ️ No new archive data to push"
@@ -739,15 +747,24 @@ jobs:
           const r2 = createR2Client({ prefix: 'archive/' });
           const dir = '.github/data/archive';
           const files = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl'));
+          if (files.length === 0) {
+            console.log('Archive R2 mirror: no archive files found');
+            return;
+          }
           let ok = 0;
+          const failed = [];
           for (const f of files) {
             const data = fs.readFileSync(path.join(dir, f), 'utf8');
             const uploaded = await r2.uploadRaw(f, data, 'application/x-jsonlines');
             if (uploaded) ok++;
+            else failed.push(f);
           }
           console.log('Archive R2 mirror: ' + ok + '/' + files.length + ' files uploaded');
+          if (failed.length > 0) {
+            throw new Error('Archive R2 mirror failed for: ' + failed.join(', '));
+          }
         }
-        main().catch(e => { console.error('Archive R2 mirror failed: ' + e.message); });
+        main().catch(e => { console.error('Archive R2 mirror failed: ' + e.message); process.exit(1); });
         "
       env:
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
