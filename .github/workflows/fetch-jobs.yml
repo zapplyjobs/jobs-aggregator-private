@@ -755,23 +755,6 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-    - name: Dispatch supplemental workflows (temporary fallback)
-      if: success()
-      env:
-        GH_TOKEN: ${{ secrets.GH_PAT }}
-      run: |
-        set -euo pipefail
-        for workflow in fetch-oracle-supplemental.yml fetch-custom-supplemental.yml; do
-          active=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?per_page=5" \
-            --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')
-          if [ "$active" = "0" ]; then
-            gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
-            echo "Dispatched $workflow"
-          else
-            echo "Skipped $workflow ($active active/queued run(s))"
-          fi
-        done
-
     - name: Notify on failure
       if: failure()
       env:
