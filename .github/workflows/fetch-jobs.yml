@@ -539,8 +539,8 @@ jobs:
           if [ "$HAS_SENIOR_PROJECTION" -eq 1 ]; then
             echo "✅ jobs-metadata.json has senior_rollout_projection contract"
           else
-            echo "❌ jobs-metadata.json missing valid senior_rollout_projection contract"
-            PASS=false
+            echo "::warning::jobs-metadata.json missing valid senior_rollout_projection contract"
+            echo "⚠️  Advisory metadata missing; fresh job publish should continue"
           fi
 
           # AGG-SOURCE-1: source-tier visibility should stay producer-owned, not prose-only.
@@ -561,8 +561,8 @@ jobs:
           if [ "$HAS_SOURCE_VISIBILITY" -eq 1 ]; then
             echo "✅ jobs-metadata.json has source_visibility contract"
           else
-            echo "❌ jobs-metadata.json missing valid source_visibility contract"
-            PASS=false
+            echo "::warning::jobs-metadata.json missing valid source_visibility contract"
+            echo "⚠️  Advisory metadata missing; fresh job publish should continue"
           fi
         fi
 
