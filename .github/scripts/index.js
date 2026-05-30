@@ -509,6 +509,7 @@ async function main() {
     console.log('');
     console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
     stageTimings.step1_fetch_ms = Date.now() - _stepStart;
+    pipelineTimestamps.fetch_completed_at = new Date().toISOString();
     console.log(`   - ATS: ${atsResult.jobs.length} jobs`);
     for (const name of fetcherNames) {
       console.log(`   - ${name}: ${fetcherResults[name].length} jobs`);
@@ -781,6 +782,8 @@ async function main() {
     console.log('📄 Step 8b: Writing description sidecars...');
     _stepStart = Date.now();
     const { writtenFiles: sidecarFiles, stats: sidecarStats } = writeSidecars(sortedJobs, DATA_DIR);
+    stageTimings.step8b_sidecars_ms = Date.now() - _stepStart;
+    pipelineTimestamps.sidecars_written_at = new Date().toISOString();
     console.log('');
 
     // Step 9: Write output files
@@ -859,6 +862,7 @@ async function main() {
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
     const duration = Date.now() - startTime;
     stageTimings.step9_write_ms = Date.now() - _stepStart;
+    pipelineTimestamps.output_ready_at = new Date().toISOString();
     // Build fetch_results: per-source counts from current fetch attempts (before carry-forward).
     // Demoted hot-path sources are intentionally absent: they were not attempted in this
     // workflow, so reporting 0 would create a false "source fetch failure" alert.
