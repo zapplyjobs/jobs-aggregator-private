@@ -1108,10 +1108,10 @@ function buildSourceVisibilitySummary(jobs) {
     if (ageMs <= 72 * 60 * 60 * 1000) row.freshness.last_72h++;
 
     if (!row.newest_posted_at || postedMs > new Date(row.newest_posted_at).getTime()) {
-      row.newest_posted_at = job.posted_at;
+      row.newest_posted_at = new Date(postedMs).toISOString();
     }
     if (!row.oldest_posted_at || postedMs < new Date(row.oldest_posted_at).getTime()) {
-      row.oldest_posted_at = job.posted_at;
+      row.oldest_posted_at = new Date(postedMs).toISOString();
     }
   }
 
