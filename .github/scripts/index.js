@@ -300,6 +300,7 @@ function computeFullPoolTagStats(publicJobs) {
 async function main() {
   const startTime = Date.now();
   const stageTimings = {};
+  const pipelineTimestamps = { started_at: new Date(startTime).toISOString() };
 
   console.log('🚀 Jobs Data Fetcher - Starting...');
   console.log('═'.repeat(60));
@@ -508,6 +509,7 @@ async function main() {
     console.log('');
     console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
     stageTimings.step1_fetch_ms = Date.now() - _stepStart;
+    pipelineTimestamps.fetch_completed_at = new Date().toISOString();
     console.log(`   - ATS: ${atsResult.jobs.length} jobs`);
     for (const name of fetcherNames) {
       console.log(`   - ${name}: ${fetcherResults[name].length} jobs`);
@@ -780,6 +782,8 @@ async function main() {
     console.log('📄 Step 8b: Writing description sidecars...');
     _stepStart = Date.now();
     const { writtenFiles: sidecarFiles, stats: sidecarStats } = writeSidecars(sortedJobs, DATA_DIR);
+    stageTimings.step8b_sidecars_ms = Date.now() - _stepStart;
+    pipelineTimestamps.sidecars_written_at = new Date().toISOString();
     console.log('');
 
     // Step 9: Write output files
@@ -858,6 +862,7 @@ async function main() {
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
     const duration = Date.now() - startTime;
     stageTimings.step9_write_ms = Date.now() - _stepStart;
+    pipelineTimestamps.output_ready_at = new Date().toISOString();
     // Build fetch_results: per-source counts from current fetch attempts (before carry-forward).
     // Demoted hot-path sources are intentionally absent: they were not attempted in this
     // workflow, so reporting 0 would create a false "source fetch failure" alert.
@@ -908,6 +913,7 @@ async function main() {
     }
 
     const metadata = generateMetadata({
+      startTime,
       jobs: publicJobs,
       uniqueCount: dedupedJobs.length,
       duplicateCount: duplicates,
@@ -918,6 +924,7 @@ async function main() {
       seniorJobs,
       zeroYieldCompanies,
       stageTimings,
+      pipelineTimestamps,
       tagDriftReport,
       tagPrecisionReport,
       keywordHealthReport,
@@ -1073,6 +1080,28 @@ const SOURCE_TIER_POLICY = {
 
 const TECH_US_DOMAINS = new Set(['software', 'data_science', 'hardware', 'ai', 'finance']);
 
+function buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps }) {
+  return {
+    pipeline_started_at: new Date(startTime).toISOString(),
+    fetch_completed_at: pipelineTimestamps.fetch_completed_at || null,
+    sidecars_written_at: pipelineTimestamps.sidecars_written_at || null,
+    output_ready_at: pipelineTimestamps.output_ready_at || null,
+    total_runtime_ms: duration,
+    step_timings_ms: {
+      step1_fetch_ms: stageTimings.step1_fetch_ms || 0,
+      step2_enhance_ms: stageTimings.step2_enhance_ms || 0,
+      step3_validate_ms: stageTimings.step3_validate_ms || 0,
+      step4_filter_ms: stageTimings.step4_filter_ms || 0,
+      step5_tag_ms: stageTimings.step5_tag_ms || 0,
+      step6_dedup_ms: stageTimings.step6_dedup_ms || 0,
+      step8_sort_ms: stageTimings.step8_sort_ms || 0,
+      step8b_sidecars_ms: stageTimings.step8b_sidecars_ms || 0,
+      step9_write_ms: stageTimings.step9_write_ms || 0,
+      step12_commit_ms: stageTimings.step12_commit_ms || 0,
+    },
+  };
+}
+
 function buildSourceVisibilitySummary(jobs) {
   const now = Date.now();
   const sources = {};
@@ -1178,7 +1207,7 @@ function buildSeniorRolloutProjection(seniorJobs, seniorBySource) {
   return projection;
 }
 
-function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth, supplementalInputs }) {
+function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, pipelineTimestamps, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth, supplementalInputs }) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -1291,6 +1320,9 @@ function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStat
 
     // AGG-SOURCE-1: Source tier/value/freshness visibility for operator decisions.
     source_visibility: buildSourceVisibilitySummary(jobs),
+
+    // AGG latency markers: producer-owned timing anchors for downstream latency measurement.
+    latency_markers: buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps }),
 
     // Tag statistics (Phase 1)
     tag_stats: tagStats,

@@ -564,6 +564,27 @@ jobs:
             echo "::warning::jobs-metadata.json missing valid source_visibility contract"
             echo "⚠️  Advisory metadata missing; fresh job publish should continue"
           fi
+
+          HAS_LATENCY_MARKERS=$(python3 -c "
+        import json
+        m = json.load(open('.github/data/jobs-metadata.json'))
+        lm = m.get('latency_markers') or {}
+        steps = lm.get('step_timings_ms') or {}
+        ok = (
+            isinstance(lm.get('pipeline_started_at'), str)
+            and isinstance(lm.get('output_ready_at'), str)
+            and isinstance(steps.get('step1_fetch_ms'), int)
+            and isinstance(steps.get('step8b_sidecars_ms'), int)
+            and isinstance(steps.get('step9_write_ms'), int)
+        )
+        print(1 if ok else 0)
+        " 2>/dev/null || echo 0)
+          if [ "$HAS_LATENCY_MARKERS" -eq 1 ]; then
+            echo "✅ jobs-metadata.json has latency_markers contract"
+          else
+            echo "::warning::jobs-metadata.json missing valid latency_markers contract"
+            echo "⚠️  Advisory metadata missing; fresh job publish should continue"
+          fi
         fi
 
         # AGG-PIPE-8: File-existence checks for critical submodule files.
