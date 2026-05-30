@@ -1050,6 +1050,87 @@ function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
  * @returns {Object} - Metadata object
  */
 
+
+const SOURCE_TIER_POLICY = {
+  workday: 'tier_a_core',
+  greenhouse: 'tier_a_core',
+  ashby: 'tier_a_core',
+  lever: 'tier_a_optional',
+  smartrecruiters: 'tier_b_async_material',
+  oracle: 'tier_b_c_scrutiny',
+  apple: 'tier_b_c_scrutiny',
+  google: 'tier_b_c_scrutiny',
+  microsoft: 'tier_b_c_scrutiny',
+  amd: 'tier_b_c_scrutiny',
+  amazon: 'tier_b_c_scrutiny',
+  tiktok: 'tier_b_c_scrutiny',
+  simplify: 'tier_c_fallback',
+  jsearch: 'tier_c_fallback',
+  eightfold: 'tier_c_fallback',
+  uber: 'tier_c_fallback',
+  twosigma: 'tier_c_fallback',
+};
+
+const TECH_US_DOMAINS = new Set(['software', 'data_science', 'hardware', 'ai', 'finance']);
+
+function buildSourceVisibilitySummary(jobs) {
+  const now = Date.now();
+  const sources = {};
+
+  for (const job of jobs || []) {
+    const source = job.source || 'unknown';
+    const row = sources[source] || (sources[source] = {
+      tier: SOURCE_TIER_POLICY[source] || 'unclassified',
+      total_jobs: 0,
+      tech_us_jobs: 0,
+      freshness: {
+        last_24h: 0,
+        last_72h: 0,
+      },
+      newest_posted_at: null,
+      oldest_posted_at: null,
+    });
+
+    row.total_jobs++;
+
+    const domains = job.tags?.domains || [];
+    const locations = job.tags?.locations || [];
+    if (locations.includes('us') && domains.some(domain => TECH_US_DOMAINS.has(domain))) {
+      row.tech_us_jobs++;
+    }
+
+    if (!job.posted_at) continue;
+    const postedMs = new Date(job.posted_at).getTime();
+    if (!Number.isFinite(postedMs)) continue;
+
+    const ageMs = now - postedMs;
+    if (ageMs <= 24 * 60 * 60 * 1000) row.freshness.last_24h++;
+    if (ageMs <= 72 * 60 * 60 * 1000) row.freshness.last_72h++;
+
+    if (!row.newest_posted_at || postedMs > new Date(row.newest_posted_at).getTime()) {
+      row.newest_posted_at = job.posted_at;
+    }
+    if (!row.oldest_posted_at || postedMs < new Date(row.oldest_posted_at).getTime()) {
+      row.oldest_posted_at = job.posted_at;
+    }
+  }
+
+  return {
+    generated_at: new Date().toISOString(),
+    policy_version: 'source-tier-a141',
+    metric_basis: 'final_public_pool',
+    tech_us_definition: ['software', 'data_science', 'hardware', 'ai', 'finance'].join('+') + ' with us location tag',
+    tiers: {
+      tier_a_core: ['workday', 'greenhouse', 'ashby'],
+      tier_a_optional: ['lever'],
+      tier_b_async_material: ['smartrecruiters'],
+      tier_b_c_scrutiny: ['oracle', 'apple', 'google', 'microsoft', 'amd', 'amazon', 'tiktok'],
+      tier_c_fallback: ['simplify', 'jsearch', 'eightfold', 'uber', 'twosigma'],
+    },
+    sources,
+  };
+}
+
 function buildSeniorRolloutProjection(seniorJobs, seniorBySource) {
   const projection = {
     generated_at: new Date().toISOString(),
@@ -1207,6 +1288,9 @@ function generateMetadata({ jobs, uniqueCount, duplicateCount, duration, tagStat
 
     // AGG-MEASURE-1: Directional rollout projection for filtered senior jobs.
     senior_rollout_projection: buildSeniorRolloutProjection(seniorJobs, seniorBySource),
+
+    // AGG-SOURCE-1: Source tier/value/freshness visibility for operator decisions.
+    source_visibility: buildSourceVisibilitySummary(jobs),
 
     // Tag statistics (Phase 1)
     tag_stats: tagStats,
