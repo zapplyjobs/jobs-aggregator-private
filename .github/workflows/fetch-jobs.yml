@@ -542,6 +542,28 @@ jobs:
             echo "❌ jobs-metadata.json missing valid senior_rollout_projection contract"
             PASS=false
           fi
+
+          # AGG-SOURCE-1: source-tier visibility should stay producer-owned, not prose-only.
+          HAS_SOURCE_VISIBILITY=$(python3 -c "
+        import json
+        m = json.load(open('.github/data/jobs-metadata.json'))
+        s = m.get('source_visibility') or {}
+        sources = s.get('sources') or {}
+        required = {'workday', 'greenhouse', 'ashby'}
+        ok = (
+            s.get('policy_version') == 'source-tier-a141'
+            and isinstance(sources, dict)
+            and required.issubset(set(sources.keys()))
+            and all(isinstance(sources[src].get('tech_us_jobs'), int) for src in required)
+        )
+        print(1 if ok else 0)
+        " 2>/dev/null || echo 0)
+          if [ "$HAS_SOURCE_VISIBILITY" -eq 1 ]; then
+            echo "✅ jobs-metadata.json has source_visibility contract"
+          else
+            echo "❌ jobs-metadata.json missing valid source_visibility contract"
+            PASS=false
+          fi
         fi
 
         # AGG-PIPE-8: File-existence checks for critical submodule files.
