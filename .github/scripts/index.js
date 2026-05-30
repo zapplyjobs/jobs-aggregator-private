@@ -920,6 +920,7 @@ async function main() {
       seniorJobs,
       zeroYieldCompanies,
       stageTimings,
+      pipelineTimestamps,
       tagDriftReport,
       tagPrecisionReport,
       keywordHealthReport,
