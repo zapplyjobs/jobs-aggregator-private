@@ -202,7 +202,7 @@ function shouldTreatCompanyScopedSourceJobClosed(job, fetcherHealth) {
   return health?.source === source && health?.status === 'alive';
 }
 
-function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, stripFields, successfulSources, fetcherHealth) {
+function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, stripFields, successfulSources, companyFetchHealth) {
 
   let mergedCount = 0;
   let nullDateCount = 0;
@@ -231,7 +231,7 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
       // A141: For Workday / SmartRecruiters, source-level success is too coarse because one tenant can fail
       // or be skipped unchanged while others succeed. But if the specific company fetched successfully and
       // returned >0 jobs this run, an absent prior job from that same company/source is safe to treat as closed.
-      if (shouldTreatCompanyScopedSourceJobClosed(job, fetcherHealth)) {
+      if (shouldTreatCompanyScopedSourceJobClosed(job, companyFetchHealth)) {
         closedDetected++;
         continue;
       }
@@ -832,7 +832,7 @@ async function main() {
       // AGG-32: Filter stale jobs by posted_at TTL
       resolvePostedAt(publicJobs, prevLines);
 
-      mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, STRIP_FIELDS, successfulSources, fetcherHealth);
+      mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, STRIP_FIELDS, successfulSources, atsResult.health || {});
     }
 
     // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
