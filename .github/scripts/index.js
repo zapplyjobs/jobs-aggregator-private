@@ -192,7 +192,18 @@ function loadSupplementalInputs() {
  * forward — if the source fetched successfully and the job isn't in the results,
  * the job is genuinely closed. Excludes WD and SR (multi-tenant false-positive risk).
  */
-function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, stripFields, successfulSources) {
+function shouldTreatCompanyScopedSourceJobClosed(job, fetcherHealth) {
+  const source = (job.source || '').toLowerCase();
+  if (source !== 'workday' && source !== 'smartrecruiters') return false;
+  if (!fetcherHealth || typeof fetcherHealth !== 'object') return false;
+  const companyKey = job.company_name;
+  if (!companyKey) return false;
+  const health = fetcherHealth[companyKey];
+  return health?.source === source && health?.status === 'alive';
+}
+
+function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, stripFields, successfulSources, fetcherHealth) {
+
   let mergedCount = 0;
   let nullDateCount = 0;
   let fpSkipCount = 0;
@@ -214,6 +225,13 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
       }
       // AGG-PIPE-4: Skip carry-forward for successfully-fetched sources (job is closed)
       if (successfulSources.has(job.source) && !PIPE4_EXCLUDED_SOURCES.has(job.source)) {
+        closedDetected++;
+        continue;
+      }
+      // A141: For Workday / SmartRecruiters, source-level success is too coarse because one tenant can fail
+      // or be skipped unchanged while others succeed. But if the specific company fetched successfully and
+      // returned >0 jobs this run, an absent prior job from that same company/source is safe to treat as closed.
+      if (shouldTreatCompanyScopedSourceJobClosed(job, fetcherHealth)) {
         closedDetected++;
         continue;
       }
@@ -814,7 +832,7 @@ async function main() {
       // AGG-32: Filter stale jobs by posted_at TTL
       resolvePostedAt(publicJobs, prevLines);
 
-      mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, STRIP_FIELDS, successfulSources);
+      mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, STRIP_FIELDS, successfulSources, fetcherHealth);
     }
 
     // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
