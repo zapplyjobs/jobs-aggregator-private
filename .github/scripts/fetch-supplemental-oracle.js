@@ -45,6 +45,8 @@ async function main() {
       included_in_main_all_jobs: false,
       merge_mode: 'separate_artifact',
       visibility: 'snapshot_only',
+      expected_cadence_minutes: 15,
+      max_staleness_minutes: 90,
     },
     source: 'oracle',
     companies_configured: oracleCompanies.length,
