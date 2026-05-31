@@ -960,7 +960,7 @@ async function main() {
 
     // Step 9c: build / refresh Workday family cache for future runs. Output is already written, so
     // cache refresh cannot block user-visible publish correctness.
-    const familyCacheBuildReport = await buildFamilyCache(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR);
+    const familyCacheBuildReport = await buildFamilyCache(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR, { maxDurationMs: 120000 });
     stageTimings.step9c_family_cache_build_ms = familyCacheBuildReport.durationMs;
 
     console.log('');
@@ -1234,113 +1234,6 @@ function buildSeniorRolloutProjection(seniorJobs, seniorBySource) {
   return projection;
 }
 
-/**
- * TAG-DIM-1: Build G1 by-domain breakdown for DASH visibility.
- * Categorizes US general jobs by source, company, fix category, engine version, employment type.
- * @param {Array} jobs - Full public pool (post-merge + post-AGG-32)
- * @returns {Object} g1_breakdown object for metadata
- */
-function buildG1Breakdown(jobs) {
-  const usJobs = jobs.filter(j => j.tags && j.tags.locations && j.tags.locations.includes('us'));
-  const g1Jobs = usJobs.filter(j => j.tags.domains && j.tags.domains.includes('general'));
-
-  if (g1Jobs.length === 0) return null;
-
-  // By source
-  const bySource = {};
-  const sourceTotals = {};
-  for (const j of usJobs) {
-    sourceTotals[j.source] = (sourceTotals[j.source] || 0) + 1;
-  }
-  for (const j of g1Jobs) {
-    bySource[j.source] = (bySource[j.source] || 0) + 1;
-  }
-  const bySourceFormatted = {};
-  for (const [src, g1] of Object.entries(bySource)) {
-    const total = sourceTotals[src] || 0;
-    bySourceFormatted[src] = { g1, total, rate: total > 0 ? Math.round(g1 / total * 1000) / 10 : 0 };
-  }
-
-  // Top 20 companies
-  const companyCounts = {};
-  const companySource = {};
-  const companyDepts = {};
-  for (const j of g1Jobs) {
-    const c = j.company_name || 'unknown';
-    companyCounts[c] = (companyCounts[c] || 0) + 1;
-    companySource[c] = j.source;
-    companyDepts[c] = companyDepts[c] || j.departments?.length > 0;
-  }
-  const top20 = Object.entries(companyCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 20)
-    .map(([company, g1]) => ({
-      company,
-      g1,
-      source: companySource[company],
-      has_departments: !!companyDepts[company],
-    }));
-
-  // Fix categories (heuristic based on source + departments)
-  let needsFamilyMapping = 0; // WD jobs with no departments
-  let familyMapGap = 0;       // WD jobs with departments but still G1
-  let noDescription = 0;      // Simplify T0 with no desc
-  let genuinelyAmbiguous = 0;  // Non-WD, non-Simplify, no domain signal
-  let other = 0;
-  for (const j of g1Jobs) {
-    if (j.source === 'workday') {
-      if (j.departments && j.departments.length > 0) {
-        familyMapGap++;
-      } else {
-        needsFamilyMapping++;
-      }
-    } else if (j.source === 'simplify') {
-      noDescription++;
-    } else {
-      // Check for domain keywords in title as signal
-      const title = (j.title || '').toLowerCase();
-      const hasSignal = /\b(engineer|developer|scientist|analyst|designer|manager|accountant|nurse|pharmacist|attorney|sales|marketing|operations|manufacturing|logistics|hardware|software|data|ai|product|finance|hr|legal)\b/i.test(title);
-      if (hasSignal) {
-        other++;
-      } else {
-        genuinelyAmbiguous++;
-      }
-    }
-  }
-
-  // Engine version distribution
-  const byVersion = {};
-  for (const j of g1Jobs) {
-    const v = j.tags.tag_engine_version || 'none';
-    byVersion['v' + v] = (byVersion['v' + v] || 0) + 1;
-  }
-
-  // Employment type distribution
-  const byEmployment = {};
-  for (const j of g1Jobs) {
-    const e = j.tags.employment || 'unknown';
-    byEmployment[e] = (byEmployment[e] || 0) + 1;
-  }
-
-  return {
-    updated: new Date().toISOString(),
-    us_total: usJobs.length,
-    us_g1: g1Jobs.length,
-    us_g1_rate: Math.round(g1Jobs.length / usJobs.length * 1000) / 10,
-    by_source: bySourceFormatted,
-    by_company_top20: top20,
-    by_fix_category: {
-      needs_family_mapping: { count: needsFamilyMapping, description: 'WD jobs with no departments — blocked on AGG-PIPE-16' },
-      family_map_gap: { count: familyMapGap, description: 'WD jobs with departments but still G1' },
-      genuinely_ambiguous: { count: genuinelyAmbiguous, description: 'Non-WD/Simplify jobs with no domain signal in title' },
-      no_description: { count: noDescription, description: 'Simplify T0 jobs — no description for L4 fallback' },
-      other: { count: other, description: 'Mixed ATS — some keyword gaps, some structural' },
-    },
-    by_engine_version: byVersion,
-    by_employment: byEmployment,
-  };
-}
-
 function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, pipelineTimestamps, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth, supplementalInputs }) {
   const bySource = {};
   const byEmploymentType = {};
@@ -1491,10 +1384,6 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
       }])
     ) : null,
 
-    // TAG-DIM-1: G1 by-domain breakdown for DASH visibility.
-    // Categorizes G1 jobs by source, company, fix category, engine version, and employment type.
-    g1_breakdown: buildG1Breakdown(jobs),
-
     // Freshness — jobs posted within last N hours (entry-level pool)
     freshness,
 
@@ -1514,9 +1403,6 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
 
     supplemental_inputs: supplementalInputs || {},
 
-    // TAG-DIM-1: Tag engine version deployed in this run.
-    // Enables zjp-metrics to surface engine_version (was null because this field was missing).
-    tag_engine_version: TAG_ENGINE_VERSION,
 
     // A91: Per-source fetch counts from current run (before carry-forward merge).
     // Enables alert checks to detect source fetch failures masked by carry-forward.
