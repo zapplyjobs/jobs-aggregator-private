@@ -1,0 +1,37 @@
+name: Workflow Lint
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/**'
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/**'
+
+jobs:
+  workflow-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+
+      - name: Lint workflows
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color -shellcheck=
+
+      - name: Enforce AGG fetch trigger invariant
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path('.github/workflows/fetch-jobs.yml').read_text()
+          if re.search(r'^\s*push:\s*$', text, re.M):
+              raise SystemExit('fetch-jobs.yml must not define a push trigger; AGG hot publish path is workflow_dispatch-only')
+          if 'workflow_dispatch:' not in text:
+              raise SystemExit('fetch-jobs.yml must define workflow_dispatch')
+          print('PASS: fetch-jobs trigger invariant holds')
+          PY
