@@ -52,6 +52,20 @@ const { runTagMonitoring } = require(`${SHARED}/utils/monitoring`);
 const COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');
 let companyOverrideMap = new Map();
 
+function deriveWorkdayPathFromUrl(url) {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    const jobIdx = parts.indexOf('job');
+    if (jobIdx === -1) return null;
+    const start = (jobIdx > 0 && /^[a-z]{2}(?:-[A-Z]{2})?$/.test(parts[jobIdx - 1])) ? jobIdx - 1 : jobIdx;
+    return '/' + parts.slice(start).join('/');
+  } catch {
+    return null;
+  }
+}
+
 function loadCompanyOverrides() {
   try {
     const companyList = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));
@@ -819,6 +833,9 @@ async function main() {
     const STRIP_FIELDS = ['source_url', '_raw', 'description', 'enriched', 'enriched_at', 'is_internship', 'is_new_grad', 'is_us_only', 'remote'];
     let publicJobs = sortedJobs.map(job => {
       const stripped = { ...job };
+      if (stripped.source === 'workday' && !stripped.wd_path) {
+        stripped.wd_path = deriveWorkdayPathFromUrl(stripped.url);
+      }
       for (const field of STRIP_FIELDS) {
         delete stripped[field];
       }
