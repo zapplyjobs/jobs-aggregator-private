@@ -836,6 +836,9 @@ async function main() {
       if (stripped.source === 'workday' && !stripped.wd_path) {
         stripped.wd_path = deriveWorkdayPathFromUrl(stripped.url);
       }
+      if (stripped.source === 'workday' && !stripped.wd_path) {
+        stripped.wd_path = deriveWorkdayPathFromUrl(stripped.url);
+      }
       for (const field of STRIP_FIELDS) {
         delete stripped[field];
       }
