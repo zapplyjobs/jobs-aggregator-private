@@ -859,6 +859,28 @@ async function main() {
       mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, STRIP_FIELDS, successfulSources, atsResult.health || {});
     }
 
+    // AGG-PIPE-19: Re-apply cached Workday family mapping after carry-forward merge.
+    // Step 1a-post only touches current-run jobs. Carry-forward jobs now preserve wd_path,
+    // so they can be annotated here before final tag stats are computed.
+    const postMergeFamilyCacheReport = await applyFamilyCache(publicJobs, JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR);
+    stageTimings.step9d_postmerge_family_cache_ms = postMergeFamilyCacheReport.durationMs;
+    let wdPostMergeRetagged = 0;
+    if (postMergeFamilyCacheReport.annotated > 0) {
+      for (const job of publicJobs) {
+        if (job.source !== 'workday') continue;
+        const oldDomains = (job.tags?.domains || []).slice().sort().join(',');
+        const freshDomains = tagDomains(job);
+        const newDomains = (freshDomains || []).slice().sort().join(',');
+        if (oldDomains !== newDomains) {
+          job.tags.domains = freshDomains;
+          wdPostMergeRetagged++;
+        }
+      }
+      if (wdPostMergeRetagged > 0) {
+        console.log(`🔁 AGG-PIPE-19: re-tagged ${wdPostMergeRetagged} Workday carry-forward jobs after post-merge family cache annotation`);
+      }
+    }
+
     // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
     tagStats = computeFullPoolTagStats(publicJobs);
 
