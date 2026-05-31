@@ -90,6 +90,10 @@ async function main() {
       const r2 = createR2Client({ prefix: 'data/' });
       await r2.uploadRaw('supplemental-custom-jobs.json', fs.readFileSync(JOBS_FILE, 'utf8'), 'application/json');
       await r2.uploadRaw('supplemental-custom-metadata.json', fs.readFileSync(META_FILE, 'utf8'), 'application/json');
+      const googleSidecar = path.join(DATA_DIR, 'descriptions-google.jsonl');
+      if (fs.existsSync(googleSidecar)) {
+        await r2.uploadRaw('descriptions-google.jsonl', fs.readFileSync(googleSidecar, 'utf8'), 'application/x-jsonlines');
+      }
       console.log('☁️ Uploaded custom supplemental artifacts to R2');
     } catch (err) {
       console.log(`⚠️ R2 upload unavailable locally — skipped (${err.message})`);
