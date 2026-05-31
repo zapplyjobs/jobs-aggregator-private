@@ -1493,7 +1493,7 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
 
     // TAG-DIM-1: G1 by-domain breakdown for DASH visibility.
     // Categorizes G1 jobs by source, company, fix category, engine version, and employment type.
-    g1_breakdown: buildG1Breakdown(publicJobs),
+    g1_breakdown: buildG1Breakdown(jobs),
 
     // Freshness — jobs posted within last N hours (entry-level pool)
     freshness,
