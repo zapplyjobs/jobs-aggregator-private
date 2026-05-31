@@ -1234,6 +1234,106 @@ function buildSeniorRolloutProjection(seniorJobs, seniorBySource) {
   return projection;
 }
 
+const G1_SIGNAL_TITLE_RE = /\b(engineer|developer|scientist|analyst|designer|manager|accountant|nurse|pharmacist|attorney|sales|marketing|operations|manufacturing|logistics|hardware|software|data|ai|product|finance|hr|legal)\b/i;
+
+/**
+ * TAG-DIM-1: Build G1 by-domain breakdown for DASH visibility.
+ * Categorizes US general jobs by source, company, fix category, engine version, employment type.
+ * @param {Array} jobs - Full public pool (post-merge + post-AGG-32)
+ * @returns {Object|null} g1_breakdown object for metadata
+ */
+function buildG1Breakdown(jobs) {
+  const bySource = Object.create(null);
+  const sourceTotals = Object.create(null);
+  const companyCounts = Object.create(null);
+  const companySource = Object.create(null);
+  const companyDepts = Object.create(null);
+  const byVersion = Object.create(null);
+  const byEmployment = Object.create(null);
+
+  let usTotal = 0;
+  let usG1 = 0;
+  let needsFamilyMapping = 0;
+  let familyMapGap = 0;
+  let noDescription = 0;
+  let genuinelyAmbiguous = 0;
+  let other = 0;
+
+  for (const job of jobs) {
+    const tags = job.tags;
+    if (!tags?.locations?.includes('us')) continue;
+
+    usTotal++;
+    const source = job.source || 'unknown';
+    sourceTotals[source] = (sourceTotals[source] || 0) + 1;
+
+    if (!tags.domains?.includes('general')) continue;
+    usG1++;
+    bySource[source] = (bySource[source] || 0) + 1;
+
+    const company = job.company_name || 'unknown';
+    companyCounts[company] = (companyCounts[company] || 0) + 1;
+    companySource[company] = source;
+    companyDepts[company] = companyDepts[company] || job.departments?.length > 0;
+
+    if (source === 'workday') {
+      if (job.departments?.length > 0) {
+        familyMapGap++;
+      } else {
+        needsFamilyMapping++;
+      }
+    } else if (source === 'simplify') {
+      noDescription++;
+    } else if (G1_SIGNAL_TITLE_RE.test(job.title || '')) {
+      other++;
+    } else {
+      genuinelyAmbiguous++;
+    }
+
+    const version = tags.tag_engine_version ?? 'none';
+    byVersion[`v${version}`] = (byVersion[`v${version}`] || 0) + 1;
+
+    const employment = tags.employment || 'unknown';
+    byEmployment[employment] = (byEmployment[employment] || 0) + 1;
+  }
+
+  if (usG1 === 0) return null;
+
+  const bySourceFormatted = {};
+  for (const [source, g1] of Object.entries(bySource)) {
+    const total = sourceTotals[source] || 0;
+    bySourceFormatted[source] = { g1, total, rate: total > 0 ? Math.round(g1 / total * 1000) / 10 : 0 };
+  }
+
+  const top20 = Object.entries(companyCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([company, g1]) => ({
+      company,
+      g1,
+      source: companySource[company],
+      has_departments: !!companyDepts[company],
+    }));
+
+  return {
+    updated: new Date().toISOString(),
+    us_total: usTotal,
+    us_g1: usG1,
+    us_g1_rate: usTotal > 0 ? Math.round(usG1 / usTotal * 1000) / 10 : null,
+    by_source: bySourceFormatted,
+    by_company_top20: top20,
+    by_fix_category: {
+      needs_family_mapping: { count: needsFamilyMapping, description: 'WD jobs with no departments — needs family cache/path coverage' },
+      family_map_gap: { count: familyMapGap, description: 'WD jobs with departments but still G1' },
+      genuinely_ambiguous: { count: genuinelyAmbiguous, description: 'Non-WD/Simplify jobs with no domain signal in title' },
+      no_description: { count: noDescription, description: 'Simplify T0 jobs — no description for L4 fallback' },
+      other: { count: other, description: 'Mixed ATS — some keyword gaps, some structural' },
+    },
+    by_engine_version: byVersion,
+    by_employment: byEmployment,
+  };
+}
+
 function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, pipelineTimestamps, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth, supplementalInputs }) {
   const bySource = {};
   const byEmploymentType = {};
@@ -1384,6 +1484,10 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
       }])
     ) : null,
 
+    // TAG-DIM-1: G1 by-domain breakdown for DASH visibility.
+    // Categorizes G1 jobs by source, company, fix category, engine version, and employment type.
+    g1_breakdown: buildG1Breakdown(jobs),
+
     // Freshness — jobs posted within last N hours (entry-level pool)
     freshness,
 
@@ -1403,6 +1507,10 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
 
     supplemental_inputs: supplementalInputs || {},
 
+
+    // TAG-DIM-1: Tag engine version deployed in this run.
+    // Enables zjp-metrics to surface engine_version (was null because this field was missing).
+    tag_engine_version: TAG_ENGINE_VERSION,
 
     // A91: Per-source fetch counts from current run (before carry-forward merge).
     // Enables alert checks to detect source fetch failures masked by carry-forward.
