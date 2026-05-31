@@ -33,6 +33,7 @@ const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
 const { fetchAllOracleJobs } = require(`${SHARED}/fetchers/oracle`);
 const { fetchAllAmdJobs } = require(`${SHARED}/fetchers/amd`);
 const { fetchAllTiktokJobs } = require(`${SHARED}/fetchers/tiktok`);
+const { applyFamilyCache, buildFamilyCache } = require(`${SHARED}/fetchers/workday`);
 
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary, normalizeJob } = require(`${SHARED}/processors/validator`);
@@ -523,6 +524,9 @@ async function main() {
       }
     }
 
+    // Step 1a-post: apply cached Workday family/department mapping before tagging.
+    const familyCacheReport = await applyFamilyCache(allJobs, JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR);
+    stageTimings.step1a_family_cache_ms = familyCacheReport.durationMs;
 
     console.log('');
     console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
@@ -953,6 +957,11 @@ async function main() {
       supplementalInputs: supplementalInputs.inputs,
     });
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
+
+    // Step 9c: build / refresh Workday family cache for future runs. Output is already written, so
+    // cache refresh cannot block user-visible publish correctness.
+    const familyCacheBuildReport = await buildFamilyCache(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR);
+    stageTimings.step9c_family_cache_build_ms = familyCacheBuildReport.durationMs;
 
     console.log('');
     console.log(`✅ Step 9 complete: Output files written`);
