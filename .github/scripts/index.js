@@ -174,6 +174,23 @@ function loadSupplementalInputs() {
       const laneJobs = JSON.parse(fs.readFileSync(lane.jobsFile, 'utf8'));
       const laneMeta = JSON.parse(fs.readFileSync(lane.metaFile, 'utf8'));
       if (!Array.isArray(laneJobs)) continue;
+      const publishContract = laneMeta.publish_contract || null;
+      const generatedAt = laneMeta.generated_at ? new Date(laneMeta.generated_at).getTime() : null;
+      const maxStalenessMinutes = Number.isFinite(publishContract?.max_staleness_minutes)
+        ? publishContract.max_staleness_minutes
+        : 90;
+      const stale = !generatedAt || (Date.now() - generatedAt) > maxStalenessMinutes * 60 * 1000;
+      if (stale) {
+        console.warn(`⚠️ Supplemental lane ${lane.lane}: artifact stale (${laneMeta.generated_at || 'missing generated_at'}), skipping merge into main pool`);
+        inputs[lane.lane] = {
+          generated_at: laneMeta.generated_at || null,
+          jobs_loaded: 0,
+          by_source: {},
+          publish_contract: publishContract,
+          stale: true,
+        };
+        continue;
+      }
       const bySource = {};
       for (const job of laneJobs) {
         if (!job || typeof job !== 'object') continue;
@@ -187,7 +204,8 @@ function loadSupplementalInputs() {
         generated_at: laneMeta.generated_at || null,
         jobs_loaded: laneJobs.length,
         by_source: bySource,
-        publish_contract: laneMeta.publish_contract || null,
+        publish_contract: publishContract,
+        stale: false,
       };
     } catch (e) {
       console.warn(`⚠️ Supplemental lane ${lane.lane}: could not load artifact (${e.message})`);
