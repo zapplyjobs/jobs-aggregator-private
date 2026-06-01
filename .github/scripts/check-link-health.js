@@ -3,19 +3,21 @@
 
 const http = require('http');
 const https = require('https');
+const fs = require('fs');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 
 const TECH_DOMAINS = new Set(['software', 'data_science', 'hardware', 'ai', 'finance']);
 const DEFAULT_GROUPS = ['greenhouse', 'lever', 'ashby', 'workday', 'smartrecruiters', 'custom'];
 
 function parseArgs(argv) {
-  const args = { minAgeDays: 2, maxAgeDays: 4, perGroup: 8, groups: [...DEFAULT_GROUPS] };
+  const args = { minAgeDays: 2, maxAgeDays: 4, perGroup: 8, groups: [...DEFAULT_GROUPS], writeDead: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--min-age-days') args.minAgeDays = Number(argv[++i]);
     else if (arg === '--max-age-days') args.maxAgeDays = Number(argv[++i]);
     else if (arg === '--per-group') args.perGroup = Number(argv[++i]);
     else if (arg === '--groups') args.groups = argv[++i].split(',').map(s => s.trim()).filter(Boolean);
+    else if (arg === '--write-dead') args.writeDead = argv[++i];
   }
   return args;
 }
@@ -48,8 +50,7 @@ function isConsumerVisible(job) {
 }
 
 function groupName(source) {
-  if (['greenhouse', 'lever', 'ashby', 'workday', 'smartrecruiters'].includes(source)) return source;
-  return 'custom';
+  return ['greenhouse', 'lever', 'ashby', 'workday', 'smartrecruiters'].includes(source) ? source : 'custom';
 }
 
 function pickSample(arr, n) {
@@ -63,7 +64,11 @@ function pickSample(arr, n) {
 function checkUrl(url, redirects = 0) {
   return new Promise(resolve => {
     let parsed;
-    try { parsed = new URL(url); } catch { return resolve({ status: 'invalid_url', code: null, final_url: url }); }
+    try {
+      parsed = new URL(url);
+    } catch {
+      return resolve({ status: 'invalid_url', code: null, final_url: url });
+    }
     const lib = parsed.protocol === 'http:' ? http : https;
     const req = lib.request(parsed, {
       method: 'GET',
@@ -85,7 +90,10 @@ function checkUrl(url, redirects = 0) {
         resolve({ status, code, final_url: parsed.toString() });
       });
     });
-    req.on('timeout', () => { req.destroy(); resolve({ status: 'timeout', code: null, final_url: parsed.toString() }); });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ status: 'timeout', code: null, final_url: parsed.toString() });
+    });
     req.on('error', err => resolve({ status: 'error', code: null, error: err.code || err.message, final_url: parsed.toString() }));
     req.end();
   });
@@ -106,11 +114,21 @@ function checkUrl(url, redirects = 0) {
   const samples = [];
   for (const group of args.groups) {
     for (const job of pickSample(grouped[group], args.perGroup)) {
-      samples.push({ group, id: job.id, source: job.source, company_name: job.company_name, title: job.title, posted_at: job.posted_at, url: job.url });
+      samples.push({
+        group,
+        id: job.id,
+        source: job.source,
+        company_name: job.company_name,
+        title: job.title,
+        posted_at: job.posted_at,
+        url: job.url,
+      });
     }
   }
   const results = [];
-  for (const item of samples) results.push({ ...item, ...(await checkUrl(item.url)) });
+  for (const item of samples) {
+    results.push({ ...item, ...(await checkUrl(item.url)) });
+  }
   const summary = {};
   let deadTotal = 0;
   for (const group of args.groups) {
@@ -123,7 +141,26 @@ function checkUrl(url, redirects = 0) {
     };
     deadTotal += summary[group].dead;
   }
-  const output = { checked_at: new Date().toISOString(), sample_window: { minAgeDays: args.minAgeDays, maxAgeDays: args.maxAgeDays }, per_group: args.perGroup, summary, results };
+  const checkedAt = new Date().toISOString();
+  const output = {
+    checked_at: checkedAt,
+    sample_window: { minAgeDays: args.minAgeDays, maxAgeDays: args.maxAgeDays },
+    per_group: args.perGroup,
+    summary,
+    results,
+  };
   console.log(JSON.stringify(output, null, 2));
+  if (args.writeDead) {
+    const dead = results.filter(r => r.status === 'dead').map(r => ({
+      id: r.id,
+      source: r.source,
+      company_name: r.company_name,
+      title: r.title,
+      url: r.url,
+      checked_at: checkedAt,
+      group: r.group,
+    }));
+    fs.writeFileSync(args.writeDead, JSON.stringify({ checked_at: checkedAt, dead }, null, 2) + '\n');
+  }
   if (deadTotal > 0) process.exit(1);
 })();
