@@ -52,7 +52,7 @@ async function main() {
   const microsoftCacheBefore = countJsonlLines(microsoftSidecarPath);
 
   const [google, microsoft, tiktok] = await Promise.all([
-    fetchAllGoogleJobs({ cachedDescriptionIds: googleCachedIds }),
+    fetchAllGoogleJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }),
     fetchAllMicrosoftJobs({ cachedDescriptionIds: microsoftCachedIds }),
     fetchAllTiktokJobs(),
   ]);
