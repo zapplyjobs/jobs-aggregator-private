@@ -32,12 +32,15 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
         run: |
-          node .github/scripts/check-link-health.js --per-group 8 > agg-link-health.json
+          node .github/scripts/check-link-health.js --per-group 8 --write-dead stale-job-candidates.json > agg-link-health.json
           cat agg-link-health.json
+          cat stale-job-candidates.json
 
       - name: Upload report artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: agg-link-health
-          path: agg-link-health.json
+          path: |
+            agg-link-health.json
+            stale-job-candidates.json
