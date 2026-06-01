@@ -14,7 +14,6 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 1
-          submodules: recursive
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -47,12 +46,24 @@ jobs:
         run: |
           node - <<'NODE'
           const fs = require('fs');
-          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
           async function main() {
-            const r2 = createR2Client({ prefix: 'data/' });
+            const client = new S3Client({
+              region: 'auto',
+              endpoint: process.env.R2_ENDPOINT,
+              credentials: {
+                accessKeyId: process.env.R2_ACCESS_KEY_ID,
+                secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+              },
+            });
             for (const file of ['agg-link-health.json', 'stale-job-candidates.json']) {
               if (!fs.existsSync(file)) continue;
-              await r2.uploadRaw(file, fs.readFileSync(file, 'utf8'), 'application/json');
+              await client.send(new PutObjectCommand({
+                Bucket: process.env.R2_BUCKET_NAME,
+                Key: `data/${file}`,
+                Body: fs.readFileSync(file, 'utf8'),
+                ContentType: 'application/json',
+              }));
               console.log(`uploaded ${file}`);
             }
           }
