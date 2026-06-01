@@ -1020,8 +1020,14 @@ async function main() {
 
     // Step 9c: build / refresh Workday family cache for future runs. Output is already written, so
     // cache refresh cannot block user-visible publish correctness.
-    const familyCacheBuildReport = await buildFamilyCache(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR, { maxDurationMs: 120000 });
-    stageTimings.step9c_family_cache_build_ms = familyCacheBuildReport.durationMs;
+    if (process.env.SKIP_WD_FAMILY_CACHE_BUILD === '1') {
+        stageTimings.step9c_family_cache_build_ms = 0;
+        console.log('');
+        console.log('⏭️  Step 9c skipped: Workday family cache refresh moved out of hot publish path');
+    } else {
+        const familyCacheBuildReport = await buildFamilyCache(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR, { maxDurationMs: 120000 });
+        stageTimings.step9c_family_cache_build_ms = familyCacheBuildReport.durationMs;
+    }
 
     console.log('');
     console.log(`✅ Step 9 complete: Output files written`);
