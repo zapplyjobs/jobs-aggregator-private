@@ -16,6 +16,16 @@ const DATA_DIR = path.join(process.cwd(), '.github', 'data');
 const JOBS_FILE = path.join(DATA_DIR, 'supplemental-custom-jobs.json');
 const META_FILE = path.join(DATA_DIR, 'supplemental-custom-metadata.json');
 
+function countJsonlLines(file) {
+  try {
+    const raw = fs.readFileSync(file, 'utf8').trim();
+    if (!raw) return 0;
+    return raw.split('\n').filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+}
+
 async function loadIds(prefix) {
   const ids = new Set();
   try {
@@ -34,8 +44,12 @@ async function main() {
   const start = Date.now();
   fs.mkdirSync(DATA_DIR, { recursive: true });
 
+  const googleSidecarPath = path.join(DATA_DIR, 'descriptions-google.jsonl');
+  const microsoftSidecarPath = path.join(DATA_DIR, 'descriptions-microsoft.jsonl');
   const googleCachedIds = await loadIds('descriptions-google');
   const microsoftCachedIds = await loadIds('descriptions-microsoft');
+  const googleCacheBefore = countJsonlLines(googleSidecarPath);
+  const microsoftCacheBefore = countJsonlLines(microsoftSidecarPath);
 
   const [google, microsoft, tiktok] = await Promise.all([
     fetchAllGoogleJobs({ cachedDescriptionIds: googleCachedIds }),
@@ -56,6 +70,9 @@ async function main() {
       description: job.description || null,
     }))
   );
+
+  const googleCacheAfter = countJsonlLines(googleSidecarPath);
+  const microsoftCacheAfter = countJsonlLines(microsoftSidecarPath);
 
   const durationMs = Date.now() - start;
   const metadata = {
@@ -78,6 +95,14 @@ async function main() {
     },
     jobs_fetched: payload.length,
     duration_ms: durationMs,
+    cache_state: {
+      google_ids_before: googleCachedIds.size,
+      google_lines_before: googleCacheBefore,
+      google_lines_after: googleCacheAfter,
+      microsoft_ids_before: microsoftCachedIds.size,
+      microsoft_lines_before: microsoftCacheBefore,
+      microsoft_lines_after: microsoftCacheAfter,
+    },
   };
 
   fs.writeFileSync(JOBS_FILE, JSON.stringify(payload, null, 2), 'utf8');
