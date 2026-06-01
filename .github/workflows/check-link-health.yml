@@ -36,6 +36,28 @@ jobs:
           cat agg-link-health.json
           cat stale-job-candidates.json
 
+      - name: Upload stale candidate outputs to R2
+        if: always()
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          async function main() {
+            const r2 = createR2Client({ prefix: 'data/' });
+            for (const file of ['agg-link-health.json', 'stale-job-candidates.json']) {
+              if (!fs.existsSync(file)) continue;
+              await r2.uploadRaw(file, fs.readFileSync(file, 'utf8'), 'application/json');
+              console.log(`uploaded ${file}`);
+            }
+          }
+          main().catch(err => { console.error(err.message); process.exit(1); });
+          NODE
+
       - name: Upload report artifact
         if: always()
         uses: actions/upload-artifact@v4
