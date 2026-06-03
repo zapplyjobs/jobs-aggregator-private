@@ -747,7 +747,8 @@ jobs:
 
     - name: Refresh Workday family cache for next run
       if: success() && github.ref_name == 'main'
-      run: node .github/scripts/refresh-wd-family-cache.js
+      run: |
+        timeout 180s node .github/scripts/refresh-wd-family-cache.js || echo "::warning::Workday family cache refresh did not complete; publish already succeeded"
       env:
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
