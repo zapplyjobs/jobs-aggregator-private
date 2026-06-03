@@ -745,6 +745,15 @@ jobs:
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
 
+    - name: Refresh Workday family cache for next run
+      if: success() && github.ref_name == 'main'
+      run: node .github/scripts/refresh-wd-family-cache.js
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
 
     - name: Display logs (always run)
       if: always()
