@@ -38,7 +38,7 @@ const { applyFamilyCache, buildFamilyCache } = require(`${SHARED}/fetchers/workd
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary, normalizeJob } = require(`${SHARED}/processors/validator`);
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
-const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS, INTERNSHIP_TTL_MS } = require(`${SHARED}/processors/deduplicator`);
+const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS, INTERNSHIP_TTL_MS, INTERNSHIP_TTL_DAYS } = require(`${SHARED}/processors/deduplicator`);
 const { tagJobs, generateTagStats, tagEmployment, tagDomains, tagLocations, setCompanyOverrideMap, TAG_ENGINE_VERSION, getKeywordMap } = require(`${SHARED}/processors/tag-engine`);
 const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport, checkKeywordHealth, checkKeywordOverlap } = require(`${SHARED}/processors/tag-monitor`);
 
@@ -94,6 +94,19 @@ const isVerbose = args.includes('--verbose');
 // Each function wraps a pipeline invariant that was previously inline in main().
 // Named functions make accidental removal structurally harder.
 
+assert(Number.isFinite(DEDUPE_TTL_MS) && DEDUPE_TTL_MS > 0, 'DEDUPE_TTL_MS must be exported by deduplicator');
+assert(Number.isFinite(INTERNSHIP_TTL_MS) && INTERNSHIP_TTL_MS > DEDUPE_TTL_MS, 'INTERNSHIP_TTL_MS must be exported by deduplicator');
+
+function isInternshipJob(job) {
+  return job.tags?.employment === 'internship'
+    || job.employment_type === 'internship'
+    || (Array.isArray(job.employment_types) && job.employment_types.includes('internship'));
+}
+
+function applicableTtlMs(job) {
+  return isInternshipJob(job) ? INTERNSHIP_TTL_MS : DEDUPE_TTL_MS;
+}
+
 /**
  * AGG-32: Filter stale jobs by posted_at TTL.
  * AGG-6 date overwrite disabled A86 — jobs keep their source-reported posted_at.
@@ -104,13 +117,13 @@ function resolvePostedAt(publicJobs, prevLines) {
   let staleRemoved = 0;
   const filtered = publicJobs.filter(job => {
     if (!job.posted_at) { staleRemoved++; return false; }
-    const jobTtlMs = job.tags?.employment === 'internship' ? INTERNSHIP_TTL_MS : DEDUPE_TTL_MS;
+    const jobTtlMs = applicableTtlMs(job);
     if (new Date(job.posted_at).getTime() < Date.now() - jobTtlMs) { staleRemoved++; return false; }
     return true;
   });
 
   if (staleRemoved > 0) {
-    console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >${DEDUPE_TTL_DAYS}d regular / 120d internship) from post-merge pool`);
+    console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >${DEDUPE_TTL_DAYS}d regular / ${INTERNSHIP_TTL_DAYS}d internship) from post-merge pool`);
   }
 
   publicJobs.length = 0;
@@ -249,7 +262,7 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
       if (job.fingerprint && currentFingerprints.has(job.fingerprint)) { fpSkipCount++; continue; }
       if (!job.posted_at) { nullDateCount++; continue; }
       const postedTs = new Date(job.posted_at).getTime();
-      const jobTtlMs = job.tags?.employment === 'internship' ? INTERNSHIP_TTL_MS : DEDUPE_TTL_MS;
+      const jobTtlMs = applicableTtlMs(job);
       if (postedTs < Date.now() - jobTtlMs) continue;
       if (isSeniorJob(job)) continue;
       if (RETIRED_CARRY_FORWARD_SOURCES.has((job.source || '').toLowerCase())) {
@@ -1669,4 +1682,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES };
+module.exports = { main, mergeCarryForward, resolvePostedAt, applicableTtlMs, RETIRED_CARRY_FORWARD_SOURCES };
