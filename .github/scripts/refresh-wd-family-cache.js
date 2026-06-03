@@ -17,6 +17,7 @@ const DATA_DIR = path.join(process.cwd(), '.github', 'data');
 const COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');
 const CACHE_FILE = path.join(DATA_DIR, 'wd-family-cache.json');
 const DEFAULT_MAX_DURATION_MS = 120000;
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 const { buildFamilyCache } = require(`${SHARED}/fetchers/workday`);
 const { createR2Client } = require(`${SHARED}/storage/r2-client`);
@@ -29,6 +30,17 @@ function parseMaxDurationMs() {
     throw new Error(`Invalid WD_FAMILY_CACHE_MAX_MS: ${raw}`);
   }
   return value;
+}
+
+
+function existingCacheFresh() {
+  try {
+    const cache = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    const generatedAt = cache.generated_at ? new Date(cache.generated_at).getTime() : 0;
+    return Number.isFinite(generatedAt) && Date.now() - generatedAt < CACHE_TTL_MS;
+  } catch {
+    return false;
+  }
 }
 
 function loadWorkdayTenants() {
@@ -75,6 +87,10 @@ async function main() {
   const r2 = createR2Client({ prefix: 'data/' });
 
   await seedExistingCache(r2);
+  if (existingCacheFresh()) {
+    console.log('WD family cache is still fresh; skipping refresh');
+    return;
+  }
   const report = await buildFamilyCache(tenants, DATA_DIR, { maxDurationMs });
   if (!fs.existsSync(CACHE_FILE)) {
     throw new Error('buildFamilyCache did not write wd-family-cache.json');
