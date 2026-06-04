@@ -692,6 +692,8 @@ jobs:
             'wd-family-cache.json',
             'filtered-samples.jsonl',
             'tag-history.jsonl',
+            'canada-tech-jobs.jsonl',
+            'canada-tech-summary.json',
           ];
 
           // Add description sidecars
@@ -769,6 +771,8 @@ jobs:
         ls -lh .github/data/all_jobs.json || echo "all_jobs.json not found"
         ls -lh .github/data/jobs-metadata.json || echo "jobs-metadata.json not found"
         ls -lh .github/data/dedupe-store.json || echo "dedupe-store.json not found"
+        ls -lh .github/data/canada-tech-jobs.jsonl || echo "canada-tech-jobs.jsonl not found"
+        ls -lh .github/data/canada-tech-summary.json || echo "canada-tech-summary.json not found"
 
     - name: Display job counts
       if: always()
