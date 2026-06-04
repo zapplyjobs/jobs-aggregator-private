@@ -84,6 +84,8 @@ loadCompanyOverrides();
 const DATA_DIR = path.join(process.cwd(), '.github', 'data');
 const JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'all_jobs.json');
 const METADATA_OUTPUT_FILE = path.join(DATA_DIR, 'jobs-metadata.json');
+const CANADA_TECH_JOBS_FILE = path.join(DATA_DIR, 'canada-tech-jobs.jsonl');
+const CANADA_TECH_SUMMARY_FILE = path.join(DATA_DIR, 'canada-tech-summary.json');
 
 // Command line args
 const args = process.argv.slice(2);
@@ -960,6 +962,11 @@ async function main() {
     // Write jobs (JSONL format)
     await writeJobsJSONL(publicJobs, JOBS_OUTPUT_FILE);
 
+    const canadaArtifacts = buildCanadaTechArtifacts(publicJobs, new Date().toISOString());
+    fs.writeFileSync(CANADA_TECH_JOBS_FILE, canadaArtifacts.lines, 'utf8');
+    fs.writeFileSync(CANADA_TECH_SUMMARY_FILE, JSON.stringify(canadaArtifacts.summary, null, 2), 'utf8');
+    console.log(`🍁 Step 9b: Canada tech feed → canada-tech-jobs.jsonl (${canadaArtifacts.summary.total_canada_tech_jobs} tech jobs, ${canadaArtifacts.summary.total_canada_tech_internships} tech internships)`);
+
     // Write metadata
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
@@ -1610,6 +1617,36 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
   };
 }
 
+function buildCanadaTechArtifacts(jobs, generatedAt = new Date().toISOString()) {
+  const TECH_DOMAINS = new Set(['software', 'hardware', 'data_science', 'ai']);
+  const canadaJobs = jobs.filter(job => (job.tags?.locations || []).includes('canada'));
+  const canadaTechJobs = canadaJobs.filter(job => (job.tags?.domains || []).some(domain => TECH_DOMAINS.has(domain)));
+  const canadaInternships = canadaJobs.filter(job => job.tags?.employment === 'internship');
+  const canadaTechInternships = canadaTechJobs.filter(job => job.tags?.employment === 'internship');
+  const companyCounts = new Map();
+  for (const job of canadaTechJobs) {
+    const company = job.company_name || 'unknown';
+    companyCounts.set(company, (companyCounts.get(company) || 0) + 1);
+  }
+  const topCompanies = [...companyCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([company, count]) => ({ company, count }));
+
+  return {
+    lines: canadaTechJobs.map(job => JSON.stringify(job)).join('\n') + (canadaTechJobs.length ? '\n' : ''),
+    summary: {
+      generated_at: generatedAt,
+      tag_engine_version: TAG_ENGINE_VERSION,
+      total_canada_jobs: canadaJobs.length,
+      total_canada_tech_jobs: canadaTechJobs.length,
+      total_canada_internships: canadaInternships.length,
+      total_canada_tech_internships: canadaTechInternships.length,
+      top_canada_tech_employers: topCompanies,
+    },
+  };
+}
+
 /**
  * Print execution summary
  * @param {Array} jobs - Final job array
@@ -1657,6 +1694,8 @@ async function gitCommit(jobCount) {
     // archive/ is NOT staged here — pushed separately to jobs-archive-private repo via workflow
     execSync('git add .github/data/descriptions-*.jsonl 2>/dev/null || true'); // per-source description sidecars (published)
     execSync('git add .github/data/tag-history.jsonl 2>/dev/null || true'); // TAG-SELF-2: tag drift/precision trend data
+    execSync('git add .github/data/canada-tech-jobs.jsonl 2>/dev/null || true'); // INF-PLATFORM-3: Canada tech feed
+    execSync('git add .github/data/canada-tech-summary.json 2>/dev/null || true'); // INF-PLATFORM-3: Canada tech feed summary
     // descriptions.jsonl is Workday fetch cache — NOT staged (local state only, managed by Step 1b)
 
     // Check if there are changes
@@ -1690,4 +1729,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, mergeCarryForward, resolvePostedAt, applicableTtlMs, RETIRED_CARRY_FORWARD_SOURCES };
+module.exports = { main, mergeCarryForward, resolvePostedAt, applicableTtlMs, RETIRED_CARRY_FORWARD_SOURCES, buildCanadaTechArtifacts };
