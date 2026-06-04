@@ -317,7 +317,8 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
     publicJobs.sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0));
     let empRetagged = 0;
     let domainRetagged = 0;
-    let locRefreshed = 0;
+    let locRetagged = 0;
+    let locNormalized = 0;
     for (const job of publicJobs) {
       if (currentIds.has(job.id)) continue;
       const newEmp = tagEmployment(job);
@@ -334,15 +335,22 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
         job.tags.domains = freshDomains;
         domainRetagged++;
       }
-      job.tags.tag_engine_version = TAG_ENGINE_VERSION;
       if ((!job.job_state || job.job_state === '') || (!job.job_city || job.job_city === '')) {
         const hadState = job.job_state && job.job_state !== '';
         const hadCity = job.job_city && job.job_city !== '';
         normalizeJob(job);
-        if ((!hadState && job.job_state) || (!hadCity && job.job_city)) locRefreshed++;
+        if ((!hadState && job.job_state) || (!hadCity && job.job_city)) locNormalized++;
       }
+      const freshLocations = tagLocations(job);
+      const oldLocations = (job.tags?.locations || []).slice().sort().join(',');
+      const newLocations = (freshLocations || []).slice().sort().join(',');
+      if (oldLocations !== newLocations) {
+        job.tags.locations = freshLocations;
+        locRetagged++;
+      }
+      job.tags.tag_engine_version = TAG_ENGINE_VERSION;
     }
-    console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${closedDetected > 0 ? `, ${closedDetected} closed detected` : ''}${empRetagged > 0 ? `, ${empRetagged} employment re-tagged` : ''}${domainRetagged > 0 ? `, ${domainRetagged} domains re-tagged (version ${TAG_ENGINE_VERSION})` : ''}${locRefreshed > 0 ? `, ${locRefreshed} locations refreshed` : ''})`);
+    console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${closedDetected > 0 ? `, ${closedDetected} closed detected` : ''}${empRetagged > 0 ? `, ${empRetagged} employment re-tagged` : ''}${domainRetagged > 0 ? `, ${domainRetagged} domains re-tagged (version ${TAG_ENGINE_VERSION})` : ''}${locRetagged > 0 ? `, ${locRetagged} locations re-tagged` : ''}${locNormalized > 0 ? `, ${locNormalized} locations normalized` : ''})`);
   } else {
     console.log(`🔄 No prior-run jobs to merge${closedDetected > 0 ? ` (${closedDetected} closed detected)` : ''}`);
   }
