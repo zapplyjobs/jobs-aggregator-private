@@ -661,6 +661,34 @@ jobs:
           else
             echo "✅ deduplicator.js exports DEDUPE_TTL_DAYS"
           fi
+
+        # 9. Canada feed artifacts exist and summary contract is valid
+        if [ ! -f ".github/data/canada-tech-jobs.jsonl" ]; then
+          echo "❌ canada-tech-jobs.jsonl missing"
+          PASS=false
+        else
+          CANADA_LINES=$(wc -l < .github/data/canada-tech-jobs.jsonl)
+          if [ "$CANADA_LINES" -lt 1 ]; then
+            echo "❌ canada-tech-jobs.jsonl empty"
+            PASS=false
+          else
+            echo "✅ canada-tech-jobs.jsonl: $CANADA_LINES lines"
+          fi
+        fi
+
+        if [ ! -f ".github/data/canada-tech-summary.json" ]; then
+          echo "❌ canada-tech-summary.json missing"
+          PASS=false
+        else
+          CANADA_SUMMARY_OK=$(python3 -c "import json; s=json.load(open('.github/data/canada-tech-summary.json')); checks=s.get('sentinel_false_positive_checks') or {}; ok=(s.get('contract_version') == 'canada-tech-feed-v1' and isinstance(s.get('canada_jobs'), int) and isinstance(s.get('canada_tech_jobs'), int) and s.get('canada_tech_jobs', 0) > 0 and isinstance(s.get('by_domain'), dict) and isinstance(s.get('by_source'), dict) and checks.get('passed') is True); print(1 if ok else 0)" 2>/dev/null || echo 0)
+          if [ "$CANADA_SUMMARY_OK" -ne 1 ]; then
+            echo "❌ canada-tech-summary.json missing required contract fields or sentinel pass"
+            PASS=false
+          else
+            echo "✅ canada-tech-summary.json contract OK"
+          fi
+        fi
+
         fi
 
         if [ "$PASS" = "true" ]; then
@@ -771,8 +799,6 @@ jobs:
         ls -lh .github/data/all_jobs.json || echo "all_jobs.json not found"
         ls -lh .github/data/jobs-metadata.json || echo "jobs-metadata.json not found"
         ls -lh .github/data/dedupe-store.json || echo "dedupe-store.json not found"
-        ls -lh .github/data/canada-tech-jobs.jsonl || echo "canada-tech-jobs.jsonl not found"
-        ls -lh .github/data/canada-tech-summary.json || echo "canada-tech-summary.json not found"
 
     - name: Display job counts
       if: always()
