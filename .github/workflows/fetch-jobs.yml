@@ -722,6 +722,7 @@ jobs:
             'tag-history.jsonl',
             'canada-tech-jobs.jsonl',
             'canada-tech-summary.json',
+            'canada-tech-early-career.jsonl',
           ];
 
           // Add description sidecars

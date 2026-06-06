@@ -86,6 +86,7 @@ const JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'all_jobs.json');
 const METADATA_OUTPUT_FILE = path.join(DATA_DIR, 'jobs-metadata.json');
 const CANADA_TECH_JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-jobs.jsonl');
 const CANADA_TECH_SUMMARY_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-summary.json');
+const CANADA_TECH_EARLY_CAREER_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-early-career.jsonl');
 
 const CANADA_TECH_DOMAINS = new Set(['software', 'hardware', 'data_science', 'ai']);
 const CANADA_LOCATION_CUE_RE = /\b(canada|canadian|ontario|toronto|ottawa|waterloo|kitchener|markham|mississauga|burlington|brampton|windsor|london|hamilton|quebec|montr[eé]al|montreal|laval|gatineau|british columbia|vancouver|burnaby|victoria|richmond|surrey|alberta|calgary|edmonton|manitoba|winnipeg|saskatchewan|regina|saskatoon|nova scotia|halifax|new brunswick|fredericton|moncton|newfoundland|st john'?s|prince edward island|charlottetown|yukon|whitehorse|northwest territories|yellowknife|nunavut|iqaluit|\bON\b|\bQC\b|\bBC\b|\bAB\b|\bMB\b|\bSK\b|\bNS\b|\bNB\b|\bNL\b|\bPE\b|\bYT\b|\bNT\b|\bNU\b)\b/i;
@@ -245,6 +246,16 @@ async function writeCanadaTechFeed(jobs) {
     throw new Error(`Canada tech feed sentinel checks failed: ${JSON.stringify(summary.sentinel_false_positive_checks.checks)}`);
   }
   return summary;
+}
+
+async function writeCanadaEarlyCareerFeed(jobs) {
+  const { jobs: canadaTechJobs } = buildCanadaTechFeed(jobs);
+  const earlyCareerJobs = canadaTechJobs.filter(job => ['entry_level', 'internship'].includes(job?.tags?.employment));
+  await writeJobsJSONL(earlyCareerJobs, CANADA_TECH_EARLY_CAREER_OUTPUT_FILE);
+  const internshipCount = earlyCareerJobs.filter(job => job?.tags?.employment === 'internship').length;
+  const entryLevelCount = earlyCareerJobs.filter(job => job?.tags?.employment === 'entry_level').length;
+  console.log(`🇨🇦 INF-PLATFORM-4: Canada early-career feed ${earlyCareerJobs.length} jobs (${entryLevelCount} entry-level, ${internshipCount} internships)`);
+  return { total: earlyCareerJobs.length, entry_level: entryLevelCount, internships: internshipCount };
 }
 
 /**
@@ -1100,6 +1111,7 @@ async function main() {
     // Write jobs (JSONL format)
     await writeJobsJSONL(publicJobs, JOBS_OUTPUT_FILE);
     const canadaTechSummary = await writeCanadaTechFeed(publicJobs);
+    await writeCanadaEarlyCareerFeed(publicJobs);
 
     // Write metadata
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
@@ -1795,6 +1807,7 @@ async function gitCommit(jobCount) {
     execSync('git add .github/data/jobs-metadata.json');
     execSync('git add .github/data/canada-tech-jobs.jsonl 2>/dev/null || true');
     execSync('git add .github/data/canada-tech-summary.json 2>/dev/null || true');
+    execSync('git add .github/data/canada-tech-early-career.jsonl 2>/dev/null || true');
     execSync('git add .github/data/dedupe-store.json');
     execSync('git add .github/data/wd-totals-cache.json 2>/dev/null || true'); // AGG-SPEED-2: WD incremental fetch cache
     execSync('git add .github/data/filtered_jobs.json 2>/dev/null || true'); // senior-filter summary for analytics (PIPELINE-1)
