@@ -17,7 +17,7 @@ const DATA_DIR = path.join(process.cwd(), '.github', 'data');
 const COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');
 const CACHE_FILE = path.join(DATA_DIR, 'wd-family-cache.json');
 const DEFAULT_MAX_DURATION_MS = 120000;
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const TENANT_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 const { buildFamilyCache } = require(`${SHARED}/fetchers/workday`);
 
@@ -40,7 +40,7 @@ function readExistingCache() {
   }
 }
 
-function getTenantCacheStatus(cache, tenants, now = Date.now()) {
+function getTenantCacheStatus(cache, tenants, now = Date.now(), maxAgeMs = TENANT_REFRESH_INTERVAL_MS) {
   if (!cache || !cache.tenants || typeof cache.tenants !== 'object') {
     return {
       fresh: false,
@@ -69,7 +69,7 @@ function getTenantCacheStatus(cache, tenants, now = Date.now()) {
       continue;
     }
 
-    if (now - fetchedAt >= CACHE_TTL_MS) {
+    if (now - fetchedAt >= maxAgeMs) {
       stale.push(tenant.name);
     }
   }
@@ -133,12 +133,14 @@ async function main() {
   const cache = readExistingCache();
   const status = getTenantCacheStatus(cache, tenants);
   if (status.fresh) {
-    console.log(`WD family cache tenant entries fresh (${status.tenantCount} tenants, TTL: ${(CACHE_TTL_MS / 3600000).toFixed(0)}h); skipping refresh`);
+    console.log(`WD family cache tenant entries fresh (${status.tenantCount} tenants, refresh interval: ${(TENANT_REFRESH_INTERVAL_MS / 3600000).toFixed(0)}h); skipping refresh`);
     return;
   }
 
-  console.log(`WD family cache refresh needed: ${status.missing.length} missing, ${status.stale.length} stale, ${status.invalid.length} invalid tenant entries (${status.cacheTenantCount}/${status.tenantCount} cached)`);
-  const report = await buildFamilyCache(tenants, DATA_DIR, { maxDurationMs });
+  const dueNames = new Set([...status.missing, ...status.stale, ...status.invalid]);
+  const tenantsToRefresh = tenants.filter(t => dueNames.has(t.name));
+  console.log(`WD family cache refresh needed: ${status.missing.length} missing, ${status.stale.length} stale, ${status.invalid.length} invalid tenant entries (${status.cacheTenantCount}/${status.tenantCount} cached); refreshing ${tenantsToRefresh.length} due tenants`);
+  const report = await buildFamilyCache(tenantsToRefresh, DATA_DIR, { maxDurationMs });
   if (!fs.existsSync(CACHE_FILE)) {
     throw new Error('buildFamilyCache did not write wd-family-cache.json');
   }
@@ -147,6 +149,7 @@ async function main() {
   console.log(JSON.stringify({
     refreshed_at: new Date().toISOString(),
     max_duration_ms: maxDurationMs,
+    tenant_refresh_interval_hours: TENANT_REFRESH_INTERVAL_MS / 3600000,
     report,
   }));
 }
