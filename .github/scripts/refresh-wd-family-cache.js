@@ -20,7 +20,6 @@ const DEFAULT_MAX_DURATION_MS = 120000;
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 const { buildFamilyCache } = require(`${SHARED}/fetchers/workday`);
-const { createR2Client } = require(`${SHARED}/storage/r2-client`);
 
 function parseMaxDurationMs() {
   const raw = process.env.WD_FAMILY_CACHE_MAX_MS;
@@ -33,14 +32,56 @@ function parseMaxDurationMs() {
 }
 
 
-function existingCacheFresh() {
+function readExistingCache() {
   try {
-    const cache = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-    const generatedAt = cache.generated_at ? new Date(cache.generated_at).getTime() : 0;
-    return Number.isFinite(generatedAt) && Date.now() - generatedAt < CACHE_TTL_MS;
+    return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
   } catch {
-    return false;
+    return null;
   }
+}
+
+function getTenantCacheStatus(cache, tenants, now = Date.now()) {
+  if (!cache || !cache.tenants || typeof cache.tenants !== 'object') {
+    return {
+      fresh: false,
+      tenantCount: tenants.length,
+      cacheTenantCount: 0,
+      missing: tenants.map(t => t.name),
+      stale: [],
+      invalid: [],
+    };
+  }
+
+  const missing = [];
+  const stale = [];
+  const invalid = [];
+
+  for (const tenant of tenants) {
+    const cached = cache.tenants[tenant.name];
+    if (!cached || !cached.pathMap || typeof cached.pathMap !== 'object') {
+      missing.push(tenant.name);
+      continue;
+    }
+
+    const fetchedAt = cached.fetched_at ? new Date(cached.fetched_at).getTime() : NaN;
+    if (!Number.isFinite(fetchedAt)) {
+      invalid.push(tenant.name);
+      continue;
+    }
+
+    if (now - fetchedAt >= CACHE_TTL_MS) {
+      stale.push(tenant.name);
+    }
+  }
+
+  return {
+    fresh: missing.length === 0 && stale.length === 0 && invalid.length === 0,
+    tenantCount: tenants.length,
+    cacheTenantCount: Object.keys(cache.tenants).length,
+    missing,
+    stale,
+    invalid,
+  };
 }
 
 function loadWorkdayTenants() {
@@ -84,13 +125,19 @@ async function uploadCache(r2) {
 async function main() {
   const maxDurationMs = parseMaxDurationMs();
   const tenants = loadWorkdayTenants();
+  const { createR2Client } = require(`${SHARED}/storage/r2-client`);
   const r2 = createR2Client({ prefix: 'data/' });
 
   await seedExistingCache(r2);
-  if (existingCacheFresh()) {
-    console.log('WD family cache is still fresh; skipping refresh');
+
+  const cache = readExistingCache();
+  const status = getTenantCacheStatus(cache, tenants);
+  if (status.fresh) {
+    console.log(`WD family cache tenant entries fresh (${status.tenantCount} tenants, TTL: ${(CACHE_TTL_MS / 3600000).toFixed(0)}h); skipping refresh`);
     return;
   }
+
+  console.log(`WD family cache refresh needed: ${status.missing.length} missing, ${status.stale.length} stale, ${status.invalid.length} invalid tenant entries (${status.cacheTenantCount}/${status.tenantCount} cached)`);
   const report = await buildFamilyCache(tenants, DATA_DIR, { maxDurationMs });
   if (!fs.existsSync(CACHE_FILE)) {
     throw new Error('buildFamilyCache did not write wd-family-cache.json');
@@ -104,7 +151,13 @@ async function main() {
   }));
 }
 
-main().catch(error => {
-  console.error(`WD family cache refresh failed: ${error.stack || error.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(error => {
+    console.error(`WD family cache refresh failed: ${error.stack || error.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  getTenantCacheStatus,
+};
