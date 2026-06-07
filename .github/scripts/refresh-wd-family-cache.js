@@ -200,7 +200,8 @@ async function main() {
 
   const dueNames = new Set([...status.missing, ...status.stale, ...status.invalid]);
   const tenantsToRefresh = tenants.filter(t => dueNames.has(t.name));
-  const { scores: tenantPriorityScores, stats: tenantPriorityStats } = getTenantPriorityScores(cache);
+  const currentJobs = readCurrentJobs();
+  const { scores: tenantPriorityScores, stats: tenantPriorityStats } = getTenantPriorityScores(cache, currentJobs);
   const scoredDueTenants = tenantsToRefresh
     .map(tenant => ({
       name: tenant.name,
@@ -212,6 +213,7 @@ async function main() {
     .slice(0, 8);
 
   console.log(`WD family cache refresh needed: ${status.missing.length} missing, ${status.stale.length} stale, ${status.invalid.length} invalid tenant entries (${status.cacheTenantCount}/${status.tenantCount} cached); refreshing ${tenantsToRefresh.length} due tenants`);
+  console.log(`WD family cache priority input: ${currentJobs.length} current jobs, ${scoredDueTenants.length} due tenants with live headroom scores`);
   if (scoredDueTenants.length > 0) {
     console.log(`WD family cache priority tenants: ${scoredDueTenants.map(row => `${row.name}:${row.score}`).join(', ')}`);
   }
