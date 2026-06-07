@@ -50,14 +50,28 @@ function isTechUs(job) {
 }
 
 function readJobsFile(jobsPath) {
+  let text = '';
   try {
-    const jobs = JSON.parse(fs.readFileSync(jobsPath, 'utf8'));
-    return Array.isArray(jobs) ? jobs : [];
+    text = fs.readFileSync(jobsPath, 'utf8');
   } catch {
     return [];
   }
-}
 
+  try {
+    const jobs = JSON.parse(text);
+    if (Array.isArray(jobs)) return jobs;
+    if (Array.isArray(jobs.jobs)) return jobs.jobs;
+  } catch {}
+
+  const records = [];
+  for (const line of text.trim().split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      records.push(JSON.parse(line));
+    } catch {}
+  }
+  return records;
+}
 function readCurrentJobs() {
   return readJobsFile(path.join(DATA_DIR, 'all_jobs.json'));
 }
