@@ -49,14 +49,32 @@ function isTechUs(job) {
     && job.tags.domains.some(domain => TECH_DOMAINS.has(domain));
 }
 
-function readCurrentJobs() {
-  const jobsPath = path.join(DATA_DIR, 'all_jobs.json');
+function readJobsFile(jobsPath) {
   try {
     const jobs = JSON.parse(fs.readFileSync(jobsPath, 'utf8'));
     return Array.isArray(jobs) ? jobs : [];
   } catch {
     return [];
   }
+}
+
+function readCurrentJobs() {
+  return readJobsFile(path.join(DATA_DIR, 'all_jobs.json'));
+}
+
+async function loadCurrentJobs(r2) {
+  const localJobs = readCurrentJobs();
+  if (localJobs.length > 0) return localJobs;
+
+  const fallbackPath = path.join(DATA_DIR, 'all_jobs.priority.json');
+  try {
+    const result = await r2.downloadToFile('all_jobs.json', fallbackPath);
+    if (result) return readJobsFile(fallbackPath);
+  } catch (error) {
+    console.warn(`Could not load all_jobs.json for WD cache priority scoring: ${error.message}`);
+  }
+
+  return [];
 }
 
 function getTenantPriorityScores(cache, jobs = readCurrentJobs()) {
@@ -200,7 +218,7 @@ async function main() {
 
   const dueNames = new Set([...status.missing, ...status.stale, ...status.invalid]);
   const tenantsToRefresh = tenants.filter(t => dueNames.has(t.name));
-  const currentJobs = readCurrentJobs();
+  const currentJobs = await loadCurrentJobs(r2);
   const { scores: tenantPriorityScores, stats: tenantPriorityStats } = getTenantPriorityScores(cache, currentJobs);
   const scoredDueTenants = tenantsToRefresh
     .map(tenant => ({
