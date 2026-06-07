@@ -40,6 +40,67 @@ function readExistingCache() {
   }
 }
 
+const TECH_DOMAINS = new Set(['software', 'data_science', 'hardware', 'cybersecurity', 'ai', 'devops', 'product', 'design', 'qa', 'it']);
+
+function isTechUs(job) {
+  return Array.isArray(job.tags?.locations)
+    && job.tags.locations.includes('us')
+    && Array.isArray(job.tags?.domains)
+    && job.tags.domains.some(domain => TECH_DOMAINS.has(domain));
+}
+
+function readCurrentJobs() {
+  const jobsPath = path.join(DATA_DIR, 'all_jobs.json');
+  try {
+    const jobs = JSON.parse(fs.readFileSync(jobsPath, 'utf8'));
+    return Array.isArray(jobs) ? jobs : [];
+  } catch {
+    return [];
+  }
+}
+
+function getTenantPriorityScores(cache, jobs = readCurrentJobs()) {
+  const scores = {};
+  const stats = {};
+
+  for (const job of jobs) {
+    if (job.source !== 'workday' || !job.company_name) continue;
+
+    const row = stats[job.company_name] || {
+      total: 0,
+      techUs: 0,
+      noCacheRows: 0,
+      noCacheTechUs: 0,
+      pathNoHit: 0,
+      techPathNoHit: 0,
+    };
+
+    row.total += 1;
+    const techUs = isTechUs(job);
+    if (techUs) row.techUs += 1;
+
+    const cached = cache?.tenants?.[job.company_name];
+    if (!cached || !cached.pathMap || typeof cached.pathMap !== 'object') {
+      row.noCacheRows += 1;
+      if (techUs) row.noCacheTechUs += 1;
+    } else if (job.wd_path && !cached.pathMap[job.wd_path]) {
+      row.pathNoHit += 1;
+      if (techUs) row.techPathNoHit += 1;
+    }
+
+    stats[job.company_name] = row;
+  }
+
+  for (const [name, row] of Object.entries(stats)) {
+    scores[name] = (row.noCacheTechUs + row.techPathNoHit) * 10000
+      + (row.noCacheRows + row.pathNoHit) * 100
+      + row.techUs * 10
+      + row.total;
+  }
+
+  return { scores, stats };
+}
+
 function getTenantCacheStatus(cache, tenants, now = Date.now(), maxAgeMs = TENANT_REFRESH_INTERVAL_MS) {
   if (!cache || !cache.tenants || typeof cache.tenants !== 'object') {
     return {
@@ -139,8 +200,22 @@ async function main() {
 
   const dueNames = new Set([...status.missing, ...status.stale, ...status.invalid]);
   const tenantsToRefresh = tenants.filter(t => dueNames.has(t.name));
+  const { scores: tenantPriorityScores, stats: tenantPriorityStats } = getTenantPriorityScores(cache);
+  const scoredDueTenants = tenantsToRefresh
+    .map(tenant => ({
+      name: tenant.name,
+      score: tenantPriorityScores[tenant.name] || 0,
+      stats: tenantPriorityStats[tenant.name] || null,
+    }))
+    .filter(row => row.score > 0)
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+    .slice(0, 8);
+
   console.log(`WD family cache refresh needed: ${status.missing.length} missing, ${status.stale.length} stale, ${status.invalid.length} invalid tenant entries (${status.cacheTenantCount}/${status.tenantCount} cached); refreshing ${tenantsToRefresh.length} due tenants`);
-  const report = await buildFamilyCache(tenantsToRefresh, DATA_DIR, { maxDurationMs });
+  if (scoredDueTenants.length > 0) {
+    console.log(`WD family cache priority tenants: ${scoredDueTenants.map(row => `${row.name}:${row.score}`).join(', ')}`);
+  }
+  const report = await buildFamilyCache(tenantsToRefresh, DATA_DIR, { maxDurationMs, tenantPriorityScores });
   if (!fs.existsSync(CACHE_FILE)) {
     throw new Error('buildFamilyCache did not write wd-family-cache.json');
   }
@@ -163,4 +238,6 @@ if (require.main === module) {
 
 module.exports = {
   getTenantCacheStatus,
+  getTenantPriorityScores,
+  isTechUs,
 };
