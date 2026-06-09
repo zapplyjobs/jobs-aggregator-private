@@ -5,6 +5,10 @@ on:
     - cron: '0 6 * * *'  # Daily at 6 AM UTC (midnight US Central)
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+
 jobs:
   generate-review:
     runs-on: ubuntu-latest
