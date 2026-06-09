@@ -2,6 +2,9 @@ name: Test R2 Connection
 on:
   workflow_dispatch:
 
+permissions: {}
+
+
 jobs:
   test-r2:
     runs-on: ubuntu-latest
