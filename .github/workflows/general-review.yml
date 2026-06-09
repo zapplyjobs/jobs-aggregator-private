@@ -29,10 +29,15 @@ jobs:
       - name: Download data from jobs-data-2026
         run: |
           mkdir -p /tmp/review-data
-          echo "Downloading all_jobs.json..."
-          curl -sf -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
-            "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/all_jobs.json?t=$(date +%s)" \
-            -o /tmp/review-data/all_jobs.json
+          download_content() {
+            curl -sf \
+              -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+              -H "Accept: application/vnd.github.raw" \
+              "https://api.github.com/repos/zapplyjobs/jobs-data-2026/contents/.github/data/$1?ref=main" \
+              -o "$2"
+          }
+
+          download_content all_jobs.json /tmp/review-data/all_jobs.json
           echo "  $(wc -l < /tmp/review-data/all_jobs.json) jobs"
 
           echo "Discovering sidecar description files..."
@@ -47,9 +52,7 @@ jobs:
 
           echo "Downloading sidecar descriptions..."
           for f in $SIDECAR_FILES; do
-            curl -sf -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
-              "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/$f?t=$(date +%s)" \
-              -o "/tmp/review-data/$f" 2>/dev/null && echo "  $f: $(wc -l < /tmp/review-data/$f) entries" || echo "  $f: download failed (skipped)"
+            download_content "$f" "/tmp/review-data/$f" 2>/dev/null && echo "  $f: $(wc -l < /tmp/review-data/$f) entries" || echo "  $f: download failed (skipped)"
           done
 
       - name: Generate general-review.json
