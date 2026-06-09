@@ -712,7 +712,7 @@ jobs:
         async function main() {
           const r2 = createR2Client({ prefix: 'data/' });
           const dataDir = '.github/data';
-          const files = [
+          const requiredFiles = [
             'all_jobs.json',
             'jobs-metadata.json',
             'dedupe-store.json',
@@ -725,34 +725,60 @@ jobs:
             'canada-tech-early-career.jsonl',
           ];
 
-          // Add description sidecars
-          const sidecars = fs.readdirSync(dataDir).filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
-          for (const s of sidecars) files.push(s);
+          // Description sidecars are valuable but source-dependent; they must not hide
+          // a failed core publish. Missing/failed required files fail this workflow.
+          const optionalFiles = fs.readdirSync(dataDir).filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
+          const files = [...requiredFiles, ...optionalFiles];
 
-          // AGG-SPEED-9: Upload in parallel with concurrency 5
+          // AGG-SPEED-9: Upload in parallel with concurrency 5.
           const CONCURRENCY = 5;
-          let ok = 0, fail = 0;
+          const results = [];
 
           async function uploadFile(file) {
+            const required = requiredFiles.includes(file);
             const fp = path.join(dataDir, file);
-            if (!fs.existsSync(fp)) { console.log('SKIP: ' + file); return; }
+            if (!fs.existsSync(fp)) {
+              const status = required ? 'MISSING_REQUIRED' : 'SKIP_OPTIONAL';
+              console.log(`${status}: ${file}`);
+              return { file, required, ok: !required, status };
+            }
             try {
               const data = fs.readFileSync(fp, 'utf8');
               const isJson = file.endsWith('.json');
               const uploaded = isJson
                 ? await r2.uploadRaw(file, data, 'application/json')
                 : await r2.uploadRaw(file, data, 'application/x-jsonlines');
-              if (uploaded) { ok++; } else { fail++; }
-            } catch (e) { console.error('ERR: ' + file + ' - ' + e.message); fail++; }
+              if (uploaded) return { file, required, ok: true, status: 'uploaded' };
+              console.error(`ERR: ${file} - uploadRaw returned false`);
+              return { file, required, ok: false, status: 'upload_false' };
+            } catch (e) {
+              console.error(`ERR: ${file} - ${e.message}`);
+              return { file, required, ok: false, status: 'exception' };
+            }
           }
 
           for (let i = 0; i < files.length; i += CONCURRENCY) {
             const batch = files.slice(i, i + CONCURRENCY);
-            await Promise.all(batch.map(f => uploadFile(f)));
+            results.push(...await Promise.all(batch.map(f => uploadFile(f))));
           }
 
-          await r2.writeManifest({ files_uploaded: ok, files_failed: fail, pipeline_run: process.env.GITHUB_RUN_ID });
-          console.log('R2 upload done: ' + ok + ' ok, ' + fail + ' failed');
+          const ok = results.filter(r => r.ok).length;
+          const fail = results.filter(r => !r.ok).length;
+          const requiredFailures = results.filter(r => r.required && !r.ok);
+          const optionalFailures = results.filter(r => !r.required && !r.ok);
+
+          await r2.writeManifest({
+            files_uploaded: ok,
+            files_failed: fail,
+            required_files_failed: requiredFailures.length,
+            optional_files_failed: optionalFailures.length,
+            pipeline_run: process.env.GITHUB_RUN_ID,
+          });
+          console.log(`R2 upload done: ${ok} ok, ${fail} failed (${requiredFailures.length} required, ${optionalFailures.length} optional)`);
+          if (requiredFailures.length > 0) {
+            console.error('Required R2 upload failures: ' + requiredFailures.map(r => `${r.file}:${r.status}`).join(', '));
+            process.exit(1);
+          }
         }
         main().catch(e => { console.error('R2 fatal: ' + e.message); process.exit(1); });
         "
