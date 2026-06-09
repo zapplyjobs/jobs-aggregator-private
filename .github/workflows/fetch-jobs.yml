@@ -739,7 +739,7 @@ jobs:
             const fp = path.join(dataDir, file);
             if (!fs.existsSync(fp)) {
               const status = required ? 'MISSING_REQUIRED' : 'SKIP_OPTIONAL';
-              console.log(`${status}: ${file}`);
+              console.log(status + ': ' + file);
               return { file, required, ok: !required, status };
             }
             try {
@@ -749,10 +749,10 @@ jobs:
                 ? await r2.uploadRaw(file, data, 'application/json')
                 : await r2.uploadRaw(file, data, 'application/x-jsonlines');
               if (uploaded) return { file, required, ok: true, status: 'uploaded' };
-              console.error(`ERR: ${file} - uploadRaw returned false`);
+              console.error('ERR: ' + file + ' - uploadRaw returned false');
               return { file, required, ok: false, status: 'upload_false' };
             } catch (e) {
-              console.error(`ERR: ${file} - ${e.message}`);
+              console.error('ERR: ' + file + ' - ' + e.message);
               return { file, required, ok: false, status: 'exception' };
             }
           }
@@ -774,9 +774,9 @@ jobs:
             optional_files_failed: optionalFailures.length,
             pipeline_run: process.env.GITHUB_RUN_ID,
           });
-          console.log(`R2 upload done: ${ok} ok, ${fail} failed (${requiredFailures.length} required, ${optionalFailures.length} optional)`);
+          console.log('R2 upload done: ' + ok + ' ok, ' + fail + ' failed (' + requiredFailures.length + ' required, ' + optionalFailures.length + ' optional)');
           if (requiredFailures.length > 0) {
-            console.error('Required R2 upload failures: ' + requiredFailures.map(r => `${r.file}:${r.status}`).join(', '));
+            console.error('Required R2 upload failures: ' + requiredFailures.map(r => r.file + ':' + r.status).join(', '));
             process.exit(1);
           }
         }
