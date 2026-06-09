@@ -63,9 +63,11 @@ jobs:
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
         run: |
           node .github/scripts/check-link-health.js --per-group 8 --write-dead stale-job-candidates.json --history-in stale-job-history.prev.json --write-history stale-job-history.json > agg-link-health.json
+          node .github/scripts/build-stale-tombstones.js --history-in stale-job-history.json --output stale-job-tombstones.json
           cat agg-link-health.json
           cat stale-job-candidates.json
           cat stale-job-history.json
+          cat stale-job-tombstones.json
 
       - name: Upload stale candidate outputs to R2
         if: always()
@@ -87,7 +89,7 @@ jobs:
                 secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
               },
             });
-            for (const file of ['agg-link-health.json', 'stale-job-candidates.json', 'stale-job-history.json']) {
+            for (const file of ['agg-link-health.json', 'stale-job-candidates.json', 'stale-job-history.json', 'stale-job-tombstones.json']) {
               if (!fs.existsSync(file)) continue;
               await client.send(new PutObjectCommand({
                 Bucket: process.env.R2_BUCKET_NAME,
@@ -110,3 +112,4 @@ jobs:
             agg-link-health.json
             stale-job-candidates.json
             stale-job-history.json
+            stale-job-tombstones.json
