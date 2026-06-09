@@ -15,6 +15,7 @@ permissions:
 jobs:
   workflow-lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
         with:
@@ -25,15 +26,38 @@ jobs:
         with:
           args: -color -shellcheck=
 
-      - name: Enforce AGG fetch trigger invariant
+      - name: Enforce AGG workflow governance invariants
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          text = Path('.github/workflows/fetch-jobs.yml').read_text()
-          if re.search(r'^\s*push:\s*$', text, re.M):
+
+          workflow_dir = Path('.github/workflows')
+          workflows = sorted(workflow_dir.glob('*.yml'))
+          for path in workflows:
+              text = path.read_text()
+              if not re.search(r'(?m)^(permissions:|\s+permissions:)\s*', text):
+                  raise SystemExit(f'{path} must declare explicit permissions')
+              if 'timeout-minutes:' not in text:
+                  raise SystemExit(f'{path} must declare timeout-minutes')
+
+          fetch = (workflow_dir / 'fetch-jobs.yml').read_text()
+          if re.search(r'^\s*push:\s*$', fetch, re.M):
               raise SystemExit('fetch-jobs.yml must not define a push trigger; AGG hot publish path is workflow_dispatch-only')
-          if 'workflow_dispatch:' not in text:
+          if 'workflow_dispatch:' not in fetch:
               raise SystemExit('fetch-jobs.yml must define workflow_dispatch')
-          print('PASS: fetch-jobs trigger invariant holds')
+          if 'cancel-in-progress: false' not in fetch:
+              raise SystemExit('fetch-jobs.yml must preserve cancel-in-progress:false')
+          if 'required_files_failed' not in fetch or 'Required R2 upload failures' not in fetch:
+              raise SystemExit('fetch-jobs.yml must keep required R2 upload failure accounting')
+
+          link = (workflow_dir / 'check-link-health.yml').read_text()
+          if 'validate-link-health-artifacts.js --print-summary' not in link:
+              raise SystemExit('check-link-health.yml must validate producer-truth artifacts before upload')
+          if re.search(r'name:\s*Upload stale candidate outputs to R2[\s\S]{0,120}if:\s*always\(\)', link):
+              raise SystemExit('check-link-health.yml must not upload R2 truth artifacts with if: always()')
+          if 'retention-days: 14' not in link:
+              raise SystemExit('check-link-health.yml must keep short artifact retention')
+
+          print('PASS: AGG workflow governance invariants hold')
           PY
