@@ -5,6 +5,11 @@ on:
   schedule:
     - cron: '17 */6 * * *'
 
+permissions:
+  contents: read
+  actions: write
+
+
 jobs:
   link-health:
     runs-on: ubuntu-latest
@@ -71,15 +76,10 @@ jobs:
           node .github/scripts/build-stale-tombstones.js --history-in stale-job-history.json --output stale-job-tombstones.json
           node .github/scripts/build-link-verification-sample.js --input agg-link-health.json --output link-verification-sample.json
           node .github/scripts/build-source-confidence-sample.js --link-health agg-link-health.json --verification link-verification-sample.json --tombstones stale-job-tombstones.json --metadata jobs-metadata.json --output source-confidence-sample.json
-          cat agg-link-health.json
-          cat stale-job-candidates.json
-          cat stale-job-history.json
-          cat stale-job-tombstones.json
-          cat link-verification-sample.json
-          cat source-confidence-sample.json
+          node .github/scripts/validate-link-health-artifacts.js --print-summary
 
       - name: Upload stale candidate outputs to R2
-        if: always()
+        if: success()
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -124,3 +124,4 @@ jobs:
             stale-job-tombstones.json
             link-verification-sample.json
             source-confidence-sample.json
+          retention-days: 14
