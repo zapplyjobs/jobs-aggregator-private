@@ -14,6 +14,22 @@ const COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');
 const JOBS_FILE = path.join(DATA_DIR, 'supplemental-oracle-jobs.json');
 const META_FILE = path.join(DATA_DIR, 'supplemental-oracle-metadata.json');
 
+function hasR2Env() {
+  return Boolean(process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_ENDPOINT && process.env.R2_BUCKET_NAME);
+}
+
+function isGitHubActions() {
+  return process.env.GITHUB_ACTIONS === 'true';
+}
+
+async function uploadRequired(r2, name, file, contentType) {
+  const uploaded = await r2.uploadRaw(name, fs.readFileSync(file, 'utf8'), contentType);
+  if (!uploaded) {
+    throw new Error(`R2 upload failed for ${name}`);
+  }
+}
+
+
 async function main() {
   const start = Date.now();
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -59,18 +75,23 @@ async function main() {
 
   console.log(`✅ Oracle supplemental lane wrote ${payload.length} jobs in ${Math.round(durationMs/1000)}s`);
 
-  if (process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_ENDPOINT && process.env.R2_BUCKET_NAME) {
+  if (hasR2Env()) {
     try {
       const { createR2Client } = require(`${SHARED}/storage/r2-client`);
       const r2 = createR2Client({ prefix: 'data/' });
-      await r2.uploadRaw('supplemental-oracle-jobs.json', fs.readFileSync(JOBS_FILE, 'utf8'), 'application/json');
-      await r2.uploadRaw('supplemental-oracle-metadata.json', fs.readFileSync(META_FILE, 'utf8'), 'application/json');
+      await uploadRequired(r2, 'supplemental-oracle-jobs.json', JOBS_FILE, 'application/json');
+      await uploadRequired(r2, 'supplemental-oracle-metadata.json', META_FILE, 'application/json');
       console.log('☁️ Uploaded Oracle supplemental artifacts to R2');
     } catch (err) {
+      if (isGitHubActions()) {
+        throw new Error(`Oracle supplemental R2 publish failed: ${err.message}`);
+      }
       console.log(`⚠️ R2 upload unavailable locally — skipped (${err.message})`);
     }
+  } else if (isGitHubActions()) {
+    throw new Error('R2 env missing in GitHub Actions; refusing to mark Oracle supplemental publish successful');
   } else {
-    console.log('⚠️ R2 env missing — skipped R2 upload');
+    console.log('⚠️ R2 env missing — skipped R2 upload (local mode)');
   }
 }
 
