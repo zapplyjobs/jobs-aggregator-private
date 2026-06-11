@@ -26,6 +26,22 @@ function countJsonlLines(file) {
   }
 }
 
+function hasR2Env() {
+  return Boolean(process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_ENDPOINT && process.env.R2_BUCKET_NAME);
+}
+
+function isGitHubActions() {
+  return process.env.GITHUB_ACTIONS === 'true';
+}
+
+async function uploadRequired(r2, name, file, contentType) {
+  const uploaded = await r2.uploadRaw(name, fs.readFileSync(file, 'utf8'), contentType);
+  if (!uploaded) {
+    throw new Error(`R2 upload failed for ${name}`);
+  }
+}
+
+
 async function loadIds(prefix) {
   const ids = new Set();
   try {
@@ -109,22 +125,27 @@ async function main() {
   fs.writeFileSync(META_FILE, JSON.stringify(metadata, null, 2), 'utf8');
   console.log(`✅ Custom supplemental lane wrote ${payload.length} jobs in ${Math.round(durationMs/1000)}s`);
 
-  if (process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_ENDPOINT && process.env.R2_BUCKET_NAME) {
+  if (hasR2Env()) {
     try {
       const { createR2Client } = require(`${SHARED}/storage/r2-client`);
       const r2 = createR2Client({ prefix: 'data/' });
-      await r2.uploadRaw('supplemental-custom-jobs.json', fs.readFileSync(JOBS_FILE, 'utf8'), 'application/json');
-      await r2.uploadRaw('supplemental-custom-metadata.json', fs.readFileSync(META_FILE, 'utf8'), 'application/json');
+      await uploadRequired(r2, 'supplemental-custom-jobs.json', JOBS_FILE, 'application/json');
+      await uploadRequired(r2, 'supplemental-custom-metadata.json', META_FILE, 'application/json');
       const googleSidecar = path.join(DATA_DIR, 'descriptions-google.jsonl');
       if (fs.existsSync(googleSidecar)) {
-        await r2.uploadRaw('descriptions-google.jsonl', fs.readFileSync(googleSidecar, 'utf8'), 'application/x-jsonlines');
+        await uploadRequired(r2, 'descriptions-google.jsonl', googleSidecar, 'application/x-jsonlines');
       }
       console.log('☁️ Uploaded custom supplemental artifacts to R2');
     } catch (err) {
+      if (isGitHubActions()) {
+        throw new Error(`Custom supplemental R2 publish failed: ${err.message}`);
+      }
       console.log(`⚠️ R2 upload unavailable locally — skipped (${err.message})`);
     }
+  } else if (isGitHubActions()) {
+    throw new Error('R2 env missing in GitHub Actions; refusing to mark custom supplemental publish successful');
   } else {
-    console.log('⚠️ R2 env missing — skipped R2 upload');
+    console.log('⚠️ R2 env missing — skipped R2 upload (local mode)');
   }
 }
 
