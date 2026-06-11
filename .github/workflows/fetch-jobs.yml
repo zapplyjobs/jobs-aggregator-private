@@ -792,15 +792,13 @@ jobs:
 
     - name: Trigger jobs-data public snapshot refresh
       if: success() && github.ref_name == 'main'
-      run: |
-        curl -sf -X POST "https://api.github.com/repos/zapplyjobs/jobs-data-2026/actions/workflows/refresh-zjp-public-snapshot.yml/dispatches" \
-          -H "Authorization: Bearer ${GH_PAT}" \
-          -H "Accept: application/vnd.github+json" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          -d '{"ref":"main"}'
-        echo "✅ Triggered jobs-data public snapshot refresh"
+      run: node .github/scripts/dispatch-workflow.js
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
+        DISPATCH_REPO: jobs-data-2026
+        DISPATCH_WORKFLOW: refresh-zjp-public-snapshot.yml
+        DISPATCH_REF: main
+        DISPATCH_MAX_ATTEMPTS: "3"
 
     - name: Refresh Workday family cache for next run
       if: success() && github.ref_name == 'main'
