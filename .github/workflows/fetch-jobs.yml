@@ -21,6 +21,7 @@ jobs:
 
     env:
       NODE_OPTIONS: --max-old-space-size=4096
+      SKIP_WD_FAMILY_CACHE_BUILD: 1
 
     steps:
     - name: Checkout repository
