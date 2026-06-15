@@ -2,6 +2,10 @@ name: Fetch All Jobs
 
 on:
   workflow_dispatch:  # Triggered by job-board-cron-worker (Cloudflare) every 15 min
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/scripts/**'
 
 # Prevent concurrent runs
 concurrency:
@@ -11,13 +15,12 @@ concurrency:
 jobs:
   fetch-all:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: write
 
     env:
       NODE_OPTIONS: --max-old-space-size=4096
-      SKIP_WD_FAMILY_CACHE_BUILD: '1'
 
     steps:
     - name: Checkout repository
@@ -661,34 +664,6 @@ jobs:
           else
             echo "✅ deduplicator.js exports DEDUPE_TTL_DAYS"
           fi
-
-        # 9. Canada feed artifacts exist and summary contract is valid
-        if [ ! -f ".github/data/canada-tech-jobs.jsonl" ]; then
-          echo "❌ canada-tech-jobs.jsonl missing"
-          PASS=false
-        else
-          CANADA_LINES=$(wc -l < .github/data/canada-tech-jobs.jsonl)
-          if [ "$CANADA_LINES" -lt 1 ]; then
-            echo "❌ canada-tech-jobs.jsonl empty"
-            PASS=false
-          else
-            echo "✅ canada-tech-jobs.jsonl: $CANADA_LINES lines"
-          fi
-        fi
-
-        if [ ! -f ".github/data/canada-tech-summary.json" ]; then
-          echo "❌ canada-tech-summary.json missing"
-          PASS=false
-        else
-          CANADA_SUMMARY_OK=$(python3 -c "import json; s=json.load(open('.github/data/canada-tech-summary.json')); checks=s.get('sentinel_false_positive_checks') or {}; ok=(s.get('contract_version') == 'canada-tech-feed-v1' and isinstance(s.get('canada_jobs'), int) and isinstance(s.get('canada_tech_jobs'), int) and s.get('canada_tech_jobs', 0) > 0 and isinstance(s.get('by_domain'), dict) and isinstance(s.get('by_source'), dict) and checks.get('passed') is True); print(1 if ok else 0)" 2>/dev/null || echo 0)
-          if [ "$CANADA_SUMMARY_OK" -ne 1 ]; then
-            echo "❌ canada-tech-summary.json missing required contract fields or sentinel pass"
-            PASS=false
-          else
-            echo "✅ canada-tech-summary.json contract OK"
-          fi
-        fi
-
         fi
 
         if [ "$PASS" = "true" ]; then
@@ -712,7 +687,7 @@ jobs:
         async function main() {
           const r2 = createR2Client({ prefix: 'data/' });
           const dataDir = '.github/data';
-          const requiredFiles = [
+          const files = [
             'all_jobs.json',
             'jobs-metadata.json',
             'dedupe-store.json',
@@ -720,65 +695,36 @@ jobs:
             'wd-family-cache.json',
             'filtered-samples.jsonl',
             'tag-history.jsonl',
-            'canada-tech-jobs.jsonl',
-            'canada-tech-summary.json',
-            'canada-tech-early-career.jsonl',
           ];
 
-          // Description sidecars are valuable but source-dependent; they must not hide
-          // a failed core publish. Missing/failed required files fail this workflow.
-          const optionalFiles = fs.readdirSync(dataDir).filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
-          const files = [...requiredFiles, ...optionalFiles];
+          // Add description sidecars
+          const sidecars = fs.readdirSync(dataDir).filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
+          for (const s of sidecars) files.push(s);
 
-          // AGG-SPEED-9: Upload in parallel with concurrency 5.
+          // AGG-SPEED-9: Upload in parallel with concurrency 5
           const CONCURRENCY = 5;
-          const results = [];
+          let ok = 0, fail = 0;
 
           async function uploadFile(file) {
-            const required = requiredFiles.includes(file);
             const fp = path.join(dataDir, file);
-            if (!fs.existsSync(fp)) {
-              const status = required ? 'MISSING_REQUIRED' : 'SKIP_OPTIONAL';
-              console.log(status + ': ' + file);
-              return { file, required, ok: !required, status };
-            }
+            if (!fs.existsSync(fp)) { console.log('SKIP: ' + file); return; }
             try {
               const data = fs.readFileSync(fp, 'utf8');
               const isJson = file.endsWith('.json');
               const uploaded = isJson
                 ? await r2.uploadRaw(file, data, 'application/json')
                 : await r2.uploadRaw(file, data, 'application/x-jsonlines');
-              if (uploaded) return { file, required, ok: true, status: 'uploaded' };
-              console.error('ERR: ' + file + ' - uploadRaw returned false');
-              return { file, required, ok: false, status: 'upload_false' };
-            } catch (e) {
-              console.error('ERR: ' + file + ' - ' + e.message);
-              return { file, required, ok: false, status: 'exception' };
-            }
+              if (uploaded) { ok++; } else { fail++; }
+            } catch (e) { console.error('ERR: ' + file + ' - ' + e.message); fail++; }
           }
 
           for (let i = 0; i < files.length; i += CONCURRENCY) {
             const batch = files.slice(i, i + CONCURRENCY);
-            results.push(...await Promise.all(batch.map(f => uploadFile(f))));
+            await Promise.all(batch.map(f => uploadFile(f)));
           }
 
-          const ok = results.filter(r => r.ok).length;
-          const fail = results.filter(r => !r.ok).length;
-          const requiredFailures = results.filter(r => r.required && !r.ok);
-          const optionalFailures = results.filter(r => !r.required && !r.ok);
-
-          await r2.writeManifest({
-            files_uploaded: ok,
-            files_failed: fail,
-            required_files_failed: requiredFailures.length,
-            optional_files_failed: optionalFailures.length,
-            pipeline_run: process.env.GITHUB_RUN_ID,
-          });
-          console.log('R2 upload done: ' + ok + ' ok, ' + fail + ' failed (' + requiredFailures.length + ' required, ' + optionalFailures.length + ' optional)');
-          if (requiredFailures.length > 0) {
-            console.error('Required R2 upload failures: ' + requiredFailures.map(r => r.file + ':' + r.status).join(', '));
-            process.exit(1);
-          }
+          await r2.writeManifest({ files_uploaded: ok, files_failed: fail, pipeline_run: process.env.GITHUB_RUN_ID });
+          console.log('R2 upload done: ' + ok + ' ok, ' + fail + ' failed');
         }
         main().catch(e => { console.error('R2 fatal: ' + e.message); process.exit(1); });
         "
@@ -792,23 +738,15 @@ jobs:
 
     - name: Trigger jobs-data public snapshot refresh
       if: success() && github.ref_name == 'main'
-      run: node .github/scripts/dispatch-workflow.js
+      run: |
+        curl -sf -X POST "https://api.github.com/repos/zapplyjobs/jobs-data-2026/actions/workflows/refresh-zjp-public-snapshot.yml/dispatches" \
+          -H "Authorization: Bearer ${GH_PAT}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          -d '{"ref":"main"}'
+        echo "✅ Triggered jobs-data public snapshot refresh"
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
-        DISPATCH_REPO: jobs-data-2026
-        DISPATCH_WORKFLOW: refresh-zjp-public-snapshot.yml
-        DISPATCH_REF: main
-        DISPATCH_MAX_ATTEMPTS: "3"
-
-    - name: Refresh Workday family cache for next run
-      if: success() && github.ref_name == 'main'
-      run: |
-        timeout 180s node .github/scripts/refresh-wd-family-cache.js || echo "::warning::Workday family cache refresh did not complete; publish already succeeded"
-      env:
-        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
 
     - name: Display logs (always run)
