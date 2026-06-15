@@ -38,10 +38,11 @@ const { applyFamilyCache, buildFamilyCache } = require(`${SHARED}/fetchers/workd
 // Import processors
 const { validateAndNormalizeJobs, printValidationSummary, normalizeJob } = require(`${SHARED}/processors/validator`);
 const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
-const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS, INTERNSHIP_TTL_MS, INTERNSHIP_TTL_DAYS } = require(`${SHARED}/processors/deduplicator`);
+const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS, INTERNSHIP_TTL_MS } = require(`${SHARED}/processors/deduplicator`);
 const { tagJobs, generateTagStats, tagEmployment, tagDomains, tagLocations, setCompanyOverrideMap, TAG_ENGINE_VERSION, getKeywordMap } = require(`${SHARED}/processors/tag-engine`);
 const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport, checkKeywordHealth, checkKeywordOverlap } = require(`${SHARED}/processors/tag-monitor`);
 
+const SKIP_WD_FAMILY_CACHE_BUILD = process.env.SKIP_WD_FAMILY_CACHE_BUILD === '1';
 // Import utils
 const { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);
 const { EMPLOYMENT_NORMALIZE_MAP } = require(`${SHARED}/utils/helpers`);
@@ -51,20 +52,6 @@ const { runTagMonitoring } = require(`${SHARED}/utils/monitoring`);
 // AGG-36: Company override map (populated by loadCompanyOverrides)
 const COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');
 let companyOverrideMap = new Map();
-
-function deriveWorkdayPathFromUrl(url) {
-  if (!url) return null;
-  try {
-    const parsed = new URL(url);
-    const parts = parsed.pathname.split('/').filter(Boolean);
-    const jobIdx = parts.indexOf('job');
-    if (jobIdx === -1) return null;
-    const start = (jobIdx > 0 && /^[a-z]{2}(?:-[A-Z]{2})?$/.test(parts[jobIdx - 1])) ? jobIdx - 1 : jobIdx;
-    return '/' + parts.slice(start).join('/');
-  } catch {
-    return null;
-  }
-}
 
 function loadCompanyOverrides() {
   try {
@@ -84,13 +71,6 @@ loadCompanyOverrides();
 const DATA_DIR = path.join(process.cwd(), '.github', 'data');
 const JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'all_jobs.json');
 const METADATA_OUTPUT_FILE = path.join(DATA_DIR, 'jobs-metadata.json');
-const CANADA_TECH_JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-jobs.jsonl');
-const CANADA_TECH_SUMMARY_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-summary.json');
-const CANADA_TECH_EARLY_CAREER_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-early-career.jsonl');
-
-const CANADA_TECH_DOMAINS = new Set(['software', 'hardware', 'data_science', 'ai']);
-const CANADA_LOCATION_CUE_RE = /\b(canada|canadian|ontario|toronto|ottawa|waterloo|kitchener|markham|mississauga|burlington|brampton|windsor|london|hamilton|quebec|montr[eé]al|montreal|laval|gatineau|british columbia|vancouver|burnaby|victoria|richmond|surrey|alberta|calgary|edmonton|manitoba|winnipeg|saskatchewan|regina|saskatoon|nova scotia|halifax|new brunswick|fredericton|moncton|newfoundland|st john'?s|prince edward island|charlottetown|yukon|whitehorse|northwest territories|yellowknife|nunavut|iqaluit|\bON\b|\bQC\b|\bBC\b|\bAB\b|\bMB\b|\bSK\b|\bNS\b|\bNB\b|\bNL\b|\bPE\b|\bYT\b|\bNT\b|\bNU\b)\b/i;
-const US_LOCATION_CUE_RE = /\b(united states|\busa\b|california|new york|texas|florida|washington|illinois|massachusetts|georgia|north carolina|virginia|colorado|arizona|pennsylvania|ohio|michigan|new jersey|maryland|oregon|utah|seattle|san francisco|los angeles|new york city|austin|dallas|boston|chicago|atlanta|denver|phoenix|philadelphia|detroit|portland|\bCA\b|\bNY\b|\bTX\b|\bFL\b|\bWA\b|\bIL\b|\bMA\b|\bGA\b|\bNC\b|\bVA\b|\bCO\b|\bAZ\b|\bPA\b|\bOH\b|\bMI\b|\bNJ\b|\bMD\b|\bOR\b|\bUT\b)\b/i;
 
 // Command line args
 const args = process.argv.slice(2);
@@ -101,161 +81,9 @@ const isVerbose = args.includes('--verbose');
 // Each function wraps a pipeline invariant that was previously inline in main().
 // Named functions make accidental removal structurally harder.
 
-assert(Number.isFinite(DEDUPE_TTL_MS) && DEDUPE_TTL_MS > 0, 'DEDUPE_TTL_MS must be exported by deduplicator');
-assert(Number.isFinite(INTERNSHIP_TTL_MS) && INTERNSHIP_TTL_MS > DEDUPE_TTL_MS, 'INTERNSHIP_TTL_MS must be exported by deduplicator');
-
-function isInternshipJob(job) {
-  return job.tags?.employment === 'internship'
-    || job.employment_type === 'internship'
-    || (Array.isArray(job.employment_types) && job.employment_types.includes('internship'));
-}
-
-function applicableTtlMs(job) {
-  return isInternshipJob(job) ? INTERNSHIP_TTL_MS : DEDUPE_TTL_MS;
-}
-
-function hasTag(job, field, value) {
-  const values = job?.tags?.[field];
-  return Array.isArray(values) && values.includes(value);
-}
-
-function isCanadaJob(job) {
-  return hasTag(job, 'locations', 'canada');
-}
-
-function isCanadaTechJob(job) {
-  const domains = job?.tags?.domains;
-  return isCanadaJob(job) && Array.isArray(domains) && domains.some(domain => CANADA_TECH_DOMAINS.has(domain));
-}
-
-function increment(map, key, amount = 1) {
-  const safeKey = key || 'unknown';
-  map[safeKey] = (map[safeKey] || 0) + amount;
-}
-
-function sortCountObject(map) {
-  return Object.fromEntries(Object.entries(map).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
-}
-
-function locationText(job) {
-  return [
-    job.location,
-    job.job_city,
-    job.job_state,
-    job.city,
-    job.state,
-    job.country,
-    job.url,
-  ].filter(Boolean).join(' ');
-}
-
-function buildCanadaSentinelChecks(canadaTechJobs) {
-  let missingCanadaTag = 0;
-  let nonTechDomain = 0;
-  const suspiciousUsOnly = [];
-
-  for (const job of canadaTechJobs) {
-    if (!isCanadaJob(job)) missingCanadaTag++;
-    if (!Array.isArray(job.tags?.domains) || !job.tags.domains.some(domain => CANADA_TECH_DOMAINS.has(domain))) nonTechDomain++;
-
-    const text = locationText(job);
-    const locations = Array.isArray(job.tags?.locations) ? job.tags.locations : [];
-    const canadaOnly = locations.includes('canada') && !locations.includes('us') && !locations.includes('remote');
-    if (canadaOnly && US_LOCATION_CUE_RE.test(text) && !CANADA_LOCATION_CUE_RE.test(text)) {
-      suspiciousUsOnly.push({
-        id: job.id,
-        company_name: job.company_name,
-        title: job.title,
-        source: job.source,
-        job_city: job.job_city || '',
-        job_state: job.job_state || '',
-        url: job.url || '',
-      });
-    }
-  }
-
-  return {
-    contract_version: 'canada-tech-feed-v1',
-    passed: missingCanadaTag === 0 && nonTechDomain === 0 && suspiciousUsOnly.length === 0,
-    checks: {
-      missing_canada_tag: missingCanadaTag,
-      non_tech_domain: nonTechDomain,
-      suspicious_us_only_location: suspiciousUsOnly.length,
-    },
-    suspicious_us_only_samples: suspiciousUsOnly.slice(0, 10),
-  };
-}
-
-function buildCanadaTechFeed(jobs) {
-  const canadaJobs = [];
-  const canadaTechJobs = [];
-  const byDomain = {};
-  const bySource = {};
-  const companyCounts = {};
-  let canadaInternships = 0;
-  let canadaTechInternships = 0;
-
-  for (const job of jobs) {
-    if (!isCanadaJob(job)) continue;
-    canadaJobs.push(job);
-    if (isInternshipJob(job)) canadaInternships++;
-
-    if (!isCanadaTechJob(job)) continue;
-    canadaTechJobs.push(job);
-    if (isInternshipJob(job)) canadaTechInternships++;
-
-    increment(bySource, job.source);
-    increment(companyCounts, job.company_name);
-    for (const domain of job.tags.domains || []) {
-      if (CANADA_TECH_DOMAINS.has(domain)) increment(byDomain, domain);
-    }
-  }
-
-  const topCompanies = Object.entries(companyCounts)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 20)
-    .map(([company_name, count]) => ({ company_name, count }));
-
-  return {
-    jobs: canadaTechJobs,
-    summary: {
-      contract_version: 'canada-tech-feed-v1',
-      generated_at: new Date().toISOString(),
-      source: 'jobs-aggregator-private normalized post-merge all_jobs pipeline output',
-      tag_engine_version: TAG_ENGINE_VERSION,
-      total_jobs: jobs.length,
-      canada_jobs: canadaJobs.length,
-      canada_tech_jobs: canadaTechJobs.length,
-      canada_internships: canadaInternships,
-      canada_tech_internships: canadaTechInternships,
-      included_domains: [...CANADA_TECH_DOMAINS],
-      by_domain: sortCountObject(byDomain),
-      by_source: sortCountObject(bySource),
-      top_companies: topCompanies,
-      sentinel_false_positive_checks: buildCanadaSentinelChecks(canadaTechJobs),
-    },
-  };
-}
-
-async function writeCanadaTechFeed(jobs) {
-  const { jobs: canadaTechJobs, summary } = buildCanadaTechFeed(jobs);
-  await writeJobsJSONL(canadaTechJobs, CANADA_TECH_JOBS_OUTPUT_FILE);
-  await writeMetadata(summary, CANADA_TECH_SUMMARY_OUTPUT_FILE);
-  console.log(`🇨🇦 INF-PLATFORM-3: Canada tech feed ${canadaTechJobs.length} jobs (${summary.canada_jobs} Canada total, ${summary.canada_tech_internships} tech internships)`);
-  if (!summary.sentinel_false_positive_checks.passed) {
-    throw new Error(`Canada tech feed sentinel checks failed: ${JSON.stringify(summary.sentinel_false_positive_checks.checks)}`);
-  }
-  return summary;
-}
-
-async function writeCanadaEarlyCareerFeed(jobs) {
-  const { jobs: canadaTechJobs } = buildCanadaTechFeed(jobs);
-  const earlyCareerJobs = canadaTechJobs.filter(job => ['entry_level', 'internship'].includes(job?.tags?.employment));
-  await writeJobsJSONL(earlyCareerJobs, CANADA_TECH_EARLY_CAREER_OUTPUT_FILE);
-  const internshipCount = earlyCareerJobs.filter(job => job?.tags?.employment === 'internship').length;
-  const entryLevelCount = earlyCareerJobs.filter(job => job?.tags?.employment === 'entry_level').length;
-  console.log(`🇨🇦 INF-PLATFORM-4: Canada early-career feed ${earlyCareerJobs.length} jobs (${entryLevelCount} entry-level, ${internshipCount} internships)`);
-  return { total: earlyCareerJobs.length, entry_level: entryLevelCount, internships: internshipCount };
+function appendAll(target, items) {
+  if (!Array.isArray(items) || items.length === 0) return;
+  for (const item of items) target.push(item);
 }
 
 /**
@@ -268,17 +96,17 @@ function resolvePostedAt(publicJobs, prevLines) {
   let staleRemoved = 0;
   const filtered = publicJobs.filter(job => {
     if (!job.posted_at) { staleRemoved++; return false; }
-    const jobTtlMs = applicableTtlMs(job);
+    const jobTtlMs = job.tags?.employment === 'internship' ? INTERNSHIP_TTL_MS : DEDUPE_TTL_MS;
     if (new Date(job.posted_at).getTime() < Date.now() - jobTtlMs) { staleRemoved++; return false; }
     return true;
   });
 
   if (staleRemoved > 0) {
-    console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >${DEDUPE_TTL_DAYS}d regular / ${INTERNSHIP_TTL_DAYS}d internship) from post-merge pool`);
+    console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >${DEDUPE_TTL_DAYS}d regular / 120d internship) from post-merge pool`);
   }
 
   publicJobs.length = 0;
-  publicJobs.push(...filtered);
+  appendAll(publicJobs, filtered);
 }
 
 // AGG-PIPE-4: Sources excluded from closed-job detection.
@@ -338,23 +166,6 @@ function loadSupplementalInputs() {
       const laneJobs = JSON.parse(fs.readFileSync(lane.jobsFile, 'utf8'));
       const laneMeta = JSON.parse(fs.readFileSync(lane.metaFile, 'utf8'));
       if (!Array.isArray(laneJobs)) continue;
-      const publishContract = laneMeta.publish_contract || null;
-      const generatedAt = laneMeta.generated_at ? new Date(laneMeta.generated_at).getTime() : null;
-      const maxStalenessMinutes = Number.isFinite(publishContract?.max_staleness_minutes)
-        ? publishContract.max_staleness_minutes
-        : 90;
-      const stale = !generatedAt || (Date.now() - generatedAt) > maxStalenessMinutes * 60 * 1000;
-      if (stale) {
-        console.warn(`⚠️ Supplemental lane ${lane.lane}: artifact stale (${laneMeta.generated_at || 'missing generated_at'}), skipping merge into main pool`);
-        inputs[lane.lane] = {
-          generated_at: laneMeta.generated_at || null,
-          jobs_loaded: 0,
-          by_source: {},
-          publish_contract: publishContract,
-          stale: true,
-        };
-        continue;
-      }
       const bySource = {};
       for (const job of laneJobs) {
         if (!job || typeof job !== 'object') continue;
@@ -368,8 +179,7 @@ function loadSupplementalInputs() {
         generated_at: laneMeta.generated_at || null,
         jobs_loaded: laneJobs.length,
         by_source: bySource,
-        publish_contract: publishContract,
-        stale: false,
+        publish_contract: laneMeta.publish_contract || null,
       };
     } catch (e) {
       console.warn(`⚠️ Supplemental lane ${lane.lane}: could not load artifact (${e.message})`);
@@ -413,7 +223,7 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
       if (job.fingerprint && currentFingerprints.has(job.fingerprint)) { fpSkipCount++; continue; }
       if (!job.posted_at) { nullDateCount++; continue; }
       const postedTs = new Date(job.posted_at).getTime();
-      const jobTtlMs = applicableTtlMs(job);
+      const jobTtlMs = job.tags?.employment === 'internship' ? INTERNSHIP_TTL_MS : DEDUPE_TTL_MS;
       if (postedTs < Date.now() - jobTtlMs) continue;
       if (isSeniorJob(job)) continue;
       if (RETIRED_CARRY_FORWARD_SOURCES.has((job.source || '').toLowerCase())) {
@@ -468,8 +278,7 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
     publicJobs.sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0));
     let empRetagged = 0;
     let domainRetagged = 0;
-    let locRetagged = 0;
-    let locNormalized = 0;
+    let locRefreshed = 0;
     for (const job of publicJobs) {
       if (currentIds.has(job.id)) continue;
       const newEmp = tagEmployment(job);
@@ -486,22 +295,15 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
         job.tags.domains = freshDomains;
         domainRetagged++;
       }
+      job.tags.tag_engine_version = TAG_ENGINE_VERSION;
       if ((!job.job_state || job.job_state === '') || (!job.job_city || job.job_city === '')) {
         const hadState = job.job_state && job.job_state !== '';
         const hadCity = job.job_city && job.job_city !== '';
         normalizeJob(job);
-        if ((!hadState && job.job_state) || (!hadCity && job.job_city)) locNormalized++;
+        if ((!hadState && job.job_state) || (!hadCity && job.job_city)) locRefreshed++;
       }
-      const freshLocations = tagLocations(job);
-      const oldLocations = (job.tags?.locations || []).slice().sort().join(',');
-      const newLocations = (freshLocations || []).slice().sort().join(',');
-      if (oldLocations !== newLocations) {
-        job.tags.locations = freshLocations;
-        locRetagged++;
-      }
-      job.tags.tag_engine_version = TAG_ENGINE_VERSION;
     }
-    console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${closedDetected > 0 ? `, ${closedDetected} closed detected` : ''}${empRetagged > 0 ? `, ${empRetagged} employment re-tagged` : ''}${domainRetagged > 0 ? `, ${domainRetagged} domains re-tagged (version ${TAG_ENGINE_VERSION})` : ''}${locRetagged > 0 ? `, ${locRetagged} locations re-tagged` : ''}${locNormalized > 0 ? `, ${locNormalized} locations normalized` : ''})`);
+    console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${closedDetected > 0 ? `, ${closedDetected} closed detected` : ''}${empRetagged > 0 ? `, ${empRetagged} employment re-tagged` : ''}${domainRetagged > 0 ? `, ${domainRetagged} domains re-tagged (version ${TAG_ENGINE_VERSION})` : ''}${locRefreshed > 0 ? `, ${locRefreshed} locations refreshed` : ''})`);
   } else {
     console.log(`🔄 No prior-run jobs to merge${closedDetected > 0 ? ` (${closedDetected} closed detected)` : ''}`);
   }
@@ -700,7 +502,7 @@ async function main() {
 
     // Collect ATS results
     const atsResult = phaseAResult.status === 'fulfilled' ? phaseAResult.value : { jobs: [] };
-    allJobs.push(...atsResult.jobs);
+    appendAll(allJobs, atsResult.jobs);
     console.log(`  ATS: ${atsResult.jobs.length} jobs`);
 
     // AGG-SPEED-2: Save WD totals cache for next run
@@ -716,12 +518,12 @@ async function main() {
       const name = fetcherNames[i];
       const jobs = result.status === 'fulfilled' ? result.value : [];
       fetcherResults[name] = Array.isArray(jobs) ? jobs : [];
-      allJobs.push(...fetcherResults[name]);
+      appendAll(allJobs, fetcherResults[name]);
     });
 
     const supplementalInputs = loadSupplementalInputs();
     if (supplementalInputs.jobs.length > 0) {
-      allJobs.push(...supplementalInputs.jobs);
+      appendAll(allJobs, supplementalInputs.jobs);
       console.log(`  Supplemental lanes merged: ${supplementalInputs.jobs.length} jobs`);
       for (const [lane, info] of Object.entries(supplementalInputs.inputs)) {
         console.log(`   - ${lane}: ${info.jobs_loaded} jobs from supplemental artifact`);
@@ -1023,12 +825,6 @@ async function main() {
     const STRIP_FIELDS = ['source_url', '_raw', 'description', 'enriched', 'enriched_at', 'is_internship', 'is_new_grad', 'is_us_only', 'remote'];
     let publicJobs = sortedJobs.map(job => {
       const stripped = { ...job };
-      if (stripped.source === 'workday' && !stripped.wd_path) {
-        stripped.wd_path = deriveWorkdayPathFromUrl(stripped.url);
-      }
-      if (stripped.source === 'workday' && !stripped.wd_path) {
-        stripped.wd_path = deriveWorkdayPathFromUrl(stripped.url);
-      }
       for (const field of STRIP_FIELDS) {
         delete stripped[field];
       }
@@ -1047,28 +843,6 @@ async function main() {
       resolvePostedAt(publicJobs, prevLines);
 
       mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, STRIP_FIELDS, successfulSources, atsResult.health || {});
-    }
-
-    // AGG-PIPE-19: Re-apply cached Workday family mapping after carry-forward merge.
-    // Step 1a-post only touches current-run jobs. Carry-forward jobs now preserve wd_path,
-    // so they can be annotated here before final tag stats are computed.
-    const postMergeFamilyCacheReport = await applyFamilyCache(publicJobs, JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR);
-    stageTimings.step9d_postmerge_family_cache_ms = postMergeFamilyCacheReport.durationMs;
-    let wdPostMergeRetagged = 0;
-    if (postMergeFamilyCacheReport.annotated > 0) {
-      for (const job of publicJobs) {
-        if (job.source !== 'workday') continue;
-        const oldDomains = (job.tags?.domains || []).slice().sort().join(',');
-        const freshDomains = tagDomains(job);
-        const newDomains = (freshDomains || []).slice().sort().join(',');
-        if (oldDomains !== newDomains) {
-          job.tags.domains = freshDomains;
-          wdPostMergeRetagged++;
-        }
-      }
-      if (wdPostMergeRetagged > 0) {
-        console.log(`🔁 AGG-PIPE-19: re-tagged ${wdPostMergeRetagged} Workday carry-forward jobs after post-merge family cache annotation`);
-      }
     }
 
     // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
@@ -1110,8 +884,6 @@ async function main() {
 
     // Write jobs (JSONL format)
     await writeJobsJSONL(publicJobs, JOBS_OUTPUT_FILE);
-    const canadaTechSummary = await writeCanadaTechFeed(publicJobs);
-    await writeCanadaEarlyCareerFeed(publicJobs);
 
     // Write metadata
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
@@ -1189,19 +961,18 @@ async function main() {
       fetchResults,
       fetcherHealth,
       supplementalInputs: supplementalInputs.inputs,
-      canadaTechSummary,
     });
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     // Step 9c: build / refresh Workday family cache for future runs. Output is already written, so
     // cache refresh cannot block user-visible publish correctness.
-    if (process.env.SKIP_WD_FAMILY_CACHE_BUILD === '1') {
-        stageTimings.step9c_family_cache_build_ms = 0;
-        console.log('');
-        console.log('⏭️  Step 9c skipped: Workday family cache refresh moved out of hot publish path');
+    if (!isDryRun && !SKIP_WD_FAMILY_CACHE_BUILD) {
+      const familyCacheBuildReport = await buildFamilyCache(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR);
+      stageTimings.step9c_family_cache_build_ms = familyCacheBuildReport.durationMs;
     } else {
-        const familyCacheBuildReport = await buildFamilyCache(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR, { maxDurationMs: 120000 });
-        stageTimings.step9c_family_cache_build_ms = familyCacheBuildReport.durationMs;
+      stageTimings.step9c_family_cache_build_ms = 0;
+      const reason = isDryRun ? 'dry run' : 'SKIP_WD_FAMILY_CACHE_BUILD=1';
+      console.log(`⏭️  Step 9c: Skipping Workday family cache build (${reason})`);
     }
 
     console.log('');
@@ -1475,77 +1246,43 @@ function buildSeniorRolloutProjection(seniorJobs, seniorBySource) {
   return projection;
 }
 
-const G1_SIGNAL_TITLE_RE = /\b(engineer|developer|scientist|analyst|designer|manager|accountant|nurse|pharmacist|attorney|sales|marketing|operations|manufacturing|logistics|hardware|software|data|ai|product|finance|hr|legal)\b/i;
-
 /**
  * TAG-DIM-1: Build G1 by-domain breakdown for DASH visibility.
  * Categorizes US general jobs by source, company, fix category, engine version, employment type.
  * @param {Array} jobs - Full public pool (post-merge + post-AGG-32)
- * @returns {Object|null} g1_breakdown object for metadata
+ * @returns {Object} g1_breakdown object for metadata
  */
 function buildG1Breakdown(jobs) {
-  const bySource = Object.create(null);
-  const sourceTotals = Object.create(null);
-  const companyCounts = Object.create(null);
-  const companySource = Object.create(null);
-  const companyDepts = Object.create(null);
-  const byVersion = Object.create(null);
-  const byEmployment = Object.create(null);
+  const usJobs = jobs.filter(j => j.tags && j.tags.locations && j.tags.locations.includes('us'));
+  const g1Jobs = usJobs.filter(j => j.tags.domains && j.tags.domains.includes('general'));
 
-  let usTotal = 0;
-  let usG1 = 0;
-  let needsFamilyMapping = 0;
-  let familyMapGap = 0;
-  let noDescription = 0;
-  let genuinelyAmbiguous = 0;
-  let other = 0;
+  if (g1Jobs.length === 0) return null;
 
-  for (const job of jobs) {
-    const tags = job.tags;
-    if (!tags?.locations?.includes('us')) continue;
-
-    usTotal++;
-    const source = job.source || 'unknown';
-    sourceTotals[source] = (sourceTotals[source] || 0) + 1;
-
-    if (!tags.domains?.includes('general')) continue;
-    usG1++;
-    bySource[source] = (bySource[source] || 0) + 1;
-
-    const company = job.company_name || 'unknown';
-    companyCounts[company] = (companyCounts[company] || 0) + 1;
-    companySource[company] = source;
-    companyDepts[company] = companyDepts[company] || job.departments?.length > 0;
-
-    if (source === 'workday') {
-      if (job.departments?.length > 0) {
-        familyMapGap++;
-      } else {
-        needsFamilyMapping++;
-      }
-    } else if (source === 'simplify') {
-      noDescription++;
-    } else if (G1_SIGNAL_TITLE_RE.test(job.title || '')) {
-      other++;
-    } else {
-      genuinelyAmbiguous++;
-    }
-
-    const version = tags.tag_engine_version ?? 'none';
-    byVersion[`v${version}`] = (byVersion[`v${version}`] || 0) + 1;
-
-    const employment = tags.employment || 'unknown';
-    byEmployment[employment] = (byEmployment[employment] || 0) + 1;
+  // By source
+  const bySource = {};
+  const sourceTotals = {};
+  for (const j of usJobs) {
+    sourceTotals[j.source] = (sourceTotals[j.source] || 0) + 1;
   }
-
-  if (usG1 === 0) return null;
-
+  for (const j of g1Jobs) {
+    bySource[j.source] = (bySource[j.source] || 0) + 1;
+  }
   const bySourceFormatted = {};
-  for (const [source, g1] of Object.entries(bySource)) {
-    const total = sourceTotals[source] || 0;
-    bySourceFormatted[source] = { g1, total, rate: total > 0 ? Math.round(g1 / total * 1000) / 10 : 0 };
+  for (const [src, g1] of Object.entries(bySource)) {
+    const total = sourceTotals[src] || 0;
+    bySourceFormatted[src] = { g1, total, rate: total > 0 ? Math.round(g1 / total * 1000) / 10 : 0 };
   }
 
+  // Top 20 companies
+  const companyCounts = {};
+  const companySource = {};
+  const companyDepts = {};
+  for (const j of g1Jobs) {
+    const c = j.company_name || 'unknown';
+    companyCounts[c] = (companyCounts[c] || 0) + 1;
+    companySource[c] = j.source;
+    companyDepts[c] = companyDepts[c] || j.departments?.length > 0;
+  }
   const top20 = Object.entries(companyCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 20)
@@ -1556,15 +1293,56 @@ function buildG1Breakdown(jobs) {
       has_departments: !!companyDepts[company],
     }));
 
+  // Fix categories (heuristic based on source + departments)
+  let needsFamilyMapping = 0; // WD jobs with no departments
+  let familyMapGap = 0;       // WD jobs with departments but still G1
+  let noDescription = 0;      // Simplify T0 with no desc
+  let genuinelyAmbiguous = 0;  // Non-WD, non-Simplify, no domain signal
+  let other = 0;
+  for (const j of g1Jobs) {
+    if (j.source === 'workday') {
+      if (j.departments && j.departments.length > 0) {
+        familyMapGap++;
+      } else {
+        needsFamilyMapping++;
+      }
+    } else if (j.source === 'simplify') {
+      noDescription++;
+    } else {
+      // Check for domain keywords in title as signal
+      const title = (j.title || '').toLowerCase();
+      const hasSignal = /\b(engineer|developer|scientist|analyst|designer|manager|accountant|nurse|pharmacist|attorney|sales|marketing|operations|manufacturing|logistics|hardware|software|data|ai|product|finance|hr|legal)\b/i.test(title);
+      if (hasSignal) {
+        other++;
+      } else {
+        genuinelyAmbiguous++;
+      }
+    }
+  }
+
+  // Engine version distribution
+  const byVersion = {};
+  for (const j of g1Jobs) {
+    const v = j.tags.tag_engine_version || 'none';
+    byVersion['v' + v] = (byVersion['v' + v] || 0) + 1;
+  }
+
+  // Employment type distribution
+  const byEmployment = {};
+  for (const j of g1Jobs) {
+    const e = j.tags.employment || 'unknown';
+    byEmployment[e] = (byEmployment[e] || 0) + 1;
+  }
+
   return {
     updated: new Date().toISOString(),
-    us_total: usTotal,
-    us_g1: usG1,
-    us_g1_rate: usTotal > 0 ? Math.round(usG1 / usTotal * 1000) / 10 : null,
+    us_total: usJobs.length,
+    us_g1: g1Jobs.length,
+    us_g1_rate: Math.round(g1Jobs.length / usJobs.length * 1000) / 10,
     by_source: bySourceFormatted,
     by_company_top20: top20,
     by_fix_category: {
-      needs_family_mapping: { count: needsFamilyMapping, description: 'WD jobs with no departments — needs family cache/path coverage' },
+      needs_family_mapping: { count: needsFamilyMapping, description: 'WD jobs with no departments — blocked on AGG-PIPE-16' },
       family_map_gap: { count: familyMapGap, description: 'WD jobs with departments but still G1' },
       genuinely_ambiguous: { count: genuinelyAmbiguous, description: 'Non-WD/Simplify jobs with no domain signal in title' },
       no_description: { count: noDescription, description: 'Simplify T0 jobs — no description for L4 fallback' },
@@ -1575,7 +1353,7 @@ function buildG1Breakdown(jobs) {
   };
 }
 
-function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, pipelineTimestamps, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth, supplementalInputs, canadaTechSummary }) {
+function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, pipelineTimestamps, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth, supplementalInputs }) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
@@ -1748,8 +1526,6 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
 
     supplemental_inputs: supplementalInputs || {},
 
-    canada_tech_feed: canadaTechSummary || null,
-
     // TAG-DIM-1: Tag engine version deployed in this run.
     // Enables zjp-metrics to surface engine_version (was null because this field was missing).
     tag_engine_version: TAG_ENGINE_VERSION,
@@ -1805,9 +1581,6 @@ async function gitCommit(jobCount) {
     // Add output files
     execSync('git add .github/data/all_jobs.json');
     execSync('git add .github/data/jobs-metadata.json');
-    execSync('git add .github/data/canada-tech-jobs.jsonl 2>/dev/null || true');
-    execSync('git add .github/data/canada-tech-summary.json 2>/dev/null || true');
-    execSync('git add .github/data/canada-tech-early-career.jsonl 2>/dev/null || true');
     execSync('git add .github/data/dedupe-store.json');
     execSync('git add .github/data/wd-totals-cache.json 2>/dev/null || true'); // AGG-SPEED-2: WD incremental fetch cache
     execSync('git add .github/data/filtered_jobs.json 2>/dev/null || true'); // senior-filter summary for analytics (PIPELINE-1)
@@ -1848,4 +1621,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, mergeCarryForward, resolvePostedAt, applicableTtlMs, buildCanadaTechFeed, buildCanadaSentinelChecks, RETIRED_CARRY_FORWARD_SOURCES };
+module.exports = { main, mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES };
