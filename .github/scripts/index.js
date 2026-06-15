@@ -42,6 +42,7 @@ const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS, INTERNSHIP_TTL_MS } = r
 const { tagJobs, generateTagStats, tagEmployment, tagDomains, tagLocations, setCompanyOverrideMap, TAG_ENGINE_VERSION, getKeywordMap } = require(`${SHARED}/processors/tag-engine`);
 const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport, checkKeywordHealth, checkKeywordOverlap } = require(`${SHARED}/processors/tag-monitor`);
 
+const SKIP_WD_FAMILY_CACHE_BUILD = process.env.SKIP_WD_FAMILY_CACHE_BUILD === '1';
 // Import utils
 const { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);
 const { EMPLOYMENT_NORMALIZE_MAP } = require(`${SHARED}/utils/helpers`);
@@ -965,12 +966,13 @@ async function main() {
 
     // Step 9c: build / refresh Workday family cache for future runs. Output is already written, so
     // cache refresh cannot block user-visible publish correctness.
-    if (!isDryRun) {
+    if (!isDryRun && !SKIP_WD_FAMILY_CACHE_BUILD) {
       const familyCacheBuildReport = await buildFamilyCache(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR);
       stageTimings.step9c_family_cache_build_ms = familyCacheBuildReport.durationMs;
     } else {
       stageTimings.step9c_family_cache_build_ms = 0;
-      console.log('⏭️  Step 9c: Skipping Workday family cache build in dry run');
+      const reason = isDryRun ? 'dry run' : 'SKIP_WD_FAMILY_CACHE_BUILD=1';
+      console.log(`⏭️  Step 9c: Skipping Workday family cache build (${reason})`);
     }
 
     console.log('');
