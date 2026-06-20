@@ -73,6 +73,8 @@ loadCompanyOverrides();
 const DATA_DIR = path.join(process.cwd(), '.github', 'data');
 const JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'all_jobs.json');
 const US_JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'us_jobs.json');
+const MID_LEVEL_TECH_FILE = path.join(DATA_DIR, 'mid-level-tech-jobs.jsonl');
+const MID_LEVEL_TECH_SUMMARY_FILE = path.join(DATA_DIR, 'mid-level-tech-summary.json');
 const METADATA_OUTPUT_FILE = path.join(DATA_DIR, 'jobs-metadata.json');
 
 // Command line args
@@ -110,6 +112,47 @@ function injectDescriptions(jobs, descriptionMap, source) {
 
 function buildUsSnapshotJobs(jobs) {
   return jobs.filter(isUsSnapshotJob);
+}
+
+// INF-FEED-1: mid-level tech shadow feed (additive lane artifact; no source mutation, no consumer yet).
+// Spec: research/INF_FEED_1_MID_LEVEL_TECH_FEED_SPEC_2026_06_07.md. Consumer adoption blocked until
+// TAG/AGG reviews quality-flagged rows; this artifact only measures/publishes supply.
+const MID_LEVEL_TECH_DOMAINS = ['software', 'data_science', 'hardware', 'ai'];
+function isMidLevelTechJob(job) {
+  const emp = job?.tags?.employment;
+  const doms = Array.isArray(job?.tags?.domains) ? job.tags.domains : [];
+  return emp === 'mid_level' && doms.some(d => MID_LEVEL_TECH_DOMAINS.includes(d));
+}
+function buildMidLevelTechFeed(jobs) {
+  return jobs.filter(isMidLevelTechJob);
+}
+function buildMidLevelTechSummary(feed, sourceTotal) {
+  const countsByDomain = {};
+  for (const d of MID_LEVEL_TECH_DOMAINS) countsByDomain[d] = 0;
+  const locCounts = { US: 0, non_US: 0, missing: 0 };
+  const q = { missing_location: 0, title_contains_senior: 0, title_contains_manager: 0,
+              title_contains_facilities: 0, title_contains_sales: 0, title_contains_principal_or_staff: 0 };
+  for (const j of feed) {
+    for (const d of (j.tags?.domains || [])) if (d in countsByDomain) countsByDomain[d]++;
+    const locs = Array.isArray(j.tags?.locations) ? j.tags.locations : [];
+    if (locs.length === 0) { locCounts.missing++; q.missing_location++; }
+    else if (locs.includes('us')) locCounts.US++;
+    else locCounts.non_US++;
+    const t = String(j.title || '').toLowerCase();
+    if (t.includes('senior')) q.title_contains_senior++;
+    if (t.includes('manager')) q.title_contains_manager++;
+    if (t.includes('facilities')) q.title_contains_facilities++;
+    if (t.includes('sales')) q.title_contains_sales++;
+    if (t.includes('principal') || t.includes('staff')) q.title_contains_principal_or_staff++;
+  }
+  return {
+    contract_version: 1, generated_at: new Date().toISOString(),
+    source_artifact: 'data/all_jobs.json', source_total: sourceTotal,
+    feed_total: feed.length, employment_required: 'mid_level',
+    tech_domains: MID_LEVEL_TECH_DOMAINS, counts_by_domain: countsByDomain,
+    counts_by_location: locCounts, quality_flags: q, shadow: true,
+    consumer_adoption_blocked_reason: 'TAG/AGG classification review pending for quality-flagged rows',
+  };
 }
 
 
@@ -1093,6 +1136,12 @@ async function main() {
     await writeJobsJSONL(usJobs, US_JOBS_OUTPUT_FILE);
     console.log(`🇺🇸 AGG-US-SNAPSHOT-1: Wrote ${usJobs.length} US-tagged jobs to us_jobs.json`);
 
+    // INF-FEED-1: mid-level tech shadow feed (additive; no consumer depends on it yet)
+    const midLevelTechFeed = buildMidLevelTechFeed(publicJobs);
+    await writeJobsJSONL(midLevelTechFeed, MID_LEVEL_TECH_FILE);
+    fs.writeFileSync(MID_LEVEL_TECH_SUMMARY_FILE, JSON.stringify(buildMidLevelTechSummary(midLevelTechFeed, publicJobs.length), null, 2) + '\n', 'utf8');
+    console.log(`💼 INF-FEED-1: Wrote ${midLevelTechFeed.length} mid-level tech jobs (shadow feed) → mid-level-tech-jobs.jsonl`);
+
     // Write metadata
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
@@ -1915,4 +1964,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, resolvePostedAt, mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, activePublicWindowTs, applicableTtlMs, injectDescriptions };
+module.exports = { main, resolvePostedAt, mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, buildMidLevelTechFeed, buildMidLevelTechSummary, activePublicWindowTs, applicableTtlMs, injectDescriptions };
