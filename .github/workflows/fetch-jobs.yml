@@ -716,6 +716,8 @@ jobs:
           const files = [
             'all_jobs.json',
             'us_jobs.json',
+            'mid-level-tech-jobs.jsonl',
+            'mid-level-tech-summary.json',
             'jobs-metadata.json',
             'dedupe-store.json',
             'wd-totals-cache.json',
