@@ -75,6 +75,8 @@ const JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'all_jobs.json');
 const US_JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'us_jobs.json');
 const MID_LEVEL_TECH_FILE = path.join(DATA_DIR, 'mid-level-tech-jobs.jsonl');
 const MID_LEVEL_TECH_SUMMARY_FILE = path.join(DATA_DIR, 'mid-level-tech-summary.json');
+const SENIOR_TECH_FILE = path.join(DATA_DIR, 'senior-tech-jobs.jsonl');
+const SENIOR_TECH_SUMMARY_FILE = path.join(DATA_DIR, 'senior-tech-summary.json');
 const METADATA_OUTPUT_FILE = path.join(DATA_DIR, 'jobs-metadata.json');
 
 // Command line args
@@ -152,6 +154,51 @@ function buildMidLevelTechSummary(feed, sourceTotal) {
     tech_domains: MID_LEVEL_TECH_DOMAINS, counts_by_domain: countsByDomain,
     counts_by_location: locCounts, quality_flags: q, shadow: true,
     consumer_adoption_blocked_reason: 'TAG/AGG classification review pending for quality-flagged rows',
+  };
+}
+
+// AGG-SEN-FILTERKNOB-1: senior-tech shadow feed (additive; mirrors INF-FEED-1).
+// Sources from the Step-4 seniorJobs partition (the jobs senior-filter drops before pooling),
+// NOT from publicJobs — senior jobs are absent from the final pool by design. This surfaces the
+// dropped senior tech supply as a queryable feed so INF/OUT can build a senior surface later.
+// No source mutation: the main pool (all_jobs) is untouched; senior jobs remain filtered from
+// the entry-level/new-grad pool. Shadow artifact — measures/publishes supply only (no consumer yet).
+const SENIOR_TECH_DOMAINS = ['software', 'data_science', 'hardware', 'ai'];
+function isSeniorTechJob(job) {
+  // Seniority is defined by membership in the senior-filter partition (Step 4), not by the
+  // employment tag — so we filter by tech domain only (the tag-engine and the senior filter
+  // are independent classifiers; employment is reported in the summary, not required here).
+  const doms = Array.isArray(job?.tags?.domains) ? job.tags.domains : [];
+  return doms.some(d => SENIOR_TECH_DOMAINS.includes(d));
+}
+function buildSeniorTechFeed(taggedSeniorJobs) {
+  return taggedSeniorJobs.filter(isSeniorTechJob);
+}
+function buildSeniorTechSummary(feed, seniorTotal) {
+  const countsByDomain = {};
+  for (const d of SENIOR_TECH_DOMAINS) countsByDomain[d] = 0;
+  const locCounts = { US: 0, non_US: 0, missing: 0 };
+  const empCounts = { senior: 0, mid_level: 0, entry_level: 0, other: 0, missing: 0 };
+  for (const j of feed) {
+    for (const d of (j.tags?.domains || [])) if (d in countsByDomain) countsByDomain[d]++;
+    const locs = Array.isArray(j.tags?.locations) ? j.tags.locations : [];
+    if (locs.length === 0) locCounts.missing++;
+    else if (locs.includes('us')) locCounts.US++;
+    else locCounts.non_US++;
+    const emp = j.tags?.employment;
+    if (emp === 'senior') empCounts.senior++;
+    else if (emp === 'mid_level') empCounts.mid_level++;
+    else if (emp === 'entry_level') empCounts.entry_level++;
+    else if (emp) empCounts.other++;
+    else empCounts.missing++;
+  }
+  return {
+    contract_version: 1, generated_at: new Date().toISOString(),
+    source_artifact: 'step4_senior_partition', source_total: seniorTotal,
+    feed_total: feed.length, seniority_source: 'senior-filter partition (Step 4, pre-pooling)',
+    tech_domains: SENIOR_TECH_DOMAINS, counts_by_domain: countsByDomain,
+    counts_by_location: locCounts, counts_by_employment: empCounts, shadow: true,
+    consumer_adoption_blocked_reason: 'INF/OUT senior surface not yet built; artifact measures supply only',
   };
 }
 
@@ -1142,6 +1189,26 @@ async function main() {
     fs.writeFileSync(MID_LEVEL_TECH_SUMMARY_FILE, JSON.stringify(buildMidLevelTechSummary(midLevelTechFeed, publicJobs.length), null, 2) + '\n', 'utf8');
     console.log(`💼 INF-FEED-1: Wrote ${midLevelTechFeed.length} mid-level tech jobs (shadow feed) → mid-level-tech-jobs.jsonl`);
 
+    // AGG-SEN-FILTERKNOB-1: senior-tech shadow feed (additive; mirrors INF-FEED-1).
+    // seniorJobs are untagged at Step 4 (tag-engine runs at Step 5 on entryLevelJobs only), so
+    // tag the partition here to make the feed queryable. Best-effort: a shadow feed must never
+    // block the main pipeline. Main pool (all_jobs) is untouched — parity by construction.
+    try {
+      const taggedSeniorJobs = tagJobs(seniorJobs);
+      const seniorTechFeed = buildSeniorTechFeed(taggedSeniorJobs);
+      await writeJobsJSONL(seniorTechFeed, SENIOR_TECH_FILE);
+      fs.writeFileSync(SENIOR_TECH_SUMMARY_FILE, JSON.stringify(buildSeniorTechSummary(seniorTechFeed, seniorJobs.length), null, 2) + '\n', 'utf8');
+      console.log(`👔 AGG-SEN-FILTERKNOB-1: Wrote ${seniorTechFeed.length} senior tech jobs (shadow feed) → senior-tech-jobs.jsonl (of ${seniorJobs.length} senior-filtered)`);
+    } catch (e) {
+      // Empty-file fallback: these two files are in the workflow's REQUIRED R2 upload list, so
+      // they must ALWAYS exist (empty is acceptable on failure) — a shadow feed must never block
+      // the main pipeline or fail the required R2 upload. source_total stays accurate via
+      // seniorJobs.length. (tagJobs is proven at Step 5, so reaching here is defense-in-depth.)
+      await writeJobsJSONL([], SENIOR_TECH_FILE);
+      fs.writeFileSync(SENIOR_TECH_SUMMARY_FILE, JSON.stringify(buildSeniorTechSummary([], seniorJobs.length), null, 2) + '\n', 'utf8');
+      console.warn(`⚠️ AGG-SEN-FILTERKNOB-1: senior-tech feed failed, wrote EMPTY (non-blocking): ${e.message}`);
+    }
+
     // Write metadata
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
@@ -1964,4 +2031,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, resolvePostedAt, mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, buildMidLevelTechFeed, buildMidLevelTechSummary, activePublicWindowTs, applicableTtlMs, injectDescriptions };
+module.exports = { main, resolvePostedAt, mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, buildMidLevelTechFeed, buildMidLevelTechSummary, buildSeniorTechFeed, buildSeniorTechSummary, activePublicWindowTs, applicableTtlMs, injectDescriptions };

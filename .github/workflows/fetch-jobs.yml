@@ -718,6 +718,8 @@ jobs:
             'us_jobs.json',
             'mid-level-tech-jobs.jsonl',
             'mid-level-tech-summary.json',
+            'senior-tech-jobs.jsonl',
+            'senior-tech-summary.json',
             'jobs-metadata.json',
             'dedupe-store.json',
             'wd-totals-cache.json',
