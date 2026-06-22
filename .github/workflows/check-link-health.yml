@@ -79,7 +79,7 @@ jobs:
           node .github/scripts/validate-link-health-artifacts.js --print-summary
 
       - name: Upload stale candidate outputs to R2
-        if: success()
+        if: always()
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
