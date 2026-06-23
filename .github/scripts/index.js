@@ -1198,8 +1198,30 @@ async function main() {
     await writeJobsJSONL(publicJobs, JOBS_OUTPUT_FILE);
 
     const usJobs = buildUsSnapshotJobs(publicJobs);
-    await writeJobsJSONL(usJobs, US_JOBS_OUTPUT_FILE);
-    console.log(`🇺🇸 AGG-US-SNAPSHOT-1: Wrote ${usJobs.length} US-tagged jobs to us_jobs.json`);
+
+    // AGG-SEN-DATAFOLD (board 2026-06-23): fold a ≤14-day US senior-tech subset into us_jobs so
+    // softwarejobs.dev's Senior filter has data (OUT verified the Senior UI/filter is correct; the
+    // gap was data-only — us_jobs had 0 senior rows). Sourced from the Step-4 seniorJobs partition
+    // (same as the senior-tech feed); windowed to ≤14d + US + tech domains to bound size/freshness.
+    // Schema matches us_jobs (lean via stripFeedInternal — same STRIP_FIELDS as all_jobs). Best-effort.
+    let seniorUsFold = [];
+    try {
+      const foldWindowMs = 14 * 24 * 3600 * 1000;
+      const foldNow = Date.now();
+      seniorUsFold = tagJobs(seniorJobs)
+        .filter(j => {
+          const doms = j.tags?.domains || [], locs = j.tags?.locations || [];
+          return doms.some(d => SENIOR_TECH_DOMAINS.includes(d))
+              && locs.includes('us')
+              && j.posted_at && (foldNow - Date.parse(j.posted_at)) <= foldWindowMs;
+        })
+        .map(stripFeedInternal);
+    } catch (e) {
+      console.warn(`⚠️ AGG-SEN-DATAFOLD: senior fold failed (non-blocking): ${e.message}`);
+    }
+    const usJobsWithSenior = usJobs.concat(seniorUsFold);
+    await writeJobsJSONL(usJobsWithSenior, US_JOBS_OUTPUT_FILE);
+    console.log(`🇺🇸 AGG-US-SNAPSHOT-1 + SEN-DATAFOLD: Wrote ${usJobsWithSenior.length} US jobs to us_jobs.json (entry-level ${usJobs.length} + ≤14d senior-tech ${seniorUsFold.length})`);
 
     // INF-FEED-1: mid-level tech shadow feed (additive; no consumer depends on it yet)
     const midLevelTechFeed = buildMidLevelTechFeed(publicJobs);
