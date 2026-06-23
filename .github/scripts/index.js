@@ -172,7 +172,19 @@ function isSeniorTechJob(job) {
   return doms.some(d => SENIOR_TECH_DOMAINS.includes(d));
 }
 function buildSeniorTechFeed(taggedSeniorJobs) {
-  return taggedSeniorJobs.filter(isSeniorTechJob);
+  // AGG-SEN-RAWTRIM: strip _raw (the full ATS payload, ~6 KB/job — was bloating this feed to
+  // ~155 MB) and other internal underscore-prefixed fields. The feed is a queryable pool for
+  // OUT's paginated senior board: it needs id/title/company/location/tags/posted_at/apply URL,
+  // NOT raw ATS payloads or internal filter provenance. Keeps `description` (lean, as in all_jobs).
+  return taggedSeniorJobs.filter(isSeniorTechJob).map(stripFeedInternal);
+}
+function stripFeedInternal(job) {
+  if (!job) return job;
+  const out = {};
+  for (const [k, v] of Object.entries(job)) {
+    if (!k.startsWith('_')) out[k] = v; // drop _raw, _filter_reason, and any future internal field
+  }
+  return out;
 }
 function buildSeniorTechSummary(feed, seniorTotal) {
   const countsByDomain = {};
