@@ -172,17 +172,23 @@ function isSeniorTechJob(job) {
   return doms.some(d => SENIOR_TECH_DOMAINS.includes(d));
 }
 function buildSeniorTechFeed(taggedSeniorJobs) {
-  // AGG-SEN-RAWTRIM: strip _raw (the full ATS payload, ~6 KB/job — was bloating this feed to
-  // ~155 MB) and other internal underscore-prefixed fields. The feed is a queryable pool for
-  // OUT's paginated senior board: it needs id/title/company/location/tags/posted_at/apply URL,
-  // NOT raw ATS payloads or internal filter provenance. Keeps `description` (lean, as in all_jobs).
+  // AGG-SEN-RAWTRIM: match all_jobs's STRIP_FIELDS (defined ~line 1127) so this feed is as lean
+  // as the main pool. The dominant bloat is `description` (~5 KB/job, ~150 MB total) — it lives
+  // in sidecars (descriptions-*.jsonl) fetched on-demand by detail views; this feed is a
+  // list/index pool for OUT's paginated senior board (id/title/company/location/tags/posted_at/url).
   return taggedSeniorJobs.filter(isSeniorTechJob).map(stripFeedInternal);
 }
+// Same fields all_jobs strips (STRIP_FIELDS ~line 1127) + any internal underscore-prefixed field.
+// NOTE: an earlier revision only stripped `_*` fields (wrongly assumed _raw was the bloat) — the
+// feed stayed ~151 MB. Verified the real bloat is `description`; now matches all_jobs leanness.
+const SENIOR_FEED_STRIP = ['source_url', '_raw', 'description', 'enriched', 'enriched_at', 'is_internship', 'is_new_grad', 'is_us_only', 'remote'];
 function stripFeedInternal(job) {
   if (!job) return job;
   const out = {};
   for (const [k, v] of Object.entries(job)) {
-    if (!k.startsWith('_')) out[k] = v; // drop _raw, _filter_reason, and any future internal field
+    if (k.startsWith('_')) continue;             // _filter_reason, future internal fields
+    if (SENIOR_FEED_STRIP.includes(k)) continue; // match all_jobs STRIP_FIELDS (incl. description)
+    out[k] = v;
   }
   return out;
 }
