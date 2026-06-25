@@ -2,7 +2,7 @@
 'use strict';
 
 const assert = require('assert');
-const { resolvePostedAt, applicableTtlMs } = require('../index');
+const { resolvePostedAt, applicableTtlMs, LIFECYCLE_VERSION } = require('../index');
 
 function daysAgo(days) {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -18,6 +18,20 @@ assert.ok(applicableTtlMs(validInternship) > applicableTtlMs(oldRegular), 'inter
 const publicJobs = [oldRegular, validInternship, oldInternship, legacyInternship];
 resolvePostedAt(publicJobs, []);
 
-assert.deepStrictEqual(publicJobs.map(job => job.id), ['valid-internship']);
+// AGG-LIFECYCLE-1: previously these stale jobs were DROPPED; now they are KEPT + tagged.
+assert.deepStrictEqual(
+  publicJobs.map(job => job.id).sort(),
+  ['legacy-internship', 'old-internship', 'old-regular', 'valid-internship'],
+  'all jobs must survive — TAG-AND-KEEP, no drops'
+);
 
-console.log('PASS TTL filter removes beyond-window jobs');
+const byId = Object.fromEntries(publicJobs.map(j => [j.id, j]));
+assert.strictEqual(byId['valid-internship'].tags.lifecycle_state, 'evergreen', 'within-window but >10d internship is evergreen');
+assert.strictEqual(byId['old-regular'].tags.lifecycle_state, 'stale-candidate', 'beyond-TTL regular is stale-candidate');
+assert.strictEqual(byId['old-internship'].tags.lifecycle_state, 'stale-candidate', 'beyond-TTL internship is stale-candidate');
+assert.strictEqual(byId['legacy-internship'].tags.lifecycle_state, 'stale-candidate', 'beyond-TTL legacy internship is stale-candidate');
+for (const job of publicJobs) {
+  assert.strictEqual(job.tags.lifecycle_version, LIFECYCLE_VERSION, `${job.id} must carry lifecycle_version`);
+}
+
+console.log('PASS AGG-LIFECYCLE-1 TTL tag-and-keep (no drops; stale jobs tagged stale-candidate)');

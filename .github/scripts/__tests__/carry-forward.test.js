@@ -2,7 +2,7 @@
 'use strict';
 
 const assert = require('assert');
-const { mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES } = require('../index');
+const { mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES, LIFECYCLE_VERSION } = require('../index');
 
 function line(job) {
   return JSON.stringify(job);
@@ -12,6 +12,7 @@ const now = new Date().toISOString();
 
 assert.ok(RETIRED_CARRY_FORWARD_SOURCES.has('jsearch'), 'jsearch must be retired');
 
+// Case 1: retired-source job is now KEPT + tagged 'dead' (previously dropped).
 {
   const publicJobs = [];
   mergeCarryForward(
@@ -29,9 +30,12 @@ assert.ok(RETIRED_CARRY_FORWARD_SOURCES.has('jsearch'), 'jsearch must be retired
     [],
     new Set()
   );
-  assert.strictEqual(publicJobs.length, 0, 'retired jsearch jobs must not carry forward');
+  assert.strictEqual(publicJobs.length, 1, 'retired jsearch jobs are now KEPT (TAG-AND-KEEP)');
+  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'dead', 'retired-source job tagged dead');
+  assert.strictEqual(publicJobs[0].tags.lifecycle_version, LIFECYCLE_VERSION, 'dead job carries lifecycle_version');
 }
 
+// Case 2: active non-fetched source carries forward within TTL, tagged 'carry-forward'.
 {
   const publicJobs = [];
   mergeCarryForward(
@@ -50,18 +54,22 @@ assert.ok(RETIRED_CARRY_FORWARD_SOURCES.has('jsearch'), 'jsearch must be retired
     new Set()
   );
   assert.strictEqual(publicJobs.length, 1, 'active non-fetched sources still carry forward within TTL');
+  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'carry-forward', 'alive prior-run job tagged carry-forward');
 }
 
+// Case 3: fresh job whose source fetched successfully is KEPT + tagged 'dead' (ghost/closed).
+// (Previously DROPPED via closed-detection. Uses a fresh posted_at so it reaches the closed branch
+// rather than the TTL branch, isolating the closed→dead lifecycle path.)
 {
   const publicJobs = [];
   mergeCarryForward(
     publicJobs,
     [line({
-      id: 'greenhouse-point72-7586061002',
+      id: 'greenhouse-closed-ghost',
       source: 'greenhouse',
       title: 'Quantitative Researcher Intern',
       company_name: 'Point72',
-      posted_at: '2024-08-15T17:34:49-04:00',
+      posted_at: now,
       tags: { employment: 'internship', domains: ['software'], locations: ['us'] },
     })],
     new Set(),
@@ -69,10 +77,12 @@ assert.ok(RETIRED_CARRY_FORWARD_SOURCES.has('jsearch'), 'jsearch must be retired
     [],
     new Set(['greenhouse'])
   );
-  assert.strictEqual(publicJobs.length, 0, 'current-run missing greenhouse jobs must not carry forward when greenhouse fetched successfully');
+  assert.strictEqual(publicJobs.length, 1, 'closed/ghost job is now KEPT (TAG-AND-KEEP)');
+  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'dead', 'closed job tagged dead');
 }
 
 
+// Case 4: carry-forward Canada row, tagged 'carry-forward'; location tags recomputed.
 {
   const publicJobs = [];
   mergeCarryForward(
@@ -95,9 +105,11 @@ assert.ok(RETIRED_CARRY_FORWARD_SOURCES.has('jsearch'), 'jsearch must be retired
     new Set()
   );
   assert.strictEqual(publicJobs.length, 1, 'carry-forward Canada row should remain in rolling pool');
+  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'carry-forward', 'canada carry-forward tagged carry-forward');
   assert.deepStrictEqual(publicJobs[0].tags.locations, ['canada'], 'carry-forward location tags must be recomputed from current tagLocations logic');
 }
 
+// Case 5: carry-forward India row, tagged 'carry-forward'; stale us tag dropped.
 {
   const publicJobs = [];
   mergeCarryForward(
@@ -120,9 +132,11 @@ assert.ok(RETIRED_CARRY_FORWARD_SOURCES.has('jsearch'), 'jsearch must be retired
     new Set()
   );
   assert.strictEqual(publicJobs.length, 1, 'carry-forward India row should remain in rolling pool');
+  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'carry-forward', 'india carry-forward tagged carry-forward');
   assert.deepStrictEqual(publicJobs[0].tags.locations, [], 'carry-forward India row must drop stale us tag');
 }
 
+// Case 6: carry-forward Heredia row, tagged 'carry-forward'; stale us tag dropped.
 {
   const publicJobs = [];
   mergeCarryForward(
@@ -145,7 +159,8 @@ assert.ok(RETIRED_CARRY_FORWARD_SOURCES.has('jsearch'), 'jsearch must be retired
     new Set()
   );
   assert.strictEqual(publicJobs.length, 1, 'carry-forward Heredia row should remain in rolling pool');
+  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'carry-forward', 'heredia carry-forward tagged carry-forward');
   assert.deepStrictEqual(publicJobs[0].tags.locations, [], 'carry-forward Heredia row must drop stale us tag');
 }
 
-console.log('PASS carry-forward retired source guard');
+console.log('PASS carry-forward lifecycle tag-and-keep');

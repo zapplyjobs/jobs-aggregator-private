@@ -388,27 +388,88 @@ function applicableTtlMs(job) {
   return job?.tags?.employment === 'internship' ? INTERNSHIP_TTL_MS : DEDUPE_TTL_MS;
 }
 
+// AGG-LIFECYCLE-1: TAG-AND-KEEP for evergreen / ghost / TTL-expired jobs.
+// Previously these were DROPPED from the pool; now they are KEPT and tagged with a
+// lifecycle_state so they stay visible + filterable instead of vanishing. The 5 states:
+//   fresh            — current-run job, within the active window (recent posted_at)
+//   carry-forward    — prior-run job merged via rolling window (source absent this run, still alive)
+//   evergreen        — old-but-alive (always-open repost); posted_at in the 10d–TTL evergreen band
+//   stale-candidate  — posted_at beyond TTL (or null/unverifiable); previously TTL-dropped
+//   dead             — confirmed closed/ghost (absent from a successful fetch) or retired source
+// Precedence (most actionable first): dead > stale-candidate > evergreen > carry-forward > fresh.
+// Consumers replicate the pre-LIFECYCLE "dropped" set by excluding {dead, stale-candidate}.
+const LIFECYCLE_VERSION = 1;
+const LIFECYCLE_EVERGREEN_THRESHOLD_DAYS = 10; // matches evergreen-detector.js EVERGREEN_THRESHOLD_DAYS
+const LIFECYCLE_EVERGREEN_THRESHOLD_MS = LIFECYCLE_EVERGREEN_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
+// Anti-flood guardrail (verify-no-flood): dead / stale-candidate jobs are KEPT for visibility but
+// truly retired (dropped) once posted_at outlives its TTL + this window, so the rolling store
+// cannot accumulate closed/expired jobs forever. Generous vs both 14d regular and 120d internship TTL.
+const LIFECYCLE_VISIBILITY_DAYS = 45;
+const LIFECYCLE_VISIBILITY_MS = LIFECYCLE_VISIBILITY_DAYS * 24 * 60 * 60 * 1000;
+
 /**
- * AGG-32: Filter stale jobs by posted_at TTL.
+ * AGG-LIFECYCLE-1: classify a job's age-based lifecycle_state.
+ * Returns 'stale-candidate' | 'evergreen' | null (null = within the fresh window; caller resolves
+ * carry-forward vs fresh). Caller must assign 'dead' for confirmed-closed jobs separately, since
+ * closure (not age) is the strongest lifecycle signal and takes precedence over age.
+ */
+function classifyAgeLifecycle(job, now = Date.now()) {
+  const jobTtlMs = applicableTtlMs(job);
+  const windowTs = activePublicWindowTs(job, now);
+  if (!job.posted_at || Number.isNaN(windowTs) || windowTs < now - jobTtlMs) {
+    return 'stale-candidate';
+  }
+  if (windowTs < now - LIFECYCLE_EVERGREEN_THRESHOLD_MS) {
+    return 'evergreen';
+  }
+  return null;
+}
+
+/**
+ * AGG-LIFECYCLE-1: hard-retire check (anti-flood). A dead/stale-candidate job kept for visibility
+ * is truly dropped once it outlives its TTL + visibility window, bounding rolling-pool growth.
+ */
+function isLifecycleHardRetired(job, now = Date.now()) {
+  if (!job.posted_at) return false; // null-date jobs are rare; retained, bounded by their scarcity
+  const windowTs = activePublicWindowTs(job, now);
+  if (Number.isNaN(windowTs)) return false;
+  return windowTs < now - (applicableTtlMs(job) + LIFECYCLE_VISIBILITY_MS);
+}
+
+/**
+ * AGG-32 / AGG-LIFECYCLE-1: classify current-run jobs by posted_at age (TAG-AND-KEEP).
+ * Previously DROPPED stale (TTL-expired) and null-date jobs from the pool. Now KEPT and tagged
+ * with lifecycle_state (stale-candidate / evergreen / fresh) so they stay visible + filterable.
+ * Hard-retires jobs beyond TTL + visibility window (anti-flood; see isLifecycleHardRetired).
  * AGG-6 date overwrite disabled A86 — jobs keep their source-reported posted_at.
  */
 function resolvePostedAt(publicJobs, prevLines) {
-  // AGG-32: filter stale — single pass
-  // SUP-TTL-1: Internships get wider TTL window (120d vs 14d)
-  let staleRemoved = 0;
-  const filtered = publicJobs.filter(job => {
-    if (!job.posted_at) { staleRemoved++; return false; }
-    const jobTtlMs = applicableTtlMs(job);
-    if (activePublicWindowTs(job) < Date.now() - jobTtlMs) { staleRemoved++; return false; }
-    return true;
-  });
-
-  if (staleRemoved > 0) {
-    console.log(`🧹 AGG-32: Removed ${staleRemoved} stale jobs (posted_at >${DEDUPE_TTL_DAYS}d regular / 120d internship) from post-merge pool`);
+  // AGG-LIFECYCLE-1: single pass — tag instead of drop. Current-run jobs are re-fetched each run,
+  // so they cannot accumulate unboundedly across runs; the anti-flood hard-retire belongs only in
+  // the carry-forward merge (mergeCarryForward), where prior-run jobs would otherwise pile up.
+  // SUP-TTL-1: Internships get wider TTL window (120d vs 14d).
+  let staleTagged = 0;
+  let evergreenTagged = 0;
+  let freshTagged = 0;
+  for (const job of publicJobs) {
+    if (!job.tags) job.tags = {};
+    const ageState = classifyAgeLifecycle(job);
+    if (ageState === 'stale-candidate') {
+      job.tags.lifecycle_state = 'stale-candidate';
+      staleTagged++;
+    } else if (ageState === 'evergreen') {
+      job.tags.lifecycle_state = 'evergreen';
+      evergreenTagged++;
+    } else {
+      job.tags.lifecycle_state = 'fresh';
+      freshTagged++;
+    }
+    job.tags.lifecycle_version = LIFECYCLE_VERSION;
   }
 
-  publicJobs.length = 0;
-  appendAll(publicJobs, filtered);
+  if (staleTagged > 0 || evergreenTagged > 0) {
+    console.log(`🏷️  AGG-LIFECYCLE-1: kept+tagged ${staleTagged} stale-candidate + ${evergreenTagged} evergreen current-run jobs (previously dropped; >${DEDUPE_TTL_DAYS}d regular / 120d internship)`);
+  }
 }
 
 // AGG-PIPE-4: Sources excluded from closed-job detection.
@@ -635,36 +696,22 @@ function shouldTreatCompanyScopedSourceJobClosed(job, fetcherHealth) {
 function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, stripFields, successfulSources, companyFetchHealth) {
 
   let mergedCount = 0;
-  let nullDateCount = 0;
+  let staleKept = 0;          // AGG-LIFECYCLE-1: TTL-expired / null-date prior-run (was dropped)
+  let deadKept = 0;           // AGG-LIFECYCLE-1: closed / retired-source prior-run (was dropped)
+  let evergreenTagged = 0;
+  let carryForwardTagged = 0;
+  let hardRetired = 0;        // AGG-LIFECYCLE-1: anti-flood true-drop
+  let seniorDropped = 0;      // OUT OF SCOPE (senior filter) — still dropped, not lifecycle-tagged
   let fpSkipCount = 0;
-  let closedDetected = 0;
-  let retiredSourceDropped = 0;
   for (const line of prevLines) {
     try {
       const job = JSON.parse(line);
-      if (currentIds.has(job.id)) continue;
-      if (job.fingerprint && currentFingerprints.has(job.fingerprint)) { fpSkipCount++; continue; }
-      if (!job.posted_at) { nullDateCount++; continue; }
-      const postedTs = new Date(job.posted_at).getTime();
-      const jobTtlMs = applicableTtlMs(job);
-      if (postedTs < Date.now() - jobTtlMs) continue;
-      if (isSeniorJob(job)) continue;
-      if (RETIRED_CARRY_FORWARD_SOURCES.has((job.source || '').toLowerCase())) {
-        retiredSourceDropped++;
-        continue;
-      }
-      // AGG-PIPE-4: Skip carry-forward for successfully-fetched sources (job is closed)
-      if (successfulSources.has(job.source) && !PIPE4_EXCLUDED_SOURCES.has(job.source)) {
-        closedDetected++;
-        continue;
-      }
-      // A141: For Workday / SmartRecruiters, source-level success is too coarse because one tenant can fail
-      // or be skipped unchanged while others succeed. But if the specific company fetched successfully and
-      // returned >0 jobs this run, an absent prior job from that same company/source is safe to treat as closed.
-      if (shouldTreatCompanyScopedSourceJobClosed(job, companyFetchHealth)) {
-        closedDetected++;
-        continue;
-      }
+      if (currentIds.has(job.id)) continue;                                       // dedup (unchanged)
+      if (job.fingerprint && currentFingerprints.has(job.fingerprint)) { fpSkipCount++; continue; } // dedup
+      if (isSeniorJob(job)) { seniorDropped++; continue; }                        // senior filter (OUT OF SCOPE)
+
+      // AGG-LIFECYCLE-1: build the carried-forward job once, then TAG-AND-KEEP.
+      // (Previously the cases below each `continue`-DROPPED the job; now they keep + tag it.)
       const strippedJob = { ...job };
       for (const field of stripFields) delete strippedJob[field];
       // AGG-DATA-13: normalize employment types on carry-forward jobs (AGG-PIPE-13: shared constant)
@@ -681,21 +728,49 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
           strippedJob.posted_at = strippedJob.first_published;
         }
       }
+      if (!strippedJob.tags) strippedJob.tags = {};
+
+      // Classify lifecycle_state, preserving the original drop precedence:
+      //   TTL-expired / null-date (stale-candidate) → retired / closed (dead) → age band.
+      // Consumers replicate the pre-LIFECYCLE "dropped" set by excluding {dead, stale-candidate}.
+      let state;
+      const ageState = classifyAgeLifecycle(strippedJob);
+      if (ageState === 'stale-candidate') {
+        if (isLifecycleHardRetired(strippedJob)) { hardRetired++; continue; }      // anti-flood: truly drop
+        state = 'stale-candidate';
+        staleKept++;
+      } else if (RETIRED_CARRY_FORWARD_SOURCES.has((strippedJob.source || '').toLowerCase())) {
+        state = 'dead'; deadKept++;
+      } else if (successfulSources.has(strippedJob.source) && !PIPE4_EXCLUDED_SOURCES.has(strippedJob.source)) {
+        state = 'dead'; deadKept++;
+      } else if (shouldTreatCompanyScopedSourceJobClosed(strippedJob, companyFetchHealth)) {
+        state = 'dead'; deadKept++;
+      } else if (ageState === 'evergreen') {
+        state = 'evergreen'; evergreenTagged++;
+      } else {
+        state = 'carry-forward'; carryForwardTagged++;
+      }
+      strippedJob.tags.lifecycle_state = state;
+      strippedJob.tags.lifecycle_version = LIFECYCLE_VERSION;
       publicJobs.push(strippedJob);
       mergedCount++;
     } catch { /* skip malformed lines */ }
   }
-  if (nullDateCount > 0) {
-    console.log(`⚠️ Rolling window: dropped ${nullDateCount} prior-run jobs with null posted_at (cannot verify TTL)`);
+
+  if (staleKept > 0) {
+    console.log(`🏷️  AGG-LIFECYCLE-1: kept+tagged ${staleKept} stale-candidate prior-run jobs (TTL-expired/null-date; previously dropped)`);
+  }
+  if (deadKept > 0) {
+    console.log(`🏷️  AGG-LIFECYCLE-1: kept+tagged ${deadKept} dead prior-run jobs (closed/ghost/retired; previously dropped)`);
+  }
+  if (hardRetired > 0) {
+    console.log(`🧹 AGG-LIFECYCLE-1: hard-retired ${hardRetired} prior-run jobs beyond TTL+${LIFECYCLE_VISIBILITY_DAYS}d visibility window (anti-flood)`);
   }
   if (fpSkipCount > 0) {
     console.log(`🔄 Rolling window: skipped ${fpSkipCount} prior-run jobs with matching fingerprint (ID changed, current version wins)`);
   }
-  if (closedDetected > 0) {
-    console.log(`🔍 AGG-PIPE-4: ${closedDetected} carry-forward jobs detected as closed (source fetched successfully, job absent)`);
-  }
-  if (retiredSourceDropped > 0) {
-    console.log(`🧹 Retired sources: dropped ${retiredSourceDropped} prior-run jobs from disabled sources (${[...RETIRED_CARRY_FORWARD_SOURCES].join(', ')})`);
+  if (seniorDropped > 0) {
+    console.log(`🛡️  Rolling window: dropped ${seniorDropped} senior prior-run jobs (senior filter; out of lifecycle scope)`);
   }
   if (mergedCount > 0) {
     publicJobs.sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0));
@@ -734,10 +809,12 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
         locRetagged++;
       }
       job.tags.tag_engine_version = TAG_ENGINE_VERSION;
+      // AGG-LIFECYCLE-1: re-stamp lifecycle version on every carry-forward job each run.
+      if (job.tags.lifecycle_state) job.tags.lifecycle_version = LIFECYCLE_VERSION;
     }
-    console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${closedDetected > 0 ? `, ${closedDetected} closed detected` : ''}${empRetagged > 0 ? `, ${empRetagged} employment re-tagged` : ''}${domainRetagged > 0 ? `, ${domainRetagged} domains re-tagged (version ${TAG_ENGINE_VERSION})` : ''}${locRefreshed > 0 ? `, ${locRefreshed} location fields refreshed` : ''}${locRetagged > 0 ? `, ${locRetagged} locations re-tagged` : ''})`);
+    console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${deadKept > 0 ? `, ${deadKept} dead kept+tagged` : ''}${staleKept > 0 ? `, ${staleKept} stale-candidate kept+tagged` : ''}${evergreenTagged > 0 ? `, ${evergreenTagged} evergreen` : ''}${carryForwardTagged > 0 ? `, ${carryForwardTagged} carry-forward` : ''}${empRetagged > 0 ? `, ${empRetagged} employment re-tagged` : ''}${domainRetagged > 0 ? `, ${domainRetagged} domains re-tagged (version ${TAG_ENGINE_VERSION})` : ''}${locRefreshed > 0 ? `, ${locRefreshed} location fields refreshed` : ''}${locRetagged > 0 ? `, ${locRetagged} locations re-tagged` : ''})`);
   } else {
-    console.log(`🔄 No prior-run jobs to merge${closedDetected > 0 ? ` (${closedDetected} closed detected)` : ''}`);
+    console.log(`🔄 No prior-run jobs to merge${(deadKept + staleKept) > 0 ? ` (${deadKept + staleKept} lifecycle-tagged)` : ''}`);
   }
 }
 
@@ -2163,6 +2240,18 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
     // status: 'alive' (has jobs), 'zero' (fetched ok but 0 jobs), 'error' (fetch failed).
     // Enables check-19 to classify without HTTP probing.
     fetcher_health: fetcherHealth || {},
+
+    // AGG-LIFECYCLE-1: lifecycle_state distribution + version. Evergreen/ghost/TTL-expired jobs are
+    // now KEPT+TAGGED (fresh / carry-forward / evergreen / stale-candidate / dead) instead of dropped.
+    // Consumers replicate the pre-LIFECYCLE "dropped" set by excluding {dead, stale-candidate}.
+    lifecycle: {
+      version: LIFECYCLE_VERSION,
+      distribution: jobs.reduce((acc, j) => {
+        const s = j?.tags?.lifecycle_state || 'untagged';
+        acc[s] = (acc[s] || 0) + 1;
+        return acc;
+      }, {}),
+    },
   };
 }
 
@@ -2250,4 +2339,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, resolvePostedAt, mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, buildMidLevelTechFeed, buildMidLevelTechSummary, buildSeniorTechFeed, buildSeniorTechSummary, buildCanadaTechFeed, buildCanadaInternshipsFeed, buildCanadaSentinelChecks, activePublicWindowTs, applicableTtlMs, injectDescriptions };
+module.exports = { main, resolvePostedAt, mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, buildMidLevelTechFeed, buildMidLevelTechSummary, buildSeniorTechFeed, buildSeniorTechSummary, buildCanadaTechFeed, buildCanadaInternshipsFeed, buildCanadaSentinelChecks, activePublicWindowTs, applicableTtlMs, classifyAgeLifecycle, isLifecycleHardRetired, LIFECYCLE_VERSION, LIFECYCLE_EVERGREEN_THRESHOLD_DAYS, injectDescriptions };
