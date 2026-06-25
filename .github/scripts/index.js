@@ -220,6 +220,156 @@ function buildSeniorTechSummary(feed, seniorTotal) {
   };
 }
 
+// CANADA-LANE: tag-driven additive partition over the post-merge pool (locations:'canada').
+// Re-added 2026-06-25 (operator reactivation of the Canada lane). Recovered from commit 81f6347~1
+// and hardened with an empty-file fallback (A196 lesson): a shadow feed must never block the
+// pipeline. This is NOT a new fetcher — it partitions the SAME publicJobs pool the US feed uses,
+// via the tag-engine's `locations:'canada'` tag (the scope knob). Zero US-path impact by
+// construction: the US snapshot and all_jobs are computed upstream and untouched here.
+// Dual-tag policy (AGG-8): a "Canada; United States" job carries BOTH tags and intentionally
+// appears in BOTH the us_jobs and canada feeds — preserved verbatim from the original partition.
+const CANADA_TECH_DOMAINS = new Set(['software', 'hardware', 'data_science', 'ai']);
+const CANADA_TECH_JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-jobs.jsonl');
+const CANADA_TECH_INTERNSHIPS_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-internships.jsonl');
+const CANADA_TECH_SUMMARY_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-summary.json');
+
+// Sentinel cue regexes — used ONLY by buildCanadaSentinelChecks (the FP guard), NEVER for tagging
+// (the tag-engine owns canada detection via hasCanadaLocation). The US cue flags a canada-tagged
+// job whose raw location text reads US-only (a mis-tag / leak); the canada cue whitelists genuine
+// Canadian text so dual-country rows do not false-alarm.
+const CANADA_LOCATION_CUE_RE = /\b(canada|canadian|ontario|toronto|ottawa|waterloo|kitchener|markham|mississauga|burlington|brampton|windsor|london|hamilton|quebec|montr[eé]al|montreal|laval|gatineau|british columbia|vancouver|burnaby|victoria|richmond|surrey|alberta|calgary|edmonton|manitoba|winnipeg|saskatchewan|regina|saskatoon|nova scotia|halifax|new brunswick|fredericton|moncton|newfoundland|st john'?s|prince edward island|charlottetown|yukon|whitehorse|northwest territories|yellowknife|nunavut|iqaluit|\bON\b|\bQC\b|\bBC\b|\bAB\b|\bMB\b|\bSK\b|\bNS\b|\bNB\b|\bNL\b|\bPE\b|\bYT\b|\bNT\b|\bNU\b)\b/i;
+const US_LOCATION_CUE_RE = /\b(united states|\busa\b|california|new york|texas|florida|washington|illinois|massachusetts|georgia|north carolina|virginia|colorado|arizona|pennsylvania|ohio|michigan|new jersey|maryland|oregon|utah|seattle|san francisco|los angeles|new york city|austin|dallas|boston|chicago|atlanta|denver|phoenix|philadelphia|detroit|portland|\bCA\b|\bNY\b|\bTX\b|\bFL\b|\bWA\b|\bIL\b|\bMA\b|\bGA\b|\bNC\b|\bVA\b|\bCO\b|\bAZ\b|\bPA\b|\bOH\b|\bMI\b|\bNJ\b|\bMD\b|\bOR\b|\bUT\b)\b/i;
+
+// Shared partition helpers (restored with the canada feed; pure, no side effects, no collisions).
+function hasTag(job, field, value) {
+  const values = job?.tags?.[field];
+  return Array.isArray(values) && values.includes(value);
+}
+function isInternshipJob(job) {
+  return job.tags?.employment === 'internship'
+    || job.employment_type === 'internship'
+    || (Array.isArray(job.employment_types) && job.employment_types.includes('internship'));
+}
+function isCanadaJob(job) {
+  return hasTag(job, 'locations', 'canada');
+}
+function isCanadaTechJob(job) {
+  const domains = job?.tags?.domains;
+  return isCanadaJob(job) && Array.isArray(domains) && domains.some(domain => CANADA_TECH_DOMAINS.has(domain));
+}
+function incrementCount(map, key, amount = 1) {
+  const safeKey = key || 'unknown';
+  map[safeKey] = (map[safeKey] || 0) + amount;
+}
+function sortCountObject(map) {
+  return Object.fromEntries(Object.entries(map).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
+}
+function locationText(job) {
+  return [job.location, job.job_city, job.job_state, job.city, job.state, job.country, job.url].filter(Boolean).join(' ');
+}
+
+function buildCanadaSentinelChecks(canadaTechJobs) {
+  let missingCanadaTag = 0;
+  let nonTechDomain = 0;
+  const suspiciousUsOnly = [];
+  for (const job of canadaTechJobs) {
+    if (!isCanadaJob(job)) missingCanadaTag++;
+    if (!Array.isArray(job.tags?.domains) || !job.tags.domains.some(domain => CANADA_TECH_DOMAINS.has(domain))) nonTechDomain++;
+    const text = locationText(job);
+    const locations = Array.isArray(job.tags?.locations) ? job.tags.locations : [];
+    const canadaOnly = locations.includes('canada') && !locations.includes('us') && !locations.includes('remote');
+    if (canadaOnly && US_LOCATION_CUE_RE.test(text) && !CANADA_LOCATION_CUE_RE.test(text)) {
+      suspiciousUsOnly.push({
+        id: job.id, company_name: job.company_name, title: job.title, source: job.source,
+        job_city: job.job_city || '', job_state: job.job_state || '', url: job.url || '',
+      });
+    }
+  }
+  return {
+    contract_version: 'canada-tech-feed-v1',
+    passed: missingCanadaTag === 0 && nonTechDomain === 0 && suspiciousUsOnly.length === 0,
+    checks: {
+      missing_canada_tag: missingCanadaTag,
+      non_tech_domain: nonTechDomain,
+      suspicious_us_only_location: suspiciousUsOnly.length,
+    },
+    suspicious_us_only_samples: suspiciousUsOnly.slice(0, 10),
+  };
+}
+
+function buildCanadaTechFeed(jobs) {
+  const canadaJobs = [];
+  const canadaTechJobs = [];
+  const byDomain = {};
+  const bySource = {};
+  const companyCounts = {};
+  let canadaInternships = 0;
+  let canadaTechInternships = 0;
+  for (const job of jobs) {
+    if (!isCanadaJob(job)) continue;
+    canadaJobs.push(job);
+    if (isInternshipJob(job)) canadaInternships++;
+    if (!isCanadaTechJob(job)) continue;
+    canadaTechJobs.push(job);
+    if (isInternshipJob(job)) canadaTechInternships++;
+    incrementCount(bySource, job.source);
+    incrementCount(companyCounts, job.company_name);
+    for (const domain of job.tags.domains || []) {
+      if (CANADA_TECH_DOMAINS.has(domain)) incrementCount(byDomain, domain);
+    }
+  }
+  const topCompanies = Object.entries(companyCounts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 20)
+    .map(([company_name, count]) => ({ company_name, count }));
+  return {
+    jobs: canadaTechJobs,
+    summary: {
+      contract_version: 'canada-tech-feed-v1',
+      generated_at: new Date().toISOString(),
+      source: 'jobs-aggregator-private normalized post-merge all_jobs pipeline output',
+      tag_engine_version: TAG_ENGINE_VERSION,
+      total_jobs: jobs.length,
+      canada_jobs: canadaJobs.length,
+      canada_tech_jobs: canadaTechJobs.length,
+      canada_internships: canadaInternships,
+      canada_tech_internships: canadaTechInternships,
+      included_domains: [...CANADA_TECH_DOMAINS],
+      by_domain: sortCountObject(byDomain),
+      by_source: sortCountObject(bySource),
+      top_companies: topCompanies,
+      sentinel_false_positive_checks: buildCanadaSentinelChecks(canadaTechJobs),
+    },
+  };
+}
+
+// Canada tech internships lane: subset of canada-tech-jobs filtered to entry_level + internship
+// (A164 recommended highest-signal first slice for the OUT canada-internships consumer).
+function buildCanadaInternshipsFeed(canadaTechJobs) {
+  return canadaTechJobs.filter(job => ['entry_level', 'internship'].includes(job?.tags?.employment));
+}
+
+async function writeCanadaTechFeed(jobs) {
+  const { jobs: canadaTechJobs, summary } = buildCanadaTechFeed(jobs);
+  await writeJobsJSONL(canadaTechJobs, CANADA_TECH_JOBS_OUTPUT_FILE);
+  await writeMetadata(summary, CANADA_TECH_SUMMARY_OUTPUT_FILE);
+  console.log(`🇨🇦 CANADA-LANE: tech feed ${canadaTechJobs.length} jobs (${summary.canada_jobs} Canada total, ${summary.canada_tech_internships} tech internships) → canada-tech-jobs.jsonl`);
+  if (!summary.sentinel_false_positive_checks.passed) {
+    throw new Error(`Canada tech feed sentinel checks failed: ${JSON.stringify(summary.sentinel_false_positive_checks.checks)}`);
+  }
+  return summary;
+}
+
+async function writeCanadaInternshipsFeed(jobs) {
+  const { jobs: canadaTechJobs } = buildCanadaTechFeed(jobs);
+  const internshipsJobs = buildCanadaInternshipsFeed(canadaTechJobs);
+  await writeJobsJSONL(internshipsJobs, CANADA_TECH_INTERNSHIPS_OUTPUT_FILE);
+  const internshipCount = internshipsJobs.filter(job => job?.tags?.employment === 'internship').length;
+  const entryLevelCount = internshipsJobs.filter(job => job?.tags?.employment === 'entry_level').length;
+  console.log(`🇨🇦 CANADA-LANE: internships feed ${internshipsJobs.length} jobs (${entryLevelCount} entry-level, ${internshipCount} internships) → canada-tech-internships.jsonl`);
+  return { total: internshipsJobs.length, entry_level: entryLevelCount, internships: internshipCount };
+}
+
 
 function activePublicWindowTs(job, now = Date.now()) {
   const rawPostedAt = job?.posted_at ? new Date(job.posted_at).getTime() : now;
@@ -1249,6 +1399,32 @@ async function main() {
       console.warn(`⚠️ AGG-SEN-FILTERKNOB-1: senior-tech feed failed, wrote EMPTY (non-blocking): ${e.message}`);
     }
 
+    // CANADA-LANE: tag-driven additive shadow feed (additive; zero US-path impact — the US snapshot
+    // and all_jobs are already written above, untouched). Empty-file fallback: these three files
+    // are in the workflow's REQUIRED R2 upload list, so they must ALWAYS exist (empty is acceptable
+    // on failure) — a shadow feed must never block the pipeline or fail the required R2 upload
+    // (A196 lesson). A sentinel FP failure degrades to empty feeds + a warning, NOT a pipeline crash.
+    try {
+      await writeCanadaTechFeed(publicJobs);
+      await writeCanadaInternshipsFeed(publicJobs);
+    } catch (e) {
+      await writeJobsJSONL([], CANADA_TECH_JOBS_OUTPUT_FILE);
+      await writeJobsJSONL([], CANADA_TECH_INTERNSHIPS_OUTPUT_FILE);
+      const degraded = {
+        contract_version: 'canada-tech-feed-v1',
+        generated_at: new Date().toISOString(),
+        degraded: true,
+        error: e.message,
+        total_jobs: publicJobs.length,
+        canada_jobs: 0, canada_tech_jobs: 0, canada_internships: 0, canada_tech_internships: 0,
+        included_domains: [...CANADA_TECH_DOMAINS],
+        by_domain: {}, by_source: {}, top_companies: [],
+        sentinel_false_positive_checks: { contract_version: 'canada-tech-feed-v1', passed: false, checks: { degraded: true }, suspicious_us_only_samples: [] },
+      };
+      await writeMetadata(degraded, CANADA_TECH_SUMMARY_OUTPUT_FILE);
+      console.warn(`⚠️ CANADA-LANE: feed build failed, wrote EMPTY fallbacks (non-blocking): ${e.message}`);
+    }
+
     // Write metadata
     // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
     // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
@@ -2033,6 +2209,9 @@ async function gitCommit(jobCount) {
     execSync('git add .github/data/jobs-metadata.json');
     execSync('git add .github/data/dedupe-store.json');
     execSync('git add .github/data/wd-totals-cache.json 2>/dev/null || true'); // AGG-SPEED-2: WD incremental fetch cache
+    execSync('git add .github/data/canada-tech-jobs.jsonl 2>/dev/null || true'); // CANADA-LANE: additive shadow feed (R2-required)
+    execSync('git add .github/data/canada-tech-internships.jsonl 2>/dev/null || true'); // CANADA-LANE: additive shadow feed (R2-required)
+    execSync('git add .github/data/canada-tech-summary.json 2>/dev/null || true'); // CANADA-LANE: additive shadow feed (R2-required)
     execSync('git add .github/data/filtered_jobs.json 2>/dev/null || true'); // senior-filter summary for analytics (PIPELINE-1)
     execSync('git add .github/data/filtered-samples.jsonl 2>/dev/null || true'); // AGG-DATA-8: sampled filtered jobs for FP spot-check
     // archive/ is NOT staged here — pushed separately to jobs-archive-private repo via workflow
@@ -2071,4 +2250,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, resolvePostedAt, mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, buildMidLevelTechFeed, buildMidLevelTechSummary, buildSeniorTechFeed, buildSeniorTechSummary, activePublicWindowTs, applicableTtlMs, injectDescriptions };
+module.exports = { main, resolvePostedAt, mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, buildMidLevelTechFeed, buildMidLevelTechSummary, buildSeniorTechFeed, buildSeniorTechSummary, buildCanadaTechFeed, buildCanadaInternshipsFeed, buildCanadaSentinelChecks, activePublicWindowTs, applicableTtlMs, injectDescriptions };
