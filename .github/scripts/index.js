@@ -33,6 +33,7 @@ const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
 const { fetchAllOracleJobs } = require(`${SHARED}/fetchers/oracle`);
 const { fetchAllAmdJobs } = require(`${SHARED}/fetchers/amd`);
 const { fetchAllTiktokJobs } = require(`${SHARED}/fetchers/tiktok`);
+const { fetchAllDeshawJobs } = require(`${SHARED}/fetchers/deshaw`);
 const { applyFamilyCache, buildFamilyCache } = require(`${SHARED}/fetchers/workday`);
 const { fetchSRDescriptions } = require(`${SHARED}/fetchers/smartrecruiters-descriptions`);
 
@@ -496,6 +497,7 @@ const FETCHER_NAME_TO_SOURCE = {
   'Oracle': 'oracle',
   'AMD': 'amd',
   'TikTok': 'tiktok',
+  'D.E. Shaw': 'deshaw',
 };
 
 // AGG-HOTPATH-1: fetchers explicitly removed from the fast publish path.
@@ -1011,6 +1013,7 @@ async function main() {
       HOTPATH_DEMOTED_FETCHERS.has('TikTok')
         ? Promise.resolve([])
         : withTimeout(fetchAllTiktokJobs(), 120_000, 'TikTok'),
+      withTimeout(fetchAllDeshawJobs(), 30_000, 'D.E. Shaw'),
     ]);
 
     if (HOTPATH_DEMOTED_FETCHERS.size > 0) {
@@ -1029,7 +1032,7 @@ async function main() {
     }
 
     // Collect custom fetcher results
-    const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Microsoft', 'Oracle', 'AMD', 'TikTok'];
+    const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Microsoft', 'Oracle', 'AMD', 'TikTok', 'D.E. Shaw'];
     const fetcherResults = {};
     phaseBSettled.forEach((result, i) => {
       const name = fetcherNames[i];
