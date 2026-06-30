@@ -1,0 +1,73 @@
+name: Refresh WD Family Cache
+
+# Decoupled offline refresh of wd-family-cache.json (AGG-WD-DEPT-1 / AGG-SPEED-10).
+# The 15-min fetch-jobs hot path only SEEDS this cache and consumes it via
+# applyFamilyCache; it never rebuilds it (SKIP_WD_FAMILY_CACHE_BUILD=1 there).
+# This workflow owns the rebuild: it downloads the existing cache from R2,
+# refreshes tenants whose per-tenant fetched_at is older than 24h (plus any
+# missing/invalid), merges, and uploads back to R2. Families change slowly, so a
+# 6h cadence keeps every tenant well inside its 24h freshness window. Steady
+# state refreshes only the ~tenants that crossed 24h in the last window; the
+# first cold run after a gap refreshes as many due tenants as fit in the budget.
+#
+# Per-query safety already exists in the fetcher: postJson has a 15s timeout and
+# buildFamilyCache respects WD_FAMILY_CACHE_MAX_MS, saving partial results.
+# Failed tenants are skipped (existing entry preserved) — never corrupts the cache.
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # every 6h at :00 UTC
+  workflow_dispatch:
+    inputs:
+      max_duration_ms:
+        description: 'Per-run build budget in ms (default 600000 = 10 min)'
+        required: false
+        default: '600000'
+
+concurrency:
+  group: wd-family-cache-refresh
+  cancel-in-progress: true   # the cache is a read-merge-write artifact; never run two at once
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read          # this workflow uploads to R2, not git — no commit/push
+
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+      WD_FAMILY_CACHE_MAX_MS: ${{ github.event.inputs.max_duration_ms || '600000' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          submodules: recursive
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Fix submodule index
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --force --recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create data directory
+        run: mkdir -p .github/data
+
+      - name: Refresh WD family cache
+        run: node .github/scripts/refresh-wd-family-cache.js
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
