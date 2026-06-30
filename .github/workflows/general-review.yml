@@ -30,31 +30,52 @@ jobs:
       - name: Install shared dependencies
         run: cd .github/scripts/shared && npm install && cd $GITHUB_WORKSPACE/.github/scripts/aggregator && npm install
 
-      - name: Download data from jobs-data-2026
+      - name: Download data from R2
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
         run: |
           mkdir -p /tmp/review-data
-          echo "Downloading all_jobs.json..."
-          curl -sf -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
-            "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/all_jobs.json?t=$(date +%s)" \
-            -o /tmp/review-data/all_jobs.json
-          echo "  $(wc -l < /tmp/review-data/all_jobs.json) jobs"
-
-          echo "Discovering sidecar description files..."
-          # Use Contents API to list all descriptions-*.jsonl files dynamically.
-          # This auto-discovers new enriched chunks (was hardcoded to 2 of 16, missing WD descriptions).
-          SIDECAR_FILES=$(curl -sf -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/zapplyjobs/jobs-data-2026/contents/.github/data" \
-            | jq -r '.[] | select(.name | startswith("descriptions-") and endswith(".jsonl")) | .name')
-          echo "Found sidecar files:"
-          echo "$SIDECAR_FILES"
-
-          echo "Downloading sidecar descriptions..."
-          for f in $SIDECAR_FILES; do
-            curl -sf -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
-              "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/$f?t=$(date +%s)" \
-              -o "/tmp/review-data/$f" 2>/dev/null && echo "  $f: $(wc -l < /tmp/review-data/$f) entries" || echo "  $f: download failed (skipped)"
-          done
+          cd .github/scripts/shared
+          node - <<'NODE'
+          const fs = require('fs');
+          const { S3Client, GetObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
+          const client = new S3Client({
+            region: 'auto',
+            endpoint: process.env.R2_ENDPOINT,
+            credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY },
+          });
+          const bucket = process.env.R2_BUCKET_NAME;
+          // all_jobs.json + the per-source description sidecars now live on R2 (removed from the
+          // jobs-data-2026 repo during the storage cutover). Download directly from R2.
+          // Skip enriched-* / greenhouse-* chunks: 40MB+ each, never part of this review report.
+          const skip = (key) => key.includes('descriptions-enriched-') || key.includes('descriptions-greenhouse-');
+          async function download(key, dest) {
+            const r = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+            fs.writeFileSync(dest, await r.Body.transformToString());
+          }
+          (async () => {
+            console.log('Downloading all_jobs.json from R2...');
+            await download('data/all_jobs.json', '/tmp/review-data/all_jobs.json');
+            const jobs = fs.readFileSync('/tmp/review-data/all_jobs.json', 'utf8').trim().split('\n').filter(Boolean).length;
+            console.log(`  ${jobs} jobs`);
+            const sidecars = [];
+            let tok;
+            do {
+              const r = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: 'data/descriptions-', ContinuationToken: tok }));
+              (r.Contents || []).forEach(o => { if (o.Key.endsWith('.jsonl') && !skip(o.Key)) sidecars.push(o.Key); });
+              tok = r.NextContinuationToken;
+            } while (tok);
+            console.log(`Downloading ${sidecars.length} description sidecars (skipping enriched/greenhouse chunks)...`);
+            for (const key of sidecars) {
+              const name = key.split('/').pop();
+              try { await download(key, `/tmp/review-data/${name}`); console.log(`  ${name}`); }
+              catch (e) { console.log(`  ${name}: skipped (${e.message})`); }
+            }
+          })().catch(e => { console.error('FAIL: ' + e.message); process.exit(1); });
+          NODE
 
       - name: Generate general-review.json
         run: |
