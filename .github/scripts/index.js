@@ -975,6 +975,30 @@ async function main() {
     const googleCachedIds = loadDescriptionCacheState('descriptions-google').cachedIds;
     const appleCachedIds = loadDescriptionCacheState('descriptions-apple').cachedIds;
     const oracleCache = loadDescriptionCacheState('descriptions-oracle', { minChars: 2000, marker: /^(Responsibilities|Qualifications):/m, trackShort: true });
+    // AGG-ORACLE-DEPT: also treat Oracle jobs whose department is already captured in the sidecar
+    // as cached, so the detail-fetch budget (MAX_DETAIL_FETCHES) targets jobs still missing a
+    // department. This drains the large short-sidecar pool progressively — tech-titled jobs get
+    // captured first and drop out, letting US Oracle generals (low title score) rise into the
+    // budget over successive runs instead of being permanently starved. Without this, generals
+    // (the G1 target) are never reached because the pool is tech-front-loaded.
+    try {
+      const oracleSidecarFiles = fs.readdirSync(DATA_DIR)
+        .filter(f => f.startsWith('descriptions-oracle') && f.endsWith('.jsonl'));
+      let deptCached = 0;
+      for (const fname of oracleSidecarFiles) {
+        const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
+        for (const line of lines) {
+          try {
+            const { id, departments } = JSON.parse(line);
+            if (id && Array.isArray(departments) && departments.length > 0 && !oracleCache.cachedIds.has(id)) {
+              oracleCache.cachedIds.add(id);
+              deptCached++;
+            }
+          } catch (_) {}
+        }
+      }
+      if (deptCached > 0) console.log(`  oracle dept cache: +${deptCached} IDs with captured department treated as cached`);
+    } catch (_) { /* no sidecar yet */ }
 
 
     // AGG-SPEED-2: Load WD totals cache from prior run
@@ -1265,13 +1289,15 @@ async function main() {
       .filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
     if (descSidecarFiles.length > 0) {
       const descMap = new Map();
+      const deptMap = new Map();   // AGG-ORACLE-DEPT: id -> departments[] (persisted capture)
       for (const fname of descSidecarFiles) {
         const fpath = path.join(DATA_DIR, fname);
         const descLines = fs.readFileSync(fpath, 'utf8').trim().split('\n').filter(Boolean);
         for (const line of descLines) {
           try {
-            const { id, description_text } = JSON.parse(line);
+            const { id, description_text, departments } = JSON.parse(line);
             if (id && description_text) descMap.set(id, description_text);
+            if (id && Array.isArray(departments) && departments.length > 0) deptMap.set(id, departments);
           } catch { /* skip malformed */ }
         }
       }
@@ -1282,7 +1308,18 @@ async function main() {
           injected++;
         }
       }
-      console.log(`📄 Step 4c: Injected ${injected} descriptions from ${descSidecarFiles.length} sidecar files (${descMap.size} available)`);
+      // AGG-ORACLE-DEPT: re-inject persisted departments for jobs not detail-fetched this run
+      // (description-cache-skipped or carry-forward). normalizeOracleJob only sees detailJob on
+      // the single run a job is fetched, so without this the captured department is lost and the
+      // job reverts to "general" on every later run.
+      let deptInjected = 0;
+      for (const job of entryLevelJobs) {
+        if ((!job.departments || job.departments.length === 0) && deptMap.has(job.id)) {
+          job.departments = deptMap.get(job.id);
+          deptInjected++;
+        }
+      }
+      console.log(`📄 Step 4c: Injected ${injected} descriptions from ${descSidecarFiles.length} sidecar files (${descMap.size} available)${deptInjected > 0 ? `; re-injected ${deptInjected} persisted Oracle departments` : ''}`);
     } else {
       console.log('📄 Step 4c: No description sidecar files found — description fallback inactive');
     }
