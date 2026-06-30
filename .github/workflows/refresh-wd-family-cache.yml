@@ -20,9 +20,9 @@ on:
   workflow_dispatch:
     inputs:
       max_duration_ms:
-        description: 'Per-run build budget in ms (default 600000 = 10 min)'
+        description: 'Per-run build budget in ms (default 900000 = 15 min)'
         required: false
-        default: '600000'
+        default: '900000'
 
 concurrency:
   group: wd-family-cache-refresh
@@ -37,7 +37,11 @@ jobs:
 
     env:
       NODE_OPTIONS: --max-old-space-size=4096
-      WD_FAMILY_CACHE_MAX_MS: ${{ github.event.inputs.max_duration_ms || '600000' }}
+      WD_FAMILY_CACHE_MAX_MS: ${{ github.event.inputs.max_duration_ms || '900000' }}
+      # Tenant-level concurrency (distinct Workday hosts, parallelized). 20 lets a
+      # single run clear ~100 tenants so the 6h cadence cycles all ~287 well inside
+      # the 24h per-tenant window; 5 (the fetcher default) cannot keep up.
+      WD_FAMILY_CONCURRENCY: '20'
 
     steps:
       - name: Checkout repository
