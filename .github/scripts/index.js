@@ -984,20 +984,26 @@ async function main() {
     try {
       const oracleSidecarFiles = fs.readdirSync(DATA_DIR)
         .filter(f => f.startsWith('descriptions-oracle') && f.endsWith('.jsonl'));
-      let deptCached = 0;
+      const deptHavingIds = new Set();
       for (const fname of oracleSidecarFiles) {
         const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
         for (const line of lines) {
           try {
             const { id, departments } = JSON.parse(line);
-            if (id && Array.isArray(departments) && departments.length > 0 && !oracleCache.cachedIds.has(id)) {
-              oracleCache.cachedIds.add(id);
-              deptCached++;
-            }
+            if (id && Array.isArray(departments) && departments.length > 0) deptHavingIds.add(id);
           } catch (_) {}
         }
       }
-      if (deptCached > 0) console.log(`  oracle dept cache: +${deptCached} IDs with captured department treated as cached`);
+      // AGG-ORACLE-DEPT FIX: loadDescriptionCacheState (line 977) caches ALL described Oracle
+      // jobs — including generals that never captured a Category. Remove dept-less jobs from
+      // the skip-list so they remain eligible for detail-fetch (the only source of Category).
+      // Only keep jobs WITH departments cached (skip re-fetch, preserve the captured dept).
+      // Without this, generals (the G1 target) are skipped forever → 0% department capture.
+      let removed = 0;
+      for (const id of oracleCache.cachedIds) {
+        if (!deptHavingIds.has(id)) { oracleCache.cachedIds.delete(id); removed++; }
+      }
+      if (removed > 0) console.log(`  oracle dept cache: ${deptHavingIds.size} with dept (cached/skip), ${removed} dept-less → eligible for detail-fetch`);
     } catch (_) { /* no sidecar yet */ }
 
 
