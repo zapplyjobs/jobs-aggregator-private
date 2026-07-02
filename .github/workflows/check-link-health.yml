@@ -72,11 +72,21 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
         run: |
+          # AGG-DEADNESS-1: check-link-health.js exits 1 when dead jobs are found (dead-alert signal).
+          # The Simplify age-bypass now reliably detects the persistently-410 BAE class, so dead>0 is
+          # the common case. Decouple that exit from the derived-artifact builders below so tombstone /
+          # verification / confidence artifacts still refresh on dead-detecting runs, then re-emit the
+          # original exit code to preserve the dead-alert (red workflow) signal. The primary dead list
+          # (stale-job-candidates.json) is written before the exit and uploaded via if:always regardless.
+          set +e
           node .github/scripts/check-link-health.js --per-group 8 --write-dead stale-job-candidates.json --history-in stale-job-history.prev.json --write-history stale-job-history.json > agg-link-health.json
+          CHECK_EXIT=$?
+          set -e
           node .github/scripts/build-stale-tombstones.js --history-in stale-job-history.json --output stale-job-tombstones.json
           node .github/scripts/build-link-verification-sample.js --input agg-link-health.json --output link-verification-sample.json
           node .github/scripts/build-source-confidence-sample.js --link-health agg-link-health.json --verification link-verification-sample.json --tombstones stale-job-tombstones.json --metadata jobs-metadata.json --output source-confidence-sample.json
           node .github/scripts/validate-link-health-artifacts.js --print-summary
+          exit $CHECK_EXIT
 
       - name: Upload stale candidate outputs to R2
         if: always()

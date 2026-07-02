@@ -8,15 +8,22 @@ const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 
 const TECH_DOMAINS = new Set(['software', 'data_science', 'hardware', 'ai', 'finance']);
 const DEFAULT_GROUPS = ['greenhouse', 'lever', 'ashby', 'workday', 'smartrecruiters', 'custom'];
+// AGG-DEADNESS-1 (bounded): companies whose career sites 403 bot HEAD requests regardless of
+// liveness. Excluded from the Simplify high-suspicion pass so the sample budget isn't burned on
+// guaranteed-uncertain checks. Noise control only — checkUrl already treats 403 as 'uncertain'
+// (never 'dead'), so this guards budget, not false positives. 404/410 remain the only 'dead' codes.
+const BOT_BLOCKED_COMPANIES = new Set(['tesla', 'citadel', 'citadel securities']);
 
 function parseArgs(argv) {
-  const args = { minAgeDays: 2, maxAgeDays: 4, perGroup: 8, groups: [...DEFAULT_GROUPS], writeDead: null, historyIn: null, writeHistory: null };
+  const args = { minAgeDays: 2, maxAgeDays: 4, perGroup: 8, groups: [...DEFAULT_GROUPS], perSimplify: 16, simplifyBypass: true, writeDead: null, historyIn: null, writeHistory: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--min-age-days') args.minAgeDays = Number(argv[++i]);
     else if (arg === '--max-age-days') args.maxAgeDays = Number(argv[++i]);
     else if (arg === '--per-group') args.perGroup = Number(argv[++i]);
     else if (arg === '--groups') args.groups = argv[++i].split(',').map(s => s.trim()).filter(Boolean);
+    else if (arg === '--per-simplify') args.perSimplify = Number(argv[++i]);
+    else if (arg === '--no-simplify-bypass') args.simplifyBypass = false;
     else if (arg === '--write-dead') args.writeDead = argv[++i];
     else if (arg === '--history-in') args.historyIn = argv[++i];
     else if (arg === '--write-history') args.writeHistory = argv[++i];
@@ -54,6 +61,10 @@ function isConsumerVisible(job) {
 function groupName(source) {
   if (['greenhouse', 'lever', 'ashby', 'workday', 'smartrecruiters'].includes(source)) return source;
   return 'custom';
+}
+
+function isBotBlocked(job) {
+  return BOT_BLOCKED_COMPANIES.has((job.company_name || '').trim().toLowerCase());
 }
 
 function pickSample(arr, n) {
@@ -134,9 +145,16 @@ function buildHistory(previous, deadResults, checkedAt) {
   return { checked_at: checkedAt, history };
 }
 
-(async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const jobs = await loadJsonlFromR2('all_jobs.json');
+/**
+ * AGG-DEADNESS-1 (bounded, off-hot-path): build the sample set to be HEAD-checked.
+ * Regular groups are sampled within the [minAgeDays, maxAgeDays) age window. A separate Simplify
+ * pass samples Simplify-sourced jobs REGARDLESS of age, because Simplify re-stamps posted_at=today
+ * every run, so re-fetched-but-404/410 dead jobs (the BAE class, e.g. BAE1US118005) are always
+ * age<minAgeDays and would otherwise never be checked. checkUrl only treats 404/410 as 'dead', so
+ * the bypass cannot manufacture false dead tags; bot-blocked companies are excluded (budget only).
+ * Pure (no I/O) for testability. Returns { samples, grouped, simplifyCandidates }.
+ */
+function buildSamples(jobs, args) {
   const grouped = Object.fromEntries(args.groups.map(g => [g, []]));
   for (const job of jobs) {
     const group = groupName(job.source || 'unknown');
@@ -152,14 +170,40 @@ function buildHistory(previous, deadResults, checkedAt) {
       samples.push({ group, id: job.id, source: job.source, company_name: job.company_name, title: job.title, posted_at: job.posted_at, url: job.url });
     }
   }
+
+  let simplifyCandidates = 0;
+  if (args.simplifyBypass) {
+    const seen = new Set(samples.map(s => s.id));
+    const simplifyPool = [];
+    for (const job of jobs) {
+      if ((job.source || '').toLowerCase() !== 'simplify') continue;
+      if (!job.url || !isConsumerVisible(job)) continue;
+      if (isBotBlocked(job)) continue;
+      if (seen.has(job.id)) continue;
+      simplifyPool.push(job);
+    }
+    simplifyCandidates = simplifyPool.length;
+    for (const job of pickSample(simplifyPool, args.perSimplify)) {
+      samples.push({ group: 'simplify-fresh', id: job.id, source: job.source, company_name: job.company_name, title: job.title, posted_at: job.posted_at, url: job.url });
+    }
+  }
+  return { samples, grouped, simplifyCandidates };
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const jobs = await loadJsonlFromR2('all_jobs.json');
+  const { samples, grouped, simplifyCandidates } = buildSamples(jobs, args);
+
   const results = [];
   for (const item of samples) results.push({ ...item, ...(await checkUrl(item.url)) });
   const summary = {};
   let deadTotal = 0;
-  for (const group of args.groups) {
+  const summaryGroups = args.simplifyBypass ? [...args.groups, 'simplify-fresh'] : args.groups;
+  for (const group of summaryGroups) {
     const arr = results.filter(r => r.group === group);
     summary[group] = {
-      candidates: grouped[group].length,
+      candidates: group === 'simplify-fresh' ? simplifyCandidates : (grouped[group] ? grouped[group].length : 0),
       checked: arr.length,
       dead: arr.filter(r => r.status === 'dead').length,
       uncertain: arr.filter(r => !['ok', 'dead'].includes(r.status)).length,
@@ -178,7 +222,16 @@ function buildHistory(previous, deadResults, checkedAt) {
     code: r.code ?? null,
     status: r.status,
   }));
-  const output = { checked_at: checkedAt, sample_window: { minAgeDays: args.minAgeDays, maxAgeDays: args.maxAgeDays }, per_group: args.perGroup, summary, results };
+  const output = {
+    checked_at: checkedAt,
+    sample_window: { minAgeDays: args.minAgeDays, maxAgeDays: args.maxAgeDays },
+    simplify_age_bypass: args.simplifyBypass,
+    bot_blocked_companies: [...BOT_BLOCKED_COMPANIES],
+    per_group: args.perGroup,
+    per_simplify: args.simplifyBypass ? args.perSimplify : 0,
+    summary,
+    results,
+  };
   console.log(JSON.stringify(output, null, 2));
   if (args.writeDead) {
     fs.writeFileSync(args.writeDead, JSON.stringify({ checked_at: checkedAt, dead }, null, 2) + '\n');
@@ -188,4 +241,10 @@ function buildHistory(previous, deadResults, checkedAt) {
     fs.writeFileSync(args.writeHistory, JSON.stringify(history, null, 2) + '\n');
   }
   if (deadTotal > 0) process.exit(1);
-})();
+}
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = { parseArgs, buildSamples, groupName, ageDays, isConsumerVisible, pickSample, isBotBlocked, BOT_BLOCKED_COMPANIES, DEFAULT_GROUPS };
