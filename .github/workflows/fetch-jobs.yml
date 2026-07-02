@@ -814,18 +814,6 @@ jobs:
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
 
-    - name: Trigger metrics collection (wave: producer → metrics, reliable vs cron)
-      if: success() && github.ref_name == 'main'
-      run: |
-        curl -sf -X POST "https://api.github.com/repos/zapplyjobs/jobs-data-2026/actions/workflows/collect-metrics.yml/dispatches" \
-          -H "Authorization: Bearer ${GH_PAT}" \
-          -H "Accept: application/vnd.github+json" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          -d '{"ref":"main"}'
-        echo "✅ Triggered metrics collection (wave link — collect-metrics now runs right after the producer, not on the unreliable cron)"
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-
 
     - name: Display logs (always run)
       if: always()
