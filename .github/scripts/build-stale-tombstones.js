@@ -87,7 +87,7 @@ function buildTombstones(historyInput, options = {}) {
       lifecycle_state: 'stale_candidate',
       automatic_removal: false,
       removal_authority: 'none',
-      note: 'Evidence feed only. Do not suppress all_jobs.json rows from this artifact without a separately approved recurrence policy and destination proof.',
+      note: 'Confirmed-dead (hard 404/410, recurrence-confirmed) ids ARE now suppressed at the CONSUMER (job-board-consumer), which consults data/stale-job-candidates.json fresh each generation and hides matching ids everywhere. PRODUCER rows are NOT dropped here (tag-not-filter preserved; automatic_removal=false, removal_authority=none); only the consumer hides them.',
     },
     summary: {
       total: tombstones.length,
