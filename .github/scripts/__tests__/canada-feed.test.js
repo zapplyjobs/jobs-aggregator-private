@@ -11,8 +11,8 @@ const {
   buildCanadaTechFeed,
   buildCanadaInternshipsFeed,
   buildCanadaSentinelChecks,
+  buildCanadaAllFeed,
 } = require('../index');
-
 // --- Fixtures -----------------------------------------------------------------
 
 // Pure canada tech job (Toronto, software, entry-level) — must be in BOTH the tech feed and the
@@ -124,5 +124,23 @@ assert.strictEqual(empty.summary.sentinel_false_positive_checks.passed, true, 'e
 assert.strictEqual(buildCanadaInternshipsFeed(empty.jobs).length, 0, 'empty pool yields empty internships feed');
 
 console.log('PASS empty input (empty feeds, sentinel still passes)');
+
+// --- 5. ALL-Canada feed (AGG-CANADAFEED-1): broadens tech → all domains, tech-prioritized ---
+const allFeed = buildCanadaAllFeed(POOL);
+const allIds = allFeed.jobs.map(j => j.id);
+assert.ok(allIds.includes('workday-can-1'), 'all-canada feed includes pure canada tech');
+assert.ok(allIds.includes('oracle-can-2'), 'all-canada feed includes dual-tagged canada+us');
+assert.ok(allIds.includes('ashby-can-3'), 'all-canada feed includes canada tech internship');
+assert.ok(allIds.includes('greenhouse-can-4'), 'all-canada feed includes canada NON-tech (the broaden)');
+assert.ok(!allIds.includes('greenhouse-us-5'), 'US-only job must NOT leak into all-canada feed');
+assert.strictEqual(allFeed.summary.canada_jobs, 4, 'all-canada total = all 4 canada jobs (tech+non-tech)');
+assert.strictEqual(allFeed.summary.canada_tech_jobs, 3, 'all-canada tech count');
+assert.strictEqual(allFeed.summary.canada_non_tech_jobs, 1, 'all-canada non-tech count');
+assert.strictEqual(allFeed.summary.tech_prioritized, true, 'tech_prioritized flag set');
+assert.strictEqual(allFeed.summary.contract_version, 'canada-all-feed-v1', 'all-canada contract version');
+const nonTechIdx = allIds.indexOf('greenhouse-can-4');
+assert.ok(['workday-can-1', 'oracle-can-2', 'ashby-can-3'].every(id => allIds.indexOf(id) < nonTechIdx), 'tech jobs sorted before non-tech (tech-prioritized)');
+assert.strictEqual(allFeed.summary.sentinel_false_positive_checks.passed, true, 'clean all-canada feed passes sentinel');
+console.log('PASS all-canada feed (tech+non-tech included, US-excluded, tech-prioritized, counts)');
 
 console.log('\n✅ canada-feed: all partition/sentinel/dual-tag/empty checks passed');

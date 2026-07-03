@@ -723,6 +723,8 @@ jobs:
             'canada-tech-jobs.jsonl',
             'canada-tech-internships.jsonl',
             'canada-tech-summary.json',
+            'canada-jobs.jsonl',
+            'canada-all-summary.json',
             'jobs-metadata.json',
             'dedupe-store.json',
             'wd-totals-cache.json',
