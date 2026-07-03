@@ -699,7 +699,7 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
 
   let mergedCount = 0;
   let staleKept = 0;          // AGG-LIFECYCLE-1: TTL-expired / null-date prior-run (was dropped)
-  let deadKept = 0;           // AGG-LIFECYCLE-1: closed / retired-source prior-run (was dropped)
+  let deadDropped = 0;       // OPERATOR 2026-07-03: dead dropped UPSTREAM (reverses AGG-LIFECYCLE-1 tag-and-keep). dead = source fetched OK this run but job absent (or retired source) — high-precision, no re-flood (source no longer lists it). Restores pre-LIFECYCLE drop behavior.
   let evergreenTagged = 0;
   let carryForwardTagged = 0;
   let hardRetired = 0;        // AGG-LIFECYCLE-1: anti-flood true-drop
@@ -742,11 +742,11 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
         state = 'stale-candidate';
         staleKept++;
       } else if (RETIRED_CARRY_FORWARD_SOURCES.has((strippedJob.source || '').toLowerCase())) {
-        state = 'dead'; deadKept++;
+        deadDropped++; continue;  // OPERATOR 2026-07-03: DROP dead upstream (reverse AGG-LIFECYCLE-1 tag-and-keep). Retired source.
       } else if (successfulSources.has(strippedJob.source) && !PIPE4_EXCLUDED_SOURCES.has(strippedJob.source)) {
-        state = 'dead'; deadKept++;
+        deadDropped++; continue;  // DROP dead upstream. Source fetched OK this run but job absent -> gone from its own career site.
       } else if (shouldTreatCompanyScopedSourceJobClosed(strippedJob, companyFetchHealth)) {
-        state = 'dead'; deadKept++;
+        deadDropped++; continue;  // DROP dead upstream. Company-scoped source confirmed closed.
       } else if (ageState === 'evergreen') {
         state = 'evergreen'; evergreenTagged++;
       } else {
@@ -762,8 +762,8 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
   if (staleKept > 0) {
     console.log(`🏷️  AGG-LIFECYCLE-1: kept+tagged ${staleKept} stale-candidate prior-run jobs (TTL-expired/null-date; previously dropped)`);
   }
-  if (deadKept > 0) {
-    console.log(`🏷️  AGG-LIFECYCLE-1: kept+tagged ${deadKept} dead prior-run jobs (closed/ghost/retired; previously dropped)`);
+  if (deadDropped > 0) {
+    console.log(`🧹 OPERATOR-2026-07-03 (reverse AGG-LIFECYCLE-1): dropped ${deadDropped} dead prior-run jobs UPSTREAM (closed/ghost/retired) — they no longer reach all_jobs/R2/consumers. [stale-candidate still tag-and-keep until posted_at re-stamping fix lands]`);
   }
   if (hardRetired > 0) {
     console.log(`🧹 AGG-LIFECYCLE-1: hard-retired ${hardRetired} prior-run jobs beyond TTL+${LIFECYCLE_VISIBILITY_DAYS}d visibility window (anti-flood)`);
@@ -814,9 +814,9 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
       // AGG-LIFECYCLE-1: re-stamp lifecycle version on every carry-forward job each run.
       if (job.tags.lifecycle_state) job.tags.lifecycle_version = LIFECYCLE_VERSION;
     }
-    console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${deadKept > 0 ? `, ${deadKept} dead kept+tagged` : ''}${staleKept > 0 ? `, ${staleKept} stale-candidate kept+tagged` : ''}${evergreenTagged > 0 ? `, ${evergreenTagged} evergreen` : ''}${carryForwardTagged > 0 ? `, ${carryForwardTagged} carry-forward` : ''}${empRetagged > 0 ? `, ${empRetagged} employment re-tagged` : ''}${domainRetagged > 0 ? `, ${domainRetagged} domains re-tagged (version ${TAG_ENGINE_VERSION})` : ''}${locRefreshed > 0 ? `, ${locRefreshed} location fields refreshed` : ''}${locRetagged > 0 ? `, ${locRetagged} locations re-tagged` : ''})`);
+    console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${deadDropped > 0 ? `, ${deadDropped} dead dropped upstream` : ''}${staleKept > 0 ? `, ${staleKept} stale-candidate kept+tagged` : ''}${evergreenTagged > 0 ? `, ${evergreenTagged} evergreen` : ''}${carryForwardTagged > 0 ? `, ${carryForwardTagged} carry-forward` : ''}${empRetagged > 0 ? `, ${empRetagged} employment re-tagged` : ''}${domainRetagged > 0 ? `, ${domainRetagged} domains re-tagged (version ${TAG_ENGINE_VERSION})` : ''}${locRefreshed > 0 ? `, ${locRefreshed} location fields refreshed` : ''}${locRetagged > 0 ? `, ${locRetagged} locations re-tagged` : ''})`);
   } else {
-    console.log(`🔄 No prior-run jobs to merge${(deadKept + staleKept) > 0 ? ` (${deadKept + staleKept} lifecycle-tagged)` : ''}`);
+    console.log(`🔄 No prior-run jobs to merge${(deadDropped + staleKept) > 0 ? ` (${deadDropped} dead dropped, ${staleKept} stale-candidate tagged)` : ''}`);
   }
 }
 

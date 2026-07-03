@@ -58,14 +58,14 @@ assert.strictEqual(isLifecycleHardRetired({ posted_at: null, tags: REG }), false
   assert.strictEqual(byId.s2.tags.lifecycle_state, 'stale-candidate');
 }
 
-// --- mergeCarryForward: precedence dead > stale-candidate > evergreen > carry-forward -
-// A closed job with a fresh date is 'dead' (closure beats age).
+// --- mergeCarryForward: OPERATOR 2026-07-03 — dead is DROPPED upstream (reverses AGG-LIFECYCLE-1 tag-and-keep) ---
+// A closed job with a fresh date is 'dead' → DROPPED (not in pool), so it never reaches R2/consumers.
 {
   const publicJobs = [];
   mergeCarryForward(publicJobs,
     [line({ id: 'closed-fresh', source: 'greenhouse', posted_at: daysAgo(2), tags: { ...REG } })],
     new Set(), new Set(), [], new Set(['greenhouse']));
-  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'dead', 'closed job is dead even when fresh');
+  assert.strictEqual(publicJobs.length, 0, 'closed (dead) job DROPPED upstream — not in pool');
 }
 // A TTL-expired job from a successful source is 'stale-candidate' (age precedence preserved).
 {

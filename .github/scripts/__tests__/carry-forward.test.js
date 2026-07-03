@@ -12,7 +12,7 @@ const now = new Date().toISOString();
 
 assert.ok(RETIRED_CARRY_FORWARD_SOURCES.has('jsearch'), 'jsearch must be retired');
 
-// Case 1: retired-source job is now KEPT + tagged 'dead' (previously dropped).
+// Case 1: retired-source job is DROPPED upstream (OPERATOR 2026-07-03; reverses AGG-LIFECYCLE-1 tag-and-keep; dead never reaches R2/consumers).
 {
   const publicJobs = [];
   mergeCarryForward(
@@ -30,9 +30,7 @@ assert.ok(RETIRED_CARRY_FORWARD_SOURCES.has('jsearch'), 'jsearch must be retired
     [],
     new Set()
   );
-  assert.strictEqual(publicJobs.length, 1, 'retired jsearch jobs are now KEPT (TAG-AND-KEEP)');
-  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'dead', 'retired-source job tagged dead');
-  assert.strictEqual(publicJobs[0].tags.lifecycle_version, LIFECYCLE_VERSION, 'dead job carries lifecycle_version');
+  assert.strictEqual(publicJobs.length, 0, 'retired jsearch dead jobs DROPPED upstream (not in pool)');
 }
 
 // Case 2: active non-fetched source carries forward within TTL, tagged 'carry-forward'.
@@ -57,9 +55,8 @@ assert.ok(RETIRED_CARRY_FORWARD_SOURCES.has('jsearch'), 'jsearch must be retired
   assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'carry-forward', 'alive prior-run job tagged carry-forward');
 }
 
-// Case 3: fresh job whose source fetched successfully is KEPT + tagged 'dead' (ghost/closed).
-// (Previously DROPPED via closed-detection. Uses a fresh posted_at so it reaches the closed branch
-// rather than the TTL branch, isolating the closed→dead lifecycle path.)
+// Case 3: fresh job whose source fetched successfully is DROPPED upstream (OPERATOR 2026-07-03; closed/ghost = dead).
+// (Uses a fresh posted_at so it reaches the closed→dead branch, not the TTL branch.)
 {
   const publicJobs = [];
   mergeCarryForward(
@@ -77,8 +74,7 @@ assert.ok(RETIRED_CARRY_FORWARD_SOURCES.has('jsearch'), 'jsearch must be retired
     [],
     new Set(['greenhouse'])
   );
-  assert.strictEqual(publicJobs.length, 1, 'closed/ghost job is now KEPT (TAG-AND-KEEP)');
-  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'dead', 'closed job tagged dead');
+  assert.strictEqual(publicJobs.length, 0, 'closed/ghost (dead) job DROPPED upstream (not in pool)');
 }
 
 
