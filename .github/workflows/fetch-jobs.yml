@@ -942,6 +942,26 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
+    - name: Freshness SLA alert
+      if: always()
+      env:
+        DISCORD_TOKEN: ${{ secrets.DISCORD_TEAM_TOKEN }}
+        CHANNEL_ID: ${{ secrets.DISCORD_PIPELINE_ALERT_CHANNEL_ID }}
+      run: |
+        STATUS=".github/data/freshness-status.json"
+        if [ ! -f "$STATUS" ]; then exit 0; fi
+        BREACHED=$(node -e "try{const d=require('./'+process.argv[1]);console.log(d.breached?'true':'false')}catch{console.log('false')}" "$STATUS" 2>/dev/null || echo false)
+        if [ "$BREACHED" != "true" ]; then exit 0; fi
+        REASON=$(node -e "try{console.log(require('./'+process.argv[1]).reason||'breached')}catch{console.log('breached')}" "$STATUS" 2>/dev/null)
+        RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        MSG="⚠️ **AGG Freshness SLA breached**\n${REASON}\n• Run: ${RUN_URL}\n• Time: ${TS}"
+        PAYLOAD=$(printf '{"content":"%s"}' "$MSG")
+        curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
+          -H "Authorization: Bot ${DISCORD_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "$PAYLOAD" || echo "Freshness Discord alert failed (non-blocking)"
+
     - name: Notify on failure
       if: failure()
       env:

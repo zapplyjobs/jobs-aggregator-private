@@ -1545,7 +1545,17 @@ async function main() {
                                   .filter(a => a != null && !isNaN(a)).sort((a, b) => a - b);
       if (_agesH.length > 0) {
         const _pct = p => _agesH[Math.min(_agesH.length - 1, Math.floor(p * _agesH.length))];
-        console.log(`📊 FRESHNESS SLA: ${_staleResidue.length} stale-candidate in pool | age(h) p50=${_pct(0.5).toFixed(1)} p90=${_pct(0.9).toFixed(1)} max=${_agesH[_agesH.length - 1].toFixed(1)} — investigate if p50/max climb (rotate-coverage-gap signal)`);
+        const _p50 = _pct(0.5), _p90 = _pct(0.9), _max = _agesH[_agesH.length - 1];
+        console.log(`📊 FRESHNESS SLA: ${_staleResidue.length} stale-candidate in pool | age(h) p50=${_p50.toFixed(1)} p90=${_p90.toFixed(1)} max=${_max.toFixed(1)} — investigate if p50/max climb (rotate-coverage-gap signal)`);
+        // AGG-STALEUPSTREAM-1: breach check -> write freshness-status.json for the workflow alert step.
+        // Thresholds dry-run-validated (recent runs: normal p50=1.2-1.9h, max=13.7d). Alert at p50>12h
+        // (bulk staleness = rotate/cleanup degradation) OR max>15d/360h (orphan/carry-forward past the bound).
+        const _ALERT_P50_H = 12, _ALERT_MAX_H = 360;
+        let _breached = false, _reason = '';
+        if (_p50 > _ALERT_P50_H) { _breached = true; _reason = `p50 ${_p50.toFixed(1)}h > ${_ALERT_P50_H}h (bulk staleness — rotate/cleanup degradation?)`; }
+        else if (_max > _ALERT_MAX_H) { _breached = true; _reason = `max ${_max.toFixed(1)}h > ${_ALERT_MAX_H}h/15d (orphan/carry-forward past the bound — cleanup broken?)`; }
+        try { fs.writeFileSync(path.join(DATA_DIR, 'freshness-status.json'), JSON.stringify({ breached: _breached, reason: _reason, p50: +_p50.toFixed(1), p90: +_p90.toFixed(1), max: +_max.toFixed(1), staleCount: _staleResidue.length, checkedAt: new Date().toISOString() }, null, 2)); } catch (e) { console.log(`   (freshness-status.json write skipped: ${e.message})`); }
+        if (_breached) console.log(`⚠️  FRESHNESS ALERT (AGG-STALEUPSTREAM-1): ${_reason} — staleness bound breached; investigate rotate coverage + orphan cleanup.`);
       }
     }
 
