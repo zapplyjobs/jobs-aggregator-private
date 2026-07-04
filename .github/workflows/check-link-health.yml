@@ -66,6 +66,7 @@ jobs:
           NODE
 
       - name: Run AGG link health sample
+        id: link-health
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -77,7 +78,7 @@ jobs:
           # the common case. Decouple that exit from the derived-artifact builders below so tombstone /
           # verification / confidence artifacts still refresh on dead-detecting runs, then re-emit the
           # original exit code to preserve the dead-alert (red workflow) signal. The primary dead list
-          # (stale-job-candidates.json) is written before the exit and uploaded via if:always regardless.
+          # (stale-job-candidates.json) is written before the exit; uploaded via the validated flag below (AGG-LINT-FIX: upload-on-validation-passed) so dead-detect evidence still publishes but invalid/failed-build artifacts do NOT reach R2.
           set +e
           node .github/scripts/check-link-health.js --per-group 8 --write-dead stale-job-candidates.json --history-in stale-job-history.prev.json --write-history stale-job-history.json > agg-link-health.json
           CHECK_EXIT=$?
@@ -86,10 +87,11 @@ jobs:
           node .github/scripts/build-link-verification-sample.js --input agg-link-health.json --output link-verification-sample.json
           node .github/scripts/build-source-confidence-sample.js --link-health agg-link-health.json --verification link-verification-sample.json --tombstones stale-job-tombstones.json --metadata jobs-metadata.json --output source-confidence-sample.json
           node .github/scripts/validate-link-health-artifacts.js --print-summary
+          echo "validated=true" >> "$GITHUB_OUTPUT"
           exit $CHECK_EXIT
 
       - name: Upload stale candidate outputs to R2
-        if: always()
+        if: steps.link-health.outputs.validated == 'true'
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
