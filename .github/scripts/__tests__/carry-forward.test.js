@@ -77,6 +77,30 @@ assert.ok(RETIRED_CARRY_FORWARD_SOURCES.has('jsearch'), 'jsearch must be retired
   assert.strictEqual(publicJobs.length, 0, 'closed/ghost (dead) job DROPPED upstream (not in pool)');
 }
 
+// Case 7: STALE + DEAD job (old posted_at, source fetched OK but absent) is DROPPED upstream.
+// OPERATOR-2026-07-04: dead takes precedence over age. Previously this leaked as stale-candidate
+// (kept) because the age check fired before the dead check. Regression guard for the precedence fix.
+{
+  const publicJobs = [];
+  const staleDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(); // 30d old -> stale-candidate (>14d regular TTL)
+  mergeCarryForward(
+    publicJobs,
+    [line({
+      id: 'greenhouse-stale-dead',
+      source: 'greenhouse',
+      title: 'Backend Engineer',
+      company_name: 'Closed Co',
+      posted_at: staleDate,
+      tags: { employment: 'entry_level', domains: ['software'], locations: ['us'] },
+    })],
+    new Set(),
+    new Set(),
+    [],
+    new Set(['greenhouse'])  // greenhouse fetched OK this run -> job absent = dead
+  );
+  assert.strictEqual(publicJobs.length, 0, 'stale-candidate + dead (source absent) job DROPPED upstream (dead takes precedence over age)');
+}
+
 
 // Case 4: carry-forward Canada row, tagged 'carry-forward'; location tags recomputed.
 {

@@ -67,13 +67,15 @@ assert.strictEqual(isLifecycleHardRetired({ posted_at: null, tags: REG }), false
     new Set(), new Set(), [], new Set(['greenhouse']));
   assert.strictEqual(publicJobs.length, 0, 'closed (dead) job DROPPED upstream — not in pool');
 }
-// A TTL-expired job from a successful source is 'stale-candidate' (age precedence preserved).
+// A TTL-expired job from a successful source is DROPPED as dead (OPERATOR-2026-07-04: dead wins over age).
+// Previously kept as stale-candidate; the 2026-07-04 precedence fix drops it — a confirmed-dead job
+// (source fetched OK, absent) drops regardless of posted_at age. Age must not rescue a dead job.
 {
   const publicJobs = [];
   mergeCarryForward(publicJobs,
     [line({ id: 'stale-closed', source: 'greenhouse', posted_at: daysAgo(30), tags: { ...REG } })],
     new Set(), new Set(), [], new Set(['greenhouse']));
-  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'stale-candidate', 'TTL-expired wins over closed (original precedence)');
+  assert.strictEqual(publicJobs.length, 0, 'TTL-expired + dead (source absent) job DROPPED upstream (dead wins over age, 2026-07-04)');
 }
 // An evergreen-band job from a non-fetched source is 'evergreen'.
 {

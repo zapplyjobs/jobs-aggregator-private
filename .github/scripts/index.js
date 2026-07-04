@@ -804,21 +804,25 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
       }
       if (!strippedJob.tags) strippedJob.tags = {};
 
-      // Classify lifecycle_state, preserving the original drop precedence:
-      //   TTL-expired / null-date (stale-candidate) → retired / closed (dead) → age band.
+      // Classify lifecycle_state. OPERATOR-2026-07-04: DEAD takes precedence over age.
+      // A confirmed-dead prior-run job (retired source / source fetched OK but absent / company-scoped
+      // closed) is DROPPED upstream regardless of posted_at age — age must not "rescue" a dead job.
+      // Previously the stale-candidate age check fired first, so old dead jobs leaked into the pool
+      // tagged stale-candidate. This extends the 2026-07-03 dead-drop to stale-candidate-age jobs
+      // using the SAME source-absence signal (high-precision; non-dead stale-candidate still tag-and-keep).
       // Consumers replicate the pre-LIFECYCLE "dropped" set by excluding {dead, stale-candidate}.
       let state;
       const ageState = classifyAgeLifecycle(strippedJob);
-      if (ageState === 'stale-candidate') {
-        if (isLifecycleHardRetired(strippedJob)) { hardRetired++; continue; }      // anti-flood: truly drop
-        state = 'stale-candidate';
-        staleKept++;
-      } else if (RETIRED_CARRY_FORWARD_SOURCES.has((strippedJob.source || '').toLowerCase())) {
-        deadDropped++; continue;  // OPERATOR 2026-07-03: DROP dead upstream (reverse AGG-LIFECYCLE-1 tag-and-keep). Retired source.
+      if (RETIRED_CARRY_FORWARD_SOURCES.has((strippedJob.source || '').toLowerCase())) {
+        deadDropped++; continue;  // DROP dead upstream. Retired source.
       } else if (successfulSources.has(strippedJob.source) && !PIPE4_EXCLUDED_SOURCES.has(strippedJob.source)) {
         deadDropped++; continue;  // DROP dead upstream. Source fetched OK this run but job absent -> gone from its own career site.
       } else if (shouldTreatCompanyScopedSourceJobClosed(strippedJob, companyFetchHealth)) {
         deadDropped++; continue;  // DROP dead upstream. Company-scoped source confirmed closed.
+      } else if (ageState === 'stale-candidate') {
+        if (isLifecycleHardRetired(strippedJob)) { hardRetired++; continue; }      // anti-flood: truly drop (non-dead, extremely old)
+        state = 'stale-candidate';
+        staleKept++;
       } else if (ageState === 'evergreen') {
         state = 'evergreen'; evergreenTagged++;
       } else {
@@ -835,7 +839,7 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
     console.log(`🏷️  AGG-LIFECYCLE-1: kept+tagged ${staleKept} stale-candidate prior-run jobs (TTL-expired/null-date; previously dropped)`);
   }
   if (deadDropped > 0) {
-    console.log(`🧹 OPERATOR-2026-07-03 (reverse AGG-LIFECYCLE-1): dropped ${deadDropped} dead prior-run jobs UPSTREAM (closed/ghost/retired) — they no longer reach all_jobs/R2/consumers. [stale-candidate still tag-and-keep until posted_at re-stamping fix lands]`);
+    console.log(`🧹 OPERATOR 2026-07-03+07-04: dropped ${deadDropped} dead prior-run jobs UPSTREAM (closed/ghost/retired; dead takes precedence over posted_at age since 2026-07-04) — they no longer reach all_jobs/R2/consumers. [non-dead stale-candidate still tag-and-keep until a first_seen-based TTL]`);
   }
   if (hardRetired > 0) {
     console.log(`🧹 AGG-LIFECYCLE-1: hard-retired ${hardRetired} prior-run jobs beyond TTL+${LIFECYCLE_VISIBILITY_DAYS}d visibility window (anti-flood)`);
