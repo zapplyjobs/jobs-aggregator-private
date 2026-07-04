@@ -1506,6 +1506,19 @@ async function main() {
       delete job.source_updated_at;
     }
 
+    // AGG-STALEUPSTREAM-1 (2026-07-04): Freshness SLA metric — make the stale-candidate residue's age
+    // VISIBLE every run. The 4.6-day silent rot recurred because nothing measured this; if p50/max climb,
+    // the rotate sweep is losing coverage and closed jobs are lingering again — investigate.
+    const _staleResidue = publicJobs.filter(j => j?.tags?.lifecycle_state === 'stale-candidate');
+    if (_staleResidue.length > 0) {
+      const _agesH = _staleResidue.map(j => j.fetched_at ? (Date.now() - new Date(j.fetched_at).getTime()) / 3600000 : null)
+                                  .filter(a => a != null && !isNaN(a)).sort((a, b) => a - b);
+      if (_agesH.length > 0) {
+        const _pct = p => _agesH[Math.min(_agesH.length - 1, Math.floor(p * _agesH.length))];
+        console.log(`📊 FRESHNESS SLA: ${_staleResidue.length} stale-candidate in pool | age(h) p50=${_pct(0.5).toFixed(1)} p90=${_pct(0.9).toFixed(1)} max=${_agesH[_agesH.length - 1].toFixed(1)} — investigate if p50/max climb (rotate-coverage-gap signal)`);
+      }
+    }
+
     // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
     tagStats = computeFullPoolTagStats(publicJobs);
 
