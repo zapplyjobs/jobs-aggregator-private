@@ -767,6 +767,25 @@ function shouldTreatCompanyScopedSourceJobClosed(job, fetcherHealth) {
   return health?.source === source && health?.status === 'alive';
 }
 
+// AGG-STALEUPSTREAM-1 (2026-07-04): drop orphan jobs — carry-forward jobs whose company is no longer
+// in the active multi-tenant config (workday/smartrecruiters) AND not fetched in >14d. These are
+// defunct-tenant leftovers (e.g. Sanofi, Veolia) that never get re-fetched -> never dead-checked ->
+// linger indefinitely. High precision: company-list name match is exact (0 near-misses measured), and
+// the >14d fetched_at floor avoids dropping jobs from very-recently-removed companies. Exported for testing.
+function dropOrphanJobs(publicJobs, activeWdNames, activeSRNames, graceMs = 14 * 86400000, now = Date.now()) {
+  let dropped = 0;
+  for (let i = publicJobs.length - 1; i >= 0; i--) {
+    const j = publicJobs[i];
+    const src = (j.source || '').toLowerCase();
+    const set = src === 'workday' ? activeWdNames : src === 'smartrecruiters' ? activeSRNames : null;
+    if (set && set.size > 0 && !set.has(j.company_name) && j.fetched_at && (now - new Date(j.fetched_at).getTime()) > graceMs) {
+      publicJobs.splice(i, 1);
+      dropped++;
+    }
+  }
+  return dropped;
+}
+
 function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, stripFields, successfulSources, companyFetchHealth) {
 
   let mergedCount = 0;
@@ -1504,6 +1523,17 @@ async function main() {
 
     for (const job of publicJobs) {
       delete job.source_updated_at;
+    }
+
+    // AGG-STALEUPSTREAM-1 (2026-07-04): orphan cleanup pass — drop defunct-tenant jobs (company no longer
+    // in active workday/smartrecruiters config + not fetched >14d). Runs BEFORE the freshness metric so
+    // the metric reflects post-cleanup state.
+    {
+      const _cl = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));
+      const _activeWd = new Set((_cl.workday || []).map(e => e.name));
+      const _activeSR = new Set((_cl.smartrecruiters || []).map(e => e.name));
+      const _orphanDropped = dropOrphanJobs(publicJobs, _activeWd, _activeSR);
+      if (_orphanDropped > 0) console.log(`🧹 AGG-STALEUPSTREAM-1: dropped ${_orphanDropped} ORPHAN jobs upstream (company no longer in active workday/smartrecruiters config + not fetched >14d) — no longer reach all_jobs/R2/consumers.`);
     }
 
     // AGG-STALEUPSTREAM-1 (2026-07-04): Freshness SLA metric — make the stale-candidate residue's age
@@ -2491,4 +2521,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, resolvePostedAt, mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, buildMidLevelTechFeed, buildMidLevelTechSummary, buildSeniorTechFeed, buildSeniorTechSummary, buildCanadaTechFeed, buildCanadaInternshipsFeed, buildCanadaSentinelChecks, buildCanadaAllFeed, activePublicWindowTs, applicableTtlMs, classifyAgeLifecycle, isLifecycleHardRetired, LIFECYCLE_VERSION, LIFECYCLE_EVERGREEN_THRESHOLD_DAYS, injectDescriptions };
+module.exports = { main, resolvePostedAt, mergeCarryForward, dropOrphanJobs, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, buildMidLevelTechFeed, buildMidLevelTechSummary, buildSeniorTechFeed, buildSeniorTechSummary, buildCanadaTechFeed, buildCanadaInternshipsFeed, buildCanadaSentinelChecks, buildCanadaAllFeed, activePublicWindowTs, applicableTtlMs, classifyAgeLifecycle, isLifecycleHardRetired, LIFECYCLE_VERSION, LIFECYCLE_EVERGREEN_THRESHOLD_DAYS, injectDescriptions };
