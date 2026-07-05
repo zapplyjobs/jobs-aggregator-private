@@ -36,6 +36,7 @@ const { fetchAllTiktokJobs } = require(`${SHARED}/fetchers/tiktok`);
 const { fetchAllDeshawJobs } = require(`${SHARED}/fetchers/deshaw`);
 const { applyFamilyCache, buildFamilyCache } = require(`${SHARED}/fetchers/workday`);
 const { fetchSRDescriptions } = require(`${SHARED}/fetchers/smartrecruiters-descriptions`);
+const { fetchWorkdayDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
 
 
 // Import processors
@@ -1216,12 +1217,17 @@ async function main() {
 
     console.log('');
 
-    // AGG-HOTPATH-1: Workday description fetch is removed from the hot publish path.
-    // Enrichment/sidecar lanes own this slower detail work; the fast publish path must
-    // preserve Tier A freshness under the 15-minute hard cap.
+    // AGG-DESCCOVERAGE-1 (2026-07-05): Workday description fetch RE-ENABLED in the main run.
+    // It was removed (AGG-HOTPATH-1) under runtime pressure, but runtime has since recovered
+    // (~5-6 min wall, under the 8-min alert), and ~1,227 in-scope workday jobs were being dropped
+    // by the bridge for lack of a description (the workday shard sat near-empty at 25 entries).
+    // The fetcher self-caps at MAX_PER_RUN=200 (~80s), prioritizes US jobs, and caches via
+    // descriptions-workday.jsonl (seeded from R2 + uploaded each run) -> backfills over ~2 days.
+    // GUARD: monitor first runs' wall-time; revert to skipping if it breaches 8 min.
     const wdJobs = allJobs.filter(j => j.source === 'workday');
     if (wdJobs.length > 0) {
-      console.log(`📄 Step 1b: Skipping WD descriptions in hot path (${wdJobs.length} WD jobs)`);
+      const wdDescriptions = await fetchWorkdayDescriptions(wdJobs, DATA_DIR);
+      injectDescriptions(wdJobs, wdDescriptions, 'WD');
     } else {
       console.log('📄 Step 1b: No WD jobs this run — skipping description fetch');
     }
