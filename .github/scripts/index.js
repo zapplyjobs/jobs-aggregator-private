@@ -29,6 +29,7 @@ const { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);
 const { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);
 const { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);
 const { fetchAllSimplifyJobs } = require(`${SHARED}/fetchers/simplify`);
+const { fetchSimplifyDescriptions } = require(`${SHARED}/fetchers/simplify-descriptions`);
 const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
 const { fetchAllOracleJobs } = require(`${SHARED}/fetchers/oracle`);
 const { fetchAllAmdJobs } = require(`${SHARED}/fetchers/amd`);
@@ -1166,6 +1167,18 @@ async function main() {
       fetcherResults[name] = Array.isArray(jobs) ? jobs : [];
       appendAll(allJobs, fetcherResults[name]);
     });
+
+    // AGG-SIMPLIFY-EXIT-1 (2026-07-05): Fetch descriptions for simplify jobs from their own career pages.
+    // Simplify provides title+URL only (T0). This visits each job's actual career page + extracts the
+    // description text. Caps at 150/run, caches via descriptions-simplify.jsonl (like workday-descriptions).
+    // Bounded: ~45s for 150 fetches (300ms delay each). Cached misses skip re-fetching.
+    {
+      const simpJobs = fetcherResults['SimplifyJobs'] || [];
+      if (simpJobs.length > 0) {
+        const simpDescriptions = await fetchSimplifyDescriptions(simpJobs, DATA_DIR);
+        injectDescriptions(simpJobs, simpDescriptions, 'Simplify');
+      }
+    }
 
     const supplementalInputs = loadSupplementalInputs();
     if (supplementalInputs.jobs.length > 0) {
