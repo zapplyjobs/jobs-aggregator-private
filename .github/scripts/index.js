@@ -520,17 +520,27 @@ function isLifecycleHardRetired(job, now = Date.now()) {
  * AGG-6 date overwrite disabled A86 — jobs keep their source-reported posted_at.
  */
 function resolvePostedAt(publicJobs, prevLines) {
-  // AGG-LIFECYCLE-1: single pass — tag instead of drop. Current-run jobs are re-fetched each run,
-  // so they cannot accumulate unboundedly across runs; the anti-flood hard-retire belongs only in
-  // the carry-forward merge (mergeCarryForward), where prior-run jobs would otherwise pile up.
+  // AGG-LIFECYCLE-1: single pass — tag instead of drop.
   // SUP-TTL-1: Internships get wider TTL window (120d vs 14d).
+  // AGG-STALE-FIX-1 (2026-07-06): hard-retire now also applies to current-run jobs.
+  // Previously only carry-forward (mergeCarryForward) had the check. But ATS sources
+  // (oracle, greenhouse) keep returning ancient ghost postings indefinitely — 155 jobs
+  // >59d accumulated because resolvePostedAt blindly trusted "source returns it = active."
+  // Same isLifecycleHardRetired function, applied uniformly.
   let staleTagged = 0;
   let evergreenTagged = 0;
   let freshTagged = 0;
-  for (const job of publicJobs) {
+  let hardRetired = 0;
+  for (let i = publicJobs.length - 1; i >= 0; i--) {
+    const job = publicJobs[i];
     if (!job.tags) job.tags = {};
     const ageState = classifyAgeLifecycle(job);
     if (ageState === 'stale-candidate') {
+      if (isLifecycleHardRetired(job)) {
+        publicJobs.splice(i, 1);
+        hardRetired++;
+        continue;
+      }
       job.tags.lifecycle_state = 'stale-candidate';
       staleTagged++;
     } else if (ageState === 'evergreen') {
@@ -543,8 +553,11 @@ function resolvePostedAt(publicJobs, prevLines) {
     job.tags.lifecycle_version = LIFECYCLE_VERSION;
   }
 
+  if (hardRetired > 0) {
+    console.log(`🧹 AGG-STALE-FIX-1: hard-retired ${hardRetired} current-run jobs beyond TTL+${LIFECYCLE_VISIBILITY_DAYS}d (ATS ghost postings — source still returns them but posted_at expired)`);
+  }
   if (staleTagged > 0 || evergreenTagged > 0) {
-    console.log(`🏷️  AGG-LIFECYCLE-1: kept+tagged ${staleTagged} stale-candidate + ${evergreenTagged} evergreen current-run jobs (previously dropped; >${DEDUPE_TTL_DAYS}d regular / 120d internship)`);
+    console.log(`🏷️  AGG-LIFECYCLE-1: kept+tagged ${staleTagged} stale-candidate + ${evergreenTagged} evergreen current-run jobs (>${DEDUPE_TTL_DAYS}d regular / 120d internship)`);
   }
 }
 
