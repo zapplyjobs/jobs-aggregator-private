@@ -30,6 +30,7 @@ const { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);
 const { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);
 const { fetchAllSimplifyJobs } = require(`${SHARED}/fetchers/simplify`);
 const { fetchSimplifyDescriptions } = require(`${SHARED}/fetchers/simplify-descriptions`);
+const { fetchAllIcimsJobs } = require(`${SHARED}/fetchers/icims`);
 const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
 const { fetchAllOracleJobs } = require(`${SHARED}/fetchers/oracle`);
 const { fetchAllAmdJobs } = require(`${SHARED}/fetchers/amd`);
@@ -1141,6 +1142,12 @@ async function main() {
         ? Promise.resolve([])
         : withTimeout(fetchAllTiktokJobs(), 120_000, 'TikTok'),
       withTimeout(fetchAllDeshawJobs(), 30_000, 'D.E. Shaw'),
+      // AGG-SIMPLIFY-EXIT-1 (2026-07-06): Wire iCIMS fetcher (Peraton, GDMS, Cotiviti)
+      withTimeout(fetchAllIcimsJobs([
+        { host: 'careers-peraton.icims.com', companyName: 'Peraton', companySlug: 'peraton' },
+        { host: 'careers-gdms.icims.com', companyName: 'General Dynamics Mission Systems', companySlug: 'gdms' },
+        { host: 'careers-cotiviti.icims.com', companyName: 'Cotiviti', companySlug: 'cotiviti' },
+      ], { maxPages: 5, maxRowsPerTenant: 100 }), 120_000, 'iCIMS'),
     ]);
 
     if (HOTPATH_DEMOTED_FETCHERS.size > 0) {
@@ -1159,7 +1166,7 @@ async function main() {
     }
 
     // Collect custom fetcher results
-    const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Microsoft', 'Oracle', 'AMD', 'TikTok', 'D.E. Shaw'];
+    const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Microsoft', 'Oracle', 'AMD', 'TikTok', 'D.E. Shaw', 'iCIMS'];
     const fetcherResults = {};
     phaseBSettled.forEach((result, i) => {
       const name = fetcherNames[i];
