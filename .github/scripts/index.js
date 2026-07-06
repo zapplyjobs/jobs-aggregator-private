@@ -1824,6 +1824,11 @@ async function main() {
       let filesPruned = 0;
       for (const fname of fs.readdirSync(DATA_DIR)) {
         if (!/^descriptions-.+\.jsonl$/.test(fname)) continue;
+        // AGG-DESC-SPEED-1: descriptions-workday.jsonl has its own pruneDescriptions() in
+        // the workday description fetcher (uses fetcher-output pool, not filtered pool).
+        // Step 9d uses the filtered final pool — would prune valid descriptions for
+        // fetched-but-filtered workday jobs, causing a wasteful re-fetch cycle.
+        if (fname === 'descriptions-workday.jsonl') continue;
         const fp = path.join(DATA_DIR, fname);
         try {
           const lines = fs.readFileSync(fp, 'utf8').trim().split('\n').filter(Boolean);
