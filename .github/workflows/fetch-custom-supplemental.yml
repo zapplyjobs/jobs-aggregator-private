@@ -2,6 +2,8 @@ name: Fetch Custom Supplemental
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 */2 * * *'  # AGG-SLOW-LANE-1: every 2 hours (off-cycle for slow fetchers)
 
 concurrency:
   group: fetch-custom-supplemental
@@ -74,6 +76,20 @@ jobs:
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      - name: Seed descriptions-apple.jsonl from R2
+        run: |
+          node -e "
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          async function main() {
+            const r2 = createR2Client({ prefix: 'data/' });
+            const result = await r2.downloadToFile('descriptions-apple.jsonl', '.github/data/descriptions-apple.jsonl');
+            if (result) { console.log('R2_OK'); } else { process.exit(1); }
+          }
+          main().catch(() => process.exit(1));
+          " && echo "✅ Seeded Apple cache" || echo "⚠️ No Apple cache yet"
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
@@ -102,12 +118,11 @@ jobs:
           assert contract.get('included_in_main_all_jobs') is False
           assert contract.get('merge_mode') == 'separate_artifact'
           assert contract.get('visibility') == 'snapshot_only'
-          assert set(meta.get('sources', {}).keys()) == {'google','microsoft','tiktok','bytedance','icims'}
-          assert meta['sources']['bytedance'] > 0
-          assert meta['sources']['icims'] > 0
+          # AGG-SLOW-LANE-1: source set is google, microsoft, apple, bytedance
+          declared = set(meta.get('sources', {}).keys())
+          assert declared == {'google','microsoft','apple','bytedance'}, f"unexpected sources: {declared}"
           print('jobs', len(jobs))
           print('sources', meta['sources'])
-          print('icims_probe', meta.get('probe_stats', {}).get('icims'))
           PY
 
       - name: Display custom supplemental summary

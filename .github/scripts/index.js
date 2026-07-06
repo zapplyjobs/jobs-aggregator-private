@@ -675,19 +675,17 @@ function summarizeSupplementalLaneForMerge(laneName, laneJobs, laneMeta, nowMs =
   }
 
   if (laneName === 'custom') {
-    const declaredSources = laneMeta.sources && typeof laneMeta.sources === 'object'
-      ? Object.keys(laneMeta.sources).sort()
-      : [];
-    const actualSources = Object.keys(info.by_source).sort();
-    if (!declaredSources.length || declaredSources.join(',') !== actualSources.join(',')) {
-      info.status = 'skipped_invalid';
-      info.skip_reason = 'source_set_mismatch';
-      return { info, jobs: [], sourcesUsed: new Set() };
-    }
-    for (const source of declaredSources) {
-      if (laneMeta.sources[source] !== info.by_source[source]) {
+    // AGG-SLOW-LANE-1: validate that actual sources are a SUBSET of declared sources.
+    // A fetcher legitimately returning 0 (e.g. API down) shouldn't invalidate the entire lane.
+    // We still reject UNDECLARED sources (corruption/tampering detection).
+    const declaredSet = laneMeta.sources && typeof laneMeta.sources === 'object'
+      ? new Set(Object.keys(laneMeta.sources))
+      : new Set();
+    const actualSources = Object.keys(info.by_source);
+    for (const src of actualSources) {
+      if (!declaredSet.has(src)) {
         info.status = 'skipped_invalid';
-        info.skip_reason = 'source_count_mismatch';
+        info.skip_reason = `undeclared_source:${src}`;
         return { info, jobs: [], sourcesUsed: new Set() };
       }
     }

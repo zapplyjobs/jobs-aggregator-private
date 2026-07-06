@@ -4,42 +4,22 @@ const fs = require('fs');
 const path = require('path');
 let SHARED = path.join(__dirname, 'aggregator', 'lib');
 if (!fs.existsSync(SHARED)) {
-  const siblingFallback = path.join(path.dirname(process.cwd()), 'job-board-aggregator', 'lib');
-  if (fs.existsSync(siblingFallback)) SHARED = siblingFallback;
+  // Try submodule path
+  SHARED = path.join(__dirname, '..', 'aggregator', 'lib');
 }
 
 const { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);
 const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
-const { fetchAllTiktokJobs } = require(`${SHARED}/fetchers/tiktok`);
+const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
 const { fetchAllByteDanceJobs } = require(`${SHARED}/fetchers/bytedance`);
-const { fetchAllIcimsJobs } = require(`${SHARED}/fetchers/icims`);
 
 const DATA_DIR = path.join(process.cwd(), '.github', 'data');
 const JOBS_FILE = path.join(DATA_DIR, 'supplemental-custom-jobs.json');
 const META_FILE = path.join(DATA_DIR, 'supplemental-custom-metadata.json');
 
-const ICIMS_TENANTS = [
-  { host: 'careers-sig.icims.com', companyName: 'Susquehanna International Group, LLP', companySlug: 'sig' },
-  { host: 'careers-axway.icims.com', companyName: 'Axway', companySlug: 'axway' },
-  { host: 'jobs-cesi.icims.com', companyName: 'Cole Engineering Services', companySlug: 'cesi' },
-];
-
-const ICIMS_OPTIONS = {
-  maxPages: 15,
-  maxRowsPerTenant: 300,
-  staleDetails: [
-    { url: 'https://americas-cookmedical.icims.com/jobs/17536/intern%2c-artificial-intelligence-%26-innovation/job' },
-  ],
-};
-
 function countJsonlLines(file) {
-  try {
-    const raw = fs.readFileSync(file, 'utf8').trim();
-    if (!raw) return 0;
-    return raw.split('\n').filter(Boolean).length;
-  } catch {
-    return 0;
-  }
+  try { return fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).length; }
+  catch { return 0; }
 }
 
 function hasR2Env() {
@@ -51,58 +31,62 @@ function isGitHubActions() {
 }
 
 async function uploadRequired(r2, name, file, contentType) {
-  const uploaded = await r2.uploadRaw(name, fs.readFileSync(file, 'utf8'), contentType);
-  if (!uploaded) {
-    throw new Error(`R2 upload failed for ${name}`);
-  }
+  const ok = await r2.uploadRaw(name, fs.readFileSync(file, 'utf8'), contentType);
+  if (!ok) throw new Error(`R2 upload failed: ${name}`);
+  console.log(`  ☁️ ${name} → R2 OK`);
 }
 
 async function loadIds(prefix) {
+  const file = path.join(DATA_DIR, `${prefix}.jsonl`);
   const ids = new Set();
-  try {
-    const files = fs.readdirSync(DATA_DIR).filter(f => f.startsWith(prefix) && f.endsWith('.jsonl'));
-    for (const fname of files) {
-      const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
-      for (const line of lines) {
-        try { const { id } = JSON.parse(line); if (id) ids.add(id); } catch {}
-      }
-    }
-  } catch {}
+  if (!fs.existsSync(file)) return ids;
+  for (const line of fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean)) {
+    try { const { id } = JSON.parse(line); if (id) ids.add(id); } catch {}
+  }
   return ids;
 }
 
 function writeSidecar(filePath, jobs) {
-  const rows = jobs
-    .filter(job => job.id && job.description && String(job.description).trim().length > 0)
-    .map(job => JSON.stringify({ id: job.id, description_text: job.description }));
-  if (rows.length === 0) return 0;
-  fs.writeFileSync(filePath, rows.join('\n') + '\n', 'utf8');
-  return rows.length;
+  if (!jobs || jobs.length === 0) return 0;
+  const lines = jobs.filter(j => j.description).map(j =>
+    JSON.stringify({ id: j.id, description_text: j.description })
+  ).join('\n') + '\n';
+  fs.writeFileSync(filePath, lines, 'utf8');
+  return countJsonlLines(filePath);
 }
 
+/**
+ * AGG-SLOW-LANE-1: Off-cycle supplemental lane for slow fetchers (Apple, Google, Microsoft).
+ * These fetchers have 600-1200s timeouts — too slow for the 15-min main pipeline.
+ * This script runs independently (every 2h), writes to R2, main pipeline consumes via
+ * loadSupplementalInputs(). ByteDance included (not in main pipeline Phase B batch).
+ * TikTok removed (re-enabled in main pipeline — 120s timeout is hot-path safe).
+ * iCIMS removed (returns 0 from CI — PoC needs debugging).
+ */
 async function main() {
   const start = Date.now();
   fs.mkdirSync(DATA_DIR, { recursive: true });
 
   const googleSidecarPath = path.join(DATA_DIR, 'descriptions-google.jsonl');
   const microsoftSidecarPath = path.join(DATA_DIR, 'descriptions-microsoft.jsonl');
-  const icimsSidecarPath = path.join(DATA_DIR, 'descriptions-icims.jsonl');
+  const appleSidecarPath = path.join(DATA_DIR, 'descriptions-apple.jsonl');
   const bytedanceSidecarPath = path.join(DATA_DIR, 'descriptions-bytedance.jsonl');
   const googleCachedIds = await loadIds('descriptions-google');
   const microsoftCachedIds = await loadIds('descriptions-microsoft');
+  const appleCachedIds = await loadIds('descriptions-apple');
   const googleCacheBefore = countJsonlLines(googleSidecarPath);
   const microsoftCacheBefore = countJsonlLines(microsoftSidecarPath);
+  const appleCacheBefore = countJsonlLines(appleSidecarPath);
 
-  const [google, microsoft, tiktok, bytedance, icimsResult] = await Promise.all([
+  console.log('Fetching slow lane: Google, Microsoft, Apple, ByteDance...');
+  const [google, microsoft, apple, bytedance] = await Promise.all([
     fetchAllGoogleJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }),
     fetchAllMicrosoftJobs({ cachedDescriptionIds: microsoftCachedIds, fetchDetailsOnInitial: true }),
-    fetchAllTiktokJobs(),
+    fetchAllAppleJobs({ previousJobCount: 0, previousJobIds: new Set(), cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }),
     fetchAllByteDanceJobs(),
-    fetchAllIcimsJobs(ICIMS_TENANTS, ICIMS_OPTIONS),
   ]);
 
-  const icims = icimsResult.jobs;
-  const groups = { google, microsoft, tiktok, bytedance, icims };
+  const groups = { google, microsoft, apple, bytedance };
   const payload = Object.entries(groups).flatMap(([source, jobs]) =>
     jobs.map(job => ({
       id: job.id,
@@ -118,7 +102,7 @@ async function main() {
 
   const googleCacheAfter = countJsonlLines(googleSidecarPath);
   const microsoftCacheAfter = countJsonlLines(microsoftSidecarPath);
-  const icimsSidecarRows = writeSidecar(icimsSidecarPath, icims);
+  const appleCacheAfter = countJsonlLines(appleSidecarPath);
   const bytedanceSidecarRows = writeSidecar(bytedanceSidecarPath, bytedance);
 
   const durationMs = Date.now() - start;
@@ -131,16 +115,15 @@ async function main() {
       included_in_main_all_jobs: false,
       merge_mode: 'separate_artifact',
       visibility: 'snapshot_only',
-      expected_cadence_minutes: 15,
-      max_staleness_minutes: 90,
+      expected_cadence_minutes: 120,
+      max_staleness_minutes: 180,
     },
     source: 'custom',
     sources: {
       google: google.length,
       microsoft: microsoft.length,
-      tiktok: tiktok.length,
+      apple: apple.length,
       bytedance: bytedance.length,
-      icims: icims.length,
     },
     jobs_fetched: payload.length,
     duration_ms: durationMs,
@@ -151,18 +134,17 @@ async function main() {
       microsoft_ids_before: microsoftCachedIds.size,
       microsoft_lines_before: microsoftCacheBefore,
       microsoft_lines_after: microsoftCacheAfter,
-      icims_lines_after: icimsSidecarRows,
+      apple_ids_before: appleCachedIds.size,
+      apple_lines_before: appleCacheBefore,
+      apple_lines_after: appleCacheAfter,
       bytedance_lines_after: bytedanceSidecarRows,
-    },
-
-    probe_stats: {
-      icims: icimsResult.stats,
     },
   };
 
   fs.writeFileSync(JOBS_FILE, JSON.stringify(payload, null, 2), 'utf8');
   fs.writeFileSync(META_FILE, JSON.stringify(metadata, null, 2), 'utf8');
   console.log(`✅ Custom supplemental lane wrote ${payload.length} jobs in ${Math.round(durationMs/1000)}s`);
+  console.log(`  Sources: google=${google.length}, microsoft=${microsoft.length}, apple=${apple.length}, bytedance=${bytedance.length}`);
 
   if (hasR2Env()) {
     try {
@@ -173,8 +155,14 @@ async function main() {
       if (fs.existsSync(googleSidecarPath)) {
         await uploadRequired(r2, 'descriptions-google.jsonl', googleSidecarPath, 'application/x-jsonlines');
       }
-      if (fs.existsSync(icimsSidecarPath)) {
-        await uploadRequired(r2, 'descriptions-icims.jsonl', icimsSidecarPath, 'application/x-jsonlines');
+      if (fs.existsSync(appleSidecarPath)) {
+        await uploadRequired(r2, 'descriptions-apple.jsonl', appleSidecarPath, 'application/x-jsonlines');
+      }
+      if (fs.existsSync(microsoftSidecarPath)) {
+        await uploadRequired(r2, 'descriptions-microsoft.jsonl', microsoftSidecarPath, 'application/x-jsonlines');
+      }
+      if (fs.existsSync(bytedanceSidecarPath)) {
+        await uploadRequired(r2, 'descriptions-bytedance.jsonl', bytedanceSidecarPath, 'application/x-jsonlines');
       }
       console.log('☁️ Uploaded custom supplemental artifacts to R2');
     } catch (err) {
