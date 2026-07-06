@@ -1148,12 +1148,9 @@ async function main() {
         ? Promise.resolve([])
         : withTimeout(fetchAllTiktokJobs(), 120_000, 'TikTok'),
       withTimeout(fetchAllDeshawJobs(), 30_000, 'D.E. Shaw'),
-      // AGG-SIMPLIFY-EXIT-1 (2026-07-06): Wire iCIMS fetcher (Peraton, GDMS, Cotiviti)
-      withTimeout(fetchAllIcimsJobs([
-        { host: 'careers-peraton.icims.com', companyName: 'Peraton', companySlug: 'peraton' },
-        { host: 'careers-gdms.icims.com', companyName: 'General Dynamics Mission Systems', companySlug: 'gdms' },
-        { host: 'careers-cotiviti.icims.com', companyName: 'Cotiviti', companySlug: 'cotiviti' },
-      ], { maxPages: 5, maxRowsPerTenant: 100 }), 120_000, 'iCIMS'),
+      // AGG-SIMPLIFY-EXIT-1: iCIMS fetcher DISABLED (returns 0 jobs from CI — HTML parsing
+      // fails in GitHub Actions environment). PoC needs debugging before re-enabling.
+      // withTimeout(fetchAllIcimsJobs([...tenants...]), 120_000, 'iCIMS'),
     ]);
 
     if (HOTPATH_DEMOTED_FETCHERS.size > 0) {
@@ -1172,7 +1169,7 @@ async function main() {
     }
 
     // Collect custom fetcher results
-    const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Microsoft', 'Oracle', 'AMD', 'TikTok', 'D.E. Shaw', 'iCIMS'];
+    const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Microsoft', 'Oracle', 'AMD', 'TikTok', 'D.E. Shaw'];
     const fetcherResults = {};
     phaseBSettled.forEach((result, i) => {
       const name = fetcherNames[i];
@@ -1824,21 +1821,10 @@ async function main() {
     // Step 11: Print tag distribution
     printTagDistribution(sortedJobs);
 
-    // Step 12: Git commit (unless dry run)
-    _stepStart = Date.now();
-    if (!isDryRun) {
-      console.log('📝 Step 12: Committing to git...');
-      console.log('━'.repeat(60));
-
-      await gitCommit(sortedJobs.length);
-
-      console.log('');
-      console.log(`✅ Step 12 complete: Changes committed`);
-      stageTimings.step12_commit_ms = Date.now() - _stepStart;
-    } else {
-      console.log('⏭️  Step 12: Skipping git commit (dry run)');
-      stageTimings.step12_commit_ms = 0;
-    }
+    // Step 12 REMOVED (AGG-R2-CANONICAL-1, 2026-07-06): git commit was dead code —
+    // committed locally to the Actions runner but was NEVER pushed (no git push step
+    // for the main repo in the workflow). R2 upload (Step 10) is the sole persistence.
+    // Removed per operator directive: "no git fallback — crutch that does more harm than good."
 
     console.log('');
     console.log('═'.repeat(60));
@@ -1976,7 +1962,7 @@ function buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimest
       step8_sort_ms: stageTimings.step8_sort_ms || 0,
       step8b_sidecars_ms: stageTimings.step8b_sidecars_ms || 0,
       step9_write_ms: stageTimings.step9_write_ms || 0,
-      step12_commit_ms: stageTimings.step12_commit_ms || 0,
+      // step12_commit_ms removed (AGG-R2-CANONICAL-1): git commit step deleted
     },
   };
 }
@@ -2502,61 +2488,6 @@ function printSummary(jobs, uniqueCount, duplicateCount, duration) {
   console.log(`Duration: ${(duration / 1000).toFixed(1)}s`);
 }
 
-/**
- * Commit changes to git
- * @param {number} jobCount - Number of jobs for commit message
- */
-async function gitCommit(jobCount) {
-  const { execSync } = require('child_process');
-
-  try {
-    // Configure git
-    execSync('git config user.email "bot@zapplyjobs.com"');
-    execSync('git config user.name "Data Bot"');
-
-    // Add output files
-    execSync('git add .github/data/all_jobs.json');
-    execSync('git add .github/data/us_jobs.json');
-    execSync('git add .github/data/jobs-metadata.json');
-    execSync('git add .github/data/dedupe-store.json');
-    execSync('git add .github/data/wd-totals-cache.json 2>/dev/null || true'); // AGG-SPEED-2: WD incremental fetch cache
-    execSync('git add .github/data/canada-tech-jobs.jsonl 2>/dev/null || true'); // CANADA-LANE: additive shadow feed (R2-required)
-    execSync('git add .github/data/canada-tech-internships.jsonl 2>/dev/null || true'); // CANADA-LANE: additive shadow feed (R2-required)
-    execSync('git add .github/data/canada-tech-summary.json 2>/dev/null || true'); // CANADA-LANE: additive shadow feed (R2-required)
-    execSync('git add .github/data/canada-jobs.jsonl 2>/dev/null || true'); // CANADA-LANE (all): additive shadow feed (AGG-CANADAFEED-1)
-    execSync('git add .github/data/canada-all-summary.json 2>/dev/null || true'); // CANADA-LANE (all): additive shadow feed (AGG-CANADAFEED-1)
-    execSync('git add .github/data/filtered_jobs.json 2>/dev/null || true'); // senior-filter summary for analytics (PIPELINE-1)
-    execSync('git add .github/data/filtered-samples.jsonl 2>/dev/null || true'); // AGG-DATA-8: sampled filtered jobs for FP spot-check
-    // archive/ is NOT staged here — pushed separately to jobs-archive-private repo via workflow
-    execSync('git add .github/data/descriptions-*.jsonl 2>/dev/null || true'); // per-source description sidecars (published)
-    execSync('git add .github/data/tag-history.jsonl 2>/dev/null || true'); // TAG-SELF-2: tag drift/precision trend data
-    // descriptions.jsonl is Workday fetch cache — NOT staged (local state only, managed by Step 1b)
-
-    // Check if there are changes
-    const status = execSync('git status --porcelain', { encoding: 'utf8' });
-
-    if (!status.trim()) {
-      console.log('ℹ️ No changes to commit');
-      return;
-    }
-
-    // Create commit message
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-    const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
-
-    const commitMessage = `Update jobs - ${dateStr} ${timeStr}\n\n${jobCount} jobs in shared database`;
-
-    // Commit
-    execSync(`git commit -m "${commitMessage}"`);
-
-    console.log(`✅ Committed: ${jobCount} jobs`);
-
-  } catch (error) {
-    console.error('⚠️ Git commit failed:', error.message);
-    throw error;
-  }
-}
 
 // Run main function
 if (require.main === module) {
