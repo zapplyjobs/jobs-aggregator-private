@@ -85,7 +85,7 @@ async function main() {
   const [googleR, microsoftR, appleR, bytedanceR] = await Promise.allSettled([
     withTimeout(fetchAllGoogleJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
     withTimeout(fetchAllMicrosoftJobs({ cachedDescriptionIds: microsoftCachedIds, fetchDetailsOnInitial: true }), 300_000, 'Microsoft'),
-    withTimeout(fetchAllAppleJobs({ previousJobCount: 0, previousJobIds: new Set(), cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 300_000, 'Apple'),
+    withTimeout(fetchAllAppleJobs({ previousJobCount: 1, previousJobIds: new Set(['_placeholder']), cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 180_000, 'Apple'),
     withTimeout(fetchAllByteDanceJobs(), 120_000, 'ByteDance'),
   ]);
 
