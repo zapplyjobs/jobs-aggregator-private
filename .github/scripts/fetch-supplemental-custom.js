@@ -75,11 +75,18 @@ async function main() {
   const appleCachedIds = await loadIds('descriptions-apple');
 
   // allSettled + per-fetcher timeouts for fault + timeout isolation.
-  const withTimeout = (promise, ms, name) =>
-    Promise.race([
+  // CRITICAL: clearTimeout after race settles — otherwise the pending timer keeps
+  // the Node.js process alive long after the fetch completes (script hangs until
+  // the longest timer fires). This was the root cause of all slow-lane timeouts.
+  const withTimeout = (promise, ms, name) => {
+    let timer;
+    return Promise.race([
       promise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} timed out after ${ms/1000}s`)), ms)),
-    ]);
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${name} timed out after ${ms/1000}s`)), ms);
+      }),
+    ]).finally(() => clearTimeout(timer));
+  };
 
   console.log('Fetching supplemental lane: Google, Microsoft, Apple, ByteDance...');
   const [googleR, microsoftR, appleR, bytedanceR] = await Promise.allSettled([
