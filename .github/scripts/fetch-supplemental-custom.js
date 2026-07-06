@@ -169,7 +169,11 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch(err => {
+  // AGG-SLOW-LANE-1: process.exit(0) is REQUIRED — HTTP keep-alive connections
+  // and pending setTimeout timers from the fetchers keep the Node.js event loop
+  // alive long after the work is done. Without this, the script hangs until the
+  // longest timer fires (10+ min), causing every slow-lane workflow timeout.
+  main().then(() => process.exit(0)).catch(err => {
     console.error('Supplemental custom lane failed:', err.message);
     process.exit(1);
   });
