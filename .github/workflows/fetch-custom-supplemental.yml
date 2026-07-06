@@ -12,7 +12,7 @@ concurrency:
 jobs:
   fetch-custom-supplemental:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30  # AGG-SLOW-LANE-1: 30 min for initial cache build. Subsequent runs <10 min (incremental).
     permissions:
       contents: read
 
