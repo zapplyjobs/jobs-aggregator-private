@@ -28,8 +28,8 @@ const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
 const { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);
 const { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);
 const { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);
-const { fetchAllSimplifyJobs } = require(`${SHARED}/fetchers/simplify`);
-const { fetchSimplifyDescriptions } = require(`${SHARED}/fetchers/simplify-descriptions`);
+// AGG-SIMPLIFY-EXIT-1 (2026-07-06): simplify fetcher REMOVED. Source retired.
+// Fetcher files kept in submodule for reference but no longer called.
 const { fetchAllIcimsJobs } = require(`${SHARED}/fetchers/icims`);
 const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
 const { fetchAllOracleJobs } = require(`${SHARED}/fetchers/oracle`);
@@ -570,7 +570,7 @@ const PIPE4_EXCLUDED_SOURCES = new Set(['workday', 'smartrecruiters']);
 // Sources that are no longer fetched by any active lane must not survive through
 // the internship 120-day rolling window. If a retired source is absent from the
 // current run, carry-forward would otherwise preserve stale skeleton listings.
-const RETIRED_CARRY_FORWARD_SOURCES = new Set(['jsearch']);
+const RETIRED_CARRY_FORWARD_SOURCES = new Set(['jsearch', 'simplify']);
 
 // AGG-PIPE-4: Map Phase B fetcher display names to job source field values.
 const FETCHER_NAME_TO_SOURCE = {
@@ -1147,7 +1147,7 @@ async function main() {
       HOTPATH_DEMOTED_FETCHERS.has('Google')
         ? Promise.resolve([])
         : withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount, cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
-      withTimeout(fetchAllSimplifyJobs(), 30_000, 'SimplifyJobs'),
+      // AGG-SIMPLIFY-EXIT-1: simplify fetcher REMOVED (source retired).
       HOTPATH_DEMOTED_FETCHERS.has('Microsoft')
         ? Promise.resolve([])
         : withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount, cachedDescriptionIds: microsoftCachedIds }), 600_000, 'Microsoft'),
@@ -1180,7 +1180,7 @@ async function main() {
     }
 
     // Collect custom fetcher results
-    const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'SimplifyJobs', 'Microsoft', 'Oracle', 'AMD', 'TikTok', 'D.E. Shaw'];
+    const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'Microsoft', 'Oracle', 'AMD', 'TikTok', 'D.E. Shaw'];
     const fetcherResults = {};
     phaseBSettled.forEach((result, i) => {
       const name = fetcherNames[i];
@@ -1189,17 +1189,6 @@ async function main() {
       appendAll(allJobs, fetcherResults[name]);
     });
 
-    // AGG-SIMPLIFY-EXIT-1 (2026-07-05): Fetch descriptions for simplify jobs from their own career pages.
-    // Simplify provides title+URL only (T0). This visits each job's actual career page + extracts the
-    // description text. Caps at 150/run, caches via descriptions-simplify.jsonl (like workday-descriptions).
-    // Bounded: ~45s for 150 fetches (300ms delay each). Cached misses skip re-fetching.
-    {
-      const simpJobs = fetcherResults['SimplifyJobs'] || [];
-      if (simpJobs.length > 0) {
-        const simpDescriptions = await fetchSimplifyDescriptions(simpJobs, DATA_DIR);
-        injectDescriptions(simpJobs, simpDescriptions, 'Simplify');
-      }
-    }
 
     const supplementalInputs = loadSupplementalInputs();
     if (supplementalInputs.jobs.length > 0) {
