@@ -570,7 +570,7 @@ const PIPE4_EXCLUDED_SOURCES = new Set(['workday', 'smartrecruiters']);
 // Sources that are no longer fetched by any active lane must not survive through
 // the internship 120-day rolling window. If a retired source is absent from the
 // current run, carry-forward would otherwise preserve stale skeleton listings.
-const RETIRED_CARRY_FORWARD_SOURCES = new Set(['jsearch', 'simplify']);
+const RETIRED_CARRY_FORWARD_SOURCES = new Set(['jsearch', 'simplify', 'icims']);
 
 // AGG-PIPE-4: Map Phase B fetcher display names to job source field values.
 const FETCHER_NAME_TO_SOURCE = {
