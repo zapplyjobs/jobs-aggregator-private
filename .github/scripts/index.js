@@ -777,10 +777,16 @@ function shouldTreatCompanyScopedSourceJobClosed(job, fetcherHealth) {
 // the >14d fetched_at floor avoids dropping jobs from very-recently-removed companies. Exported for testing.
 function dropOrphanJobs(publicJobs, activeWdNames, activeSRNames, graceMs = 14 * 86400000, now = Date.now()) {
   let dropped = 0;
+  // AGG-SIMPLIFY-EXIT-1 (2026-07-06): extended to cover ALL multi-tenant sources (workday, SR, icims)
+  // + the hardcoded iCIMS tenant list (orphan check was workday/SR-only — zombie iCIMS jobs survived).
+  const ACTIVE_ICIMS_COMPANIES = new Set(['Peraton', 'General Dynamics Mission Systems', 'Cotiviti']);
   for (let i = publicJobs.length - 1; i >= 0; i--) {
     const j = publicJobs[i];
     const src = (j.source || '').toLowerCase();
-    const set = src === 'workday' ? activeWdNames : src === 'smartrecruiters' ? activeSRNames : null;
+    let set = null;
+    if (src === 'workday') set = activeWdNames;
+    else if (src === 'smartrecruiters') set = activeSRNames;
+    else if (src === 'icims') set = ACTIVE_ICIMS_COMPANIES;
     if (set && set.size > 0 && !set.has(j.company_name) && j.fetched_at && (now - new Date(j.fetched_at).getTime()) > graceMs) {
       publicJobs.splice(i, 1);
       dropped++;
