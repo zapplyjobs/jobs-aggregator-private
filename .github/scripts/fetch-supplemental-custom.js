@@ -78,13 +78,24 @@ async function main() {
   const microsoftCacheBefore = countJsonlLines(microsoftSidecarPath);
   const appleCacheBefore = countJsonlLines(appleSidecarPath);
 
+  // AGG-SLOW-LANE-1: Use allSettled (not Promise.all) so one slow/failed fetcher
+  // doesn't block the others. Each source writes independently — if Apple times out,
+  // Google/Microsoft/ByteDance still complete and upload.
   console.log('Fetching slow lane: Google, Microsoft, Apple, ByteDance...');
-  const [google, microsoft, apple, bytedance] = await Promise.all([
+  const [googleR, microsoftR, appleR, bytedanceR] = await Promise.allSettled([
     fetchAllGoogleJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }),
     fetchAllMicrosoftJobs({ cachedDescriptionIds: microsoftCachedIds, fetchDetailsOnInitial: true }),
     fetchAllAppleJobs({ previousJobCount: 0, previousJobIds: new Set(), cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }),
     fetchAllByteDanceJobs(),
   ]);
+  const google = googleR.status === 'fulfilled' ? googleR.value : [];
+  const microsoft = microsoftR.status === 'fulfilled' ? microsoftR.value : [];
+  const apple = appleR.status === 'fulfilled' ? appleR.value : [];
+  const bytedance = bytedanceR.status === 'fulfilled' ? bytedanceR.value : [];
+  if (googleR.status === 'rejected') console.log(`  ⚠️ Google failed: ${googleR.reason?.message || googleR.reason}`);
+  if (microsoftR.status === 'rejected') console.log(`  ⚠️ Microsoft failed: ${microsoftR.reason?.message || microsoftR.reason}`);
+  if (appleR.status === 'rejected') console.log(`  ⚠️ Apple failed: ${appleR.reason?.message || appleR.reason}`);
+  if (bytedanceR.status === 'rejected') console.log(`  ⚠️ ByteDance failed: ${bytedanceR.reason?.message || bytedanceR.reason}`);
 
   const groups = { google, microsoft, apple, bytedance };
   const payload = Object.entries(groups).flatMap(([source, jobs]) =>
@@ -119,12 +130,10 @@ async function main() {
       max_staleness_minutes: 180,
     },
     source: 'custom',
-    sources: {
-      google: google.length,
-      microsoft: microsoft.length,
-      apple: apple.length,
-      bytedance: bytedance.length,
-    },
+    sources: Object.fromEntries(
+      Object.entries({ google: google.length, microsoft: microsoft.length, apple: apple.length, bytedance: bytedance.length })
+        .filter(([, count]) => count > 0)
+    ),
     jobs_fetched: payload.length,
     duration_ms: durationMs,
     cache_state: {
