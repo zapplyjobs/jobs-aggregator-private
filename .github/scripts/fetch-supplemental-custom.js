@@ -78,24 +78,28 @@ async function main() {
   const microsoftCacheBefore = countJsonlLines(microsoftSidecarPath);
   const appleCacheBefore = countJsonlLines(appleSidecarPath);
 
-  // AGG-SLOW-LANE-1: Use allSettled (not Promise.all) so one slow/failed fetcher
-  // doesn't block the others. Each source writes independently — if Apple times out,
-  // Google/Microsoft/ByteDance still complete and upload.
-  console.log('Fetching slow lane: Google, Microsoft, Apple, ByteDance...');
+  // AGG-SLOW-LANE-1: allSettled + per-fetcher timeouts for fault + timeout isolation.
+  // If Apple is slow, it times out at 15min → rejected → others still complete.
+  const withTimeout = (promise, ms, name) =>
+    Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} timed out after ${ms/1000}s`)), ms)),
+    ]);
+  console.log('Fetching slow lane: Google, Microsoft, Apple, ByteDance (per-fetcher timeout)...');
   const [googleR, microsoftR, appleR, bytedanceR] = await Promise.allSettled([
-    fetchAllGoogleJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }),
-    fetchAllMicrosoftJobs({ cachedDescriptionIds: microsoftCachedIds, fetchDetailsOnInitial: true }),
-    fetchAllAppleJobs({ previousJobCount: 0, previousJobIds: new Set(), cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }),
-    fetchAllByteDanceJobs(),
+    withTimeout(fetchAllGoogleJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 900_000, 'Google'),
+    withTimeout(fetchAllMicrosoftJobs({ cachedDescriptionIds: microsoftCachedIds, fetchDetailsOnInitial: true }), 900_000, 'Microsoft'),
+    withTimeout(fetchAllAppleJobs({ previousJobCount: 0, previousJobIds: new Set(), cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 900_000, 'Apple'),
+    withTimeout(fetchAllByteDanceJobs(), 300_000, 'ByteDance'),
   ]);
   const google = googleR.status === 'fulfilled' ? googleR.value : [];
   const microsoft = microsoftR.status === 'fulfilled' ? microsoftR.value : [];
   const apple = appleR.status === 'fulfilled' ? appleR.value : [];
   const bytedance = bytedanceR.status === 'fulfilled' ? bytedanceR.value : [];
-  if (googleR.status === 'rejected') console.log(`  ⚠️ Google failed: ${googleR.reason?.message || googleR.reason}`);
-  if (microsoftR.status === 'rejected') console.log(`  ⚠️ Microsoft failed: ${microsoftR.reason?.message || microsoftR.reason}`);
-  if (appleR.status === 'rejected') console.log(`  ⚠️ Apple failed: ${appleR.reason?.message || appleR.reason}`);
-  if (bytedanceR.status === 'rejected') console.log(`  ⚠️ ByteDance failed: ${bytedanceR.reason?.message || bytedanceR.reason}`);
+  if (googleR.status === 'rejected') console.log(`  ⚠️ Google: ${googleR.reason?.message || googleR.reason}`);
+  if (microsoftR.status === 'rejected') console.log(`  ⚠️ Microsoft: ${microsoftR.reason?.message || microsoftR.reason}`);
+  if (appleR.status === 'rejected') console.log(`  ⚠️ Apple: ${appleR.reason?.message || appleR.reason}`);
+  if (bytedanceR.status === 'rejected') console.log(`  ⚠️ ByteDance: ${bytedanceR.reason?.message || bytedanceR.reason}`);
 
   const groups = { google, microsoft, apple, bytedance };
   const payload = Object.entries(groups).flatMap(([source, jobs]) =>
