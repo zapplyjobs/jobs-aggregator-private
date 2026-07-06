@@ -7,11 +7,19 @@ if (!fs.existsSync(SHARED)) {
   SHARED = path.join(__dirname, '..', 'aggregator', 'lib');
 }
 
+const { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);
+const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
+const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
 const { fetchAllByteDanceJobs } = require(`${SHARED}/fetchers/bytedance`);
 
 const DATA_DIR = path.join(process.cwd(), '.github', 'data');
 const JOBS_FILE = path.join(DATA_DIR, 'supplemental-custom-jobs.json');
 const META_FILE = path.join(DATA_DIR, 'supplemental-custom-metadata.json');
+
+function countJsonlLines(file) {
+  try { return fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).length; }
+  catch { return 0; }
+}
 
 function hasR2Env() {
   return Boolean(process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_ENDPOINT && process.env.R2_BUCKET_NAME);
@@ -27,41 +35,82 @@ async function uploadRequired(r2, name, file, contentType) {
   console.log(`  R2 OK: ${name}`);
 }
 
+async function loadIds(prefix) {
+  const file = path.join(DATA_DIR, `${prefix}.jsonl`);
+  const ids = new Set();
+  if (!fs.existsSync(file)) return ids;
+  for (const line of fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean)) {
+    try { const { id } = JSON.parse(line); if (id) ids.add(id); } catch {}
+  }
+  return ids;
+}
+
 function writeSidecar(filePath, jobs) {
   if (!jobs || jobs.length === 0) return 0;
   const lines = jobs.filter(j => j.description).map(j =>
     JSON.stringify({ id: j.id, description_text: j.description })
   ).join('\n') + '\n';
   fs.writeFileSync(filePath, lines, 'utf8');
-  return lines.trim().split('\n').filter(Boolean).length;
+  return countJsonlLines(filePath);
 }
 
 /**
- * AGG-SLOW-LANE-1: Supplemental lane for off-cycle fetchers.
- * Currently ByteDance only (fast, ~2 min). Google/Microsoft/Apple removed —
- * their fetchers take 10-20 min each and block the lane. Will be re-added
- * when their enrichment is made concurrent or a separate enrichment workflow exists.
+ * AGG-SLOW-LANE-1: Off-cycle supplemental lane for slow fetchers.
+ * Google/Microsoft/Apple have 600-1200s timeouts — too slow for the 15-min main pipeline.
+ * Runs independently every 2h, writes to R2, main pipeline consumes via loadSupplementalInputs().
+ *
+ * Fault isolation: allSettled + per-fetcher timeouts. If one fetcher is slow/fails,
+ * others still complete and upload independently.
  */
 async function main() {
   const start = Date.now();
   fs.mkdirSync(DATA_DIR, { recursive: true });
 
+  const googleSidecarPath = path.join(DATA_DIR, 'descriptions-google.jsonl');
+  const microsoftSidecarPath = path.join(DATA_DIR, 'descriptions-microsoft.jsonl');
+  const appleSidecarPath = path.join(DATA_DIR, 'descriptions-apple.jsonl');
   const bytedanceSidecarPath = path.join(DATA_DIR, 'descriptions-bytedance.jsonl');
+  const googleCachedIds = await loadIds('descriptions-google');
+  const microsoftCachedIds = await loadIds('descriptions-microsoft');
+  const appleCachedIds = await loadIds('descriptions-apple');
 
-  console.log('Fetching supplemental lane: ByteDance...');
-  const bytedance = await fetchAllByteDanceJobs();
-  console.log(`  ByteDance: ${bytedance.length} jobs`);
+  // allSettled + per-fetcher timeouts for fault + timeout isolation.
+  const withTimeout = (promise, ms, name) =>
+    Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} timed out after ${ms/1000}s`)), ms)),
+    ]);
 
-  const payload = bytedance.map(job => ({
-    id: job.id,
-    title: job.title,
-    company_name: job.company_name,
-    source: 'bytedance',
-    location: job.location,
-    url: job.url,
-    posted_at: job.posted_at,
-    description: job.description || null,
-  }));
+  console.log('Fetching supplemental lane: Google, Microsoft, Apple, ByteDance...');
+  const [googleR, microsoftR, appleR, bytedanceR] = await Promise.allSettled([
+    withTimeout(fetchAllGoogleJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
+    withTimeout(fetchAllMicrosoftJobs({ cachedDescriptionIds: microsoftCachedIds, fetchDetailsOnInitial: true }), 300_000, 'Microsoft'),
+    withTimeout(fetchAllAppleJobs({ previousJobCount: 0, previousJobIds: new Set(), cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 300_000, 'Apple'),
+    withTimeout(fetchAllByteDanceJobs(), 120_000, 'ByteDance'),
+  ]);
+
+  const google = googleR.status === 'fulfilled' ? googleR.value : [];
+  const microsoft = microsoftR.status === 'fulfilled' ? microsoftR.value : [];
+  const apple = appleR.status === 'fulfilled' ? appleR.value : [];
+  const bytedance = bytedanceR.status === 'fulfilled' ? bytedanceR.value : [];
+  if (googleR.status === 'rejected') console.log(`  ⚠️ Google: ${googleR.reason?.message || googleR.reason}`);
+  if (microsoftR.status === 'rejected') console.log(`  ⚠️ Microsoft: ${microsoftR.reason?.message || microsoftR.reason}`);
+  if (appleR.status === 'rejected') console.log(`  ⚠️ Apple: ${appleR.reason?.message || appleR.reason}`);
+  if (bytedanceR.status === 'rejected') console.log(`  ⚠️ ByteDance: ${bytedanceR.reason?.message || bytedanceR.reason}`);
+
+  const groups = { google, microsoft, apple, bytedance };
+  const payload = Object.entries(groups).flatMap(([source, jobs]) =>
+    jobs.map(job => ({
+      id: job.id,
+      title: job.title,
+      company_name: job.company_name,
+      source,
+      location: job.location,
+      url: job.url,
+      posted_at: job.posted_at,
+      description: job.description || null,
+    }))
+  );
 
   const bytedanceSidecarRows = writeSidecar(bytedanceSidecarPath, bytedance);
 
@@ -79,15 +128,18 @@ async function main() {
       max_staleness_minutes: 180,
     },
     source: 'custom',
-    sources: { bytedance: bytedance.length },
+    sources: Object.fromEntries(
+      Object.entries({ google: google.length, microsoft: microsoft.length, apple: apple.length, bytedance: bytedance.length })
+        .filter(([, count]) => count > 0)
+    ),
     jobs_fetched: payload.length,
     duration_ms: durationMs,
-    cache_state: { bytedance_lines_after: bytedanceSidecarRows },
   };
 
   fs.writeFileSync(JOBS_FILE, JSON.stringify(payload, null, 2), 'utf8');
   fs.writeFileSync(META_FILE, JSON.stringify(metadata, null, 2), 'utf8');
   console.log(`Custom supplemental lane wrote ${payload.length} jobs in ${Math.round(durationMs/1000)}s`);
+  console.log(`  Sources: google=${google.length}, microsoft=${microsoft.length}, apple=${apple.length}, bytedance=${bytedance.length}`);
 
   if (hasR2Env()) {
     try {
@@ -95,9 +147,10 @@ async function main() {
       const r2 = createR2Client({ prefix: 'data/' });
       await uploadRequired(r2, 'supplemental-custom-jobs.json', JOBS_FILE, 'application/json');
       await uploadRequired(r2, 'supplemental-custom-metadata.json', META_FILE, 'application/json');
-      if (fs.existsSync(bytedanceSidecarPath)) {
-        await uploadRequired(r2, 'descriptions-bytedance.jsonl', bytedanceSidecarPath, 'application/x-jsonlines');
-      }
+      if (fs.existsSync(googleSidecarPath)) await uploadRequired(r2, 'descriptions-google.jsonl', googleSidecarPath, 'application/x-jsonlines');
+      if (fs.existsSync(appleSidecarPath)) await uploadRequired(r2, 'descriptions-apple.jsonl', appleSidecarPath, 'application/x-jsonlines');
+      if (fs.existsSync(microsoftSidecarPath)) await uploadRequired(r2, 'descriptions-microsoft.jsonl', microsoftSidecarPath, 'application/x-jsonlines');
+      if (fs.existsSync(bytedanceSidecarPath)) await uploadRequired(r2, 'descriptions-bytedance.jsonl', bytedanceSidecarPath, 'application/x-jsonlines');
       console.log('Uploaded custom supplemental artifacts to R2');
     } catch (err) {
       if (isGitHubActions()) throw new Error(`R2 publish failed: ${err.message}`);

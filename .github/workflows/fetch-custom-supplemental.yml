@@ -12,7 +12,7 @@ concurrency:
 jobs:
   fetch-custom-supplemental:
     runs-on: ubuntu-latest
-    timeout-minutes: 10  # ByteDance only — fast (~2 min). Will increase when Google/Microsoft/Apple re-added.
+    timeout-minutes: 15  # Google concurrency=3 (~3min) + Microsoft (~2min) + Apple (~30s) + ByteDance (~2s)
     permissions:
       contents: read
 
@@ -45,6 +45,25 @@ jobs:
       - name: Create data directory
         run: mkdir -p .github/data
 
+      - name: Seed description sidecars from R2
+        run: |
+          for sidecar in google microsoft apple; do
+            node -e "
+            const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+            async function main() {
+              const r2 = createR2Client({ prefix: 'data/' });
+              const result = await r2.downloadToFile('descriptions-${sidecar}.jsonl', '.github/data/descriptions-${sidecar}.jsonl');
+              if (result) { console.log('R2_OK'); } else { process.exit(1); }
+            }
+            main().catch(() => process.exit(1));
+            " && echo "Seeded ${sidecar}" || echo "No ${sidecar} cache yet"
+          done
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
       - name: Fetch custom supplemental lane
         run: node .github/scripts/fetch-supplemental-custom.js
         env:
@@ -71,7 +90,7 @@ jobs:
           assert contract.get('merge_mode') == 'separate_artifact'
           assert contract.get('visibility') == 'snapshot_only'
           declared = set(meta.get('sources', {}).keys())
-          assert declared == {'bytedance'}, f"unexpected sources: {declared}"
+          assert declared <= {'google','microsoft','apple','bytedance'}, f"unexpected sources: {declared}"
           print('jobs', len(jobs))
           print('sources', meta['sources'])
           PY
