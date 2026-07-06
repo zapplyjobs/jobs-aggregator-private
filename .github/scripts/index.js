@@ -1824,10 +1824,12 @@ async function main() {
       let filesPruned = 0;
       for (const fname of fs.readdirSync(DATA_DIR)) {
         if (!/^descriptions-.+\.jsonl$/.test(fname)) continue;
-        // AGG-DESC-SPEED-1: workday fetcher's own pruning was REMOVED (it used the wrong
-        // pool — current-run only, not full pool — causing oscillation). Step 9d is now the
-        // SOLE pruning mechanism for ALL sidecars. sortedJobs includes carry-forward jobs,
-        // so descriptions for carry-forward workday jobs are preserved correctly.
+        // AGG-DESC-SPEED-1: workday descriptions are NOT pruned by Step 9d. The workday
+        // pool has ~35K jobs; the cache is naturally bounded at that size (~20MB). Both
+        // Step 9d (uses post-filter sortedJobs) and the fetcher's own pruning (uses
+        // current-run-only pool) are too narrow — they prune valid descriptions for
+        // carry-forward and filtered-out jobs, causing oscillation. No pruning = stable growth.
+        if (fname === 'descriptions-workday.jsonl') continue;
         const fp = path.join(DATA_DIR, fname);
         try {
           const lines = fs.readFileSync(fp, 'utf8').trim().split('\n').filter(Boolean);
