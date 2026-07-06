@@ -578,7 +578,7 @@ const FETCHER_NAME_TO_SOURCE = {
 // AGG-HOTPATH-1: fetchers explicitly removed from the fast publish path.
 // They may return via separate workflowing or slower lanes later, but they must not
 // consume Tier A runtime budget inside the main 15-minute-capped workflow.
-const HOTPATH_DEMOTED_FETCHERS = new Set(['Apple', 'Google', 'Microsoft', 'Oracle', 'TikTok']);
+const HOTPATH_DEMOTED_FETCHERS = new Set(['Apple', 'Google', 'Microsoft', 'Oracle']);
 const HOTPATH_DEMOTED_SOURCES = new Set(
   [...HOTPATH_DEMOTED_FETCHERS].map(name => FETCHER_NAME_TO_SOURCE[name] || name.toLowerCase())
 );
@@ -1814,6 +1814,49 @@ async function main() {
     console.log('');
     console.log(`✅ Step 9 complete: Output files written`);
     console.log('');
+    // Step 9d: Unified cache pruning (AGG-CACHE-PRUNE-1).
+    // Bounds ALL description sidecars to the current pool — evicts entries for retired/dropped jobs.
+    // One mechanism covers every descriptions-*.jsonl file, present and future.
+    if (!isDryRun) {
+      _stepStart = Date.now();
+      const validIds = new Set(sortedJobs.map(j => j.id));
+      let totalPruned = 0;
+      let filesPruned = 0;
+      for (const fname of fs.readdirSync(DATA_DIR)) {
+        if (!/^descriptions-.+\.jsonl$/.test(fname)) continue;
+        const fp = path.join(DATA_DIR, fname);
+        try {
+          const lines = fs.readFileSync(fp, 'utf8').trim().split('\n').filter(Boolean);
+          if (lines.length === 0) continue;
+          const kept = [];
+          let pruned = 0;
+          for (const line of lines) {
+            try {
+              const { id } = JSON.parse(line);
+              if (id && validIds.has(id)) kept.push(line);
+              else pruned++;
+            } catch { pruned++; } // malformed line → drop
+          }
+          // Only rewrite if we actually pruned something (avoid unnecessary I/O)
+          if (pruned > 0) {
+            const beforeKB = Math.round(lines.length * 200 / 1024); // rough estimate
+            fs.writeFileSync(fp, kept.join('\n') + '\n', 'utf8');
+            totalPruned += pruned;
+            filesPruned++;
+            console.log(`  🧹 ${fname}: pruned ${pruned} stale entries (${lines.length}→${kept.length})`);
+          }
+        } catch (e) { /* skip unreadable file */ }
+      }
+      if (totalPruned > 0) {
+        console.log(`✅ Step 9d: Cache pruned ${totalPruned} stale entries across ${filesPruned} sidecar file(s)`);
+      } else {
+        console.log(`✅ Step 9d: Cache pruning — all sidecars clean (0 stale entries)`);
+      }
+      stageTimings.step9d_cache_prune_ms = Date.now() - _stepStart;
+    } else {
+      console.log('⏭️  Step 9d: Skipping cache pruning (dry run)');
+    }
+
 
     // Step 10: Print summary
     printSummary(sortedJobs, dedupedJobs.length, duplicates, duration);
