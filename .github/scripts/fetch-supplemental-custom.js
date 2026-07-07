@@ -92,8 +92,7 @@ async function main() {
         const appleJobs = prevJobs.filter(j => j.source === 'apple');
         prevAppleCount = Math.max(appleJobs.length, 201); // Floor at routine threshold — prevents full-fetch mode (300 pages) on cold start
         prevAppleIds = new Set(appleJobs.map(j => j.id));
-        prevGoogleCount = prevJobs.filter(j => j.source === 'google').length;
-        prevMicrosoftCount = prevJobs.filter(j => j.source === 'microsoft').length;
+        prevMicrosoftCount = Math.max(prevJobs.filter(j => j.source === 'microsoft').length, 1); // Floor at 1 — prevents Infinity-pages initial mode
         console.log(`  Incremental state: Apple ${prevAppleCount} (${prevAppleIds.size} IDs), Google ${prevGoogleCount}, Microsoft ${prevMicrosoftCount}`);
       }
     }
