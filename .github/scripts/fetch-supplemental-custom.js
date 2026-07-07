@@ -7,7 +7,7 @@ if (!fs.existsSync(SHARED)) {
   SHARED = path.join(__dirname, '..', 'aggregator', 'lib');
 }
 
-const { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);
+const { fetchAllGoogleJobs, fetchGoogleCanadaJobs } = require(`${SHARED}/fetchers/google`);
 const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
 const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
 const { fetchAllByteDanceJobs } = require(`${SHARED}/fetchers/bytedance`);
@@ -90,8 +90,9 @@ async function main() {
   };
 
   console.log('Fetching supplemental lane: Google, Microsoft, Apple, ByteDance...');
-  const [googleR, microsoftR, appleR, bytedanceR, amazonR] = await Promise.allSettled([
+  const [googleR, googleCaR, microsoftR, appleR, bytedanceR, amazonR] = await Promise.allSettled([
     withTimeout(fetchAllGoogleJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
+    withTimeout(fetchGoogleCanadaJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 300_000, 'Google Canada'),
     withTimeout(fetchAllMicrosoftJobs({ cachedDescriptionIds: microsoftCachedIds, fetchDetailsOnInitial: true }), 300_000, 'Microsoft'),
     withTimeout(fetchAllAppleJobs({ previousJobCount: 1, previousJobIds: new Set(['_placeholder']), cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 180_000, 'Apple'),
     withTimeout(fetchAllByteDanceJobs(), 120_000, 'ByteDance'),
@@ -99,11 +100,14 @@ async function main() {
   ]);
 
   const google = googleR.status === 'fulfilled' ? googleR.value : [];
+  const googleCa = googleCaR.status === 'fulfilled' ? googleCaR.value : [];
+  if (googleCa.length > 0) google.push(...googleCa);
   const microsoft = microsoftR.status === 'fulfilled' ? microsoftR.value : [];
   const apple = appleR.status === 'fulfilled' ? appleR.value : [];
   const bytedance = bytedanceR.status === 'fulfilled' ? bytedanceR.value : [];
   const amazon = amazonR.status === 'fulfilled' ? amazonR.value : [];
   if (googleR.status === 'rejected') console.log(`  ⚠️ Google: ${googleR.reason?.message || googleR.reason}`);
+  if (googleCaR.status === 'rejected') console.log(`  ⚠️ Google Canada: ${googleCaR.reason?.message || googleCaR.reason}`);
   if (microsoftR.status === 'rejected') console.log(`  ⚠️ Microsoft: ${microsoftR.reason?.message || microsoftR.reason}`);
   if (appleR.status === 'rejected') console.log(`  ⚠️ Apple: ${appleR.reason?.message || appleR.reason}`);
   if (bytedanceR.status === 'rejected') console.log(`  ⚠️ ByteDance: ${bytedanceR.reason?.message || bytedanceR.reason}`);
