@@ -75,10 +75,32 @@ async function main() {
   const microsoftCachedIds = await loadIds('descriptions-microsoft');
   const appleCachedIds = await loadIds('descriptions-apple');
 
-  // allSettled + per-fetcher timeouts for fault + timeout isolation.
-  // CRITICAL: clearTimeout after race settles — otherwise the pending timer keeps
-  // the Node.js process alive long after the fetch completes (script hangs until
-  // the longest timer fires). This was the root cause of all slow-lane timeouts.
+  // AGG-SLOWLANE-SPEED-1: Load previous supplemental jobs for incremental state.
+  // The main pipeline does this (index.js lines 1025-1039) — reads previous all_jobs.json,
+  // extracts source-specific counts and IDs, passes them to fetchers. The fetchers use
+  // this to skip pages where all job IDs are already known (incremental skip).
+  // Without this, every run is a FULL crawl (50 pages + all detail pages).
+  // With this, runs are INCREMENTAL (1-2 pages + only new detail pages).
+  let prevAppleCount = 0, prevAppleIds = new Set();
+  let prevGoogleCount = 0;
+  let prevMicrosoftCount = 0;
+  try {
+    const prevJobsPath = path.join(DATA_DIR, 'supplemental-custom-jobs.json');
+    if (fs.existsSync(prevJobsPath)) {
+      const prevJobs = JSON.parse(fs.readFileSync(prevJobsPath, 'utf8'));
+      if (Array.isArray(prevJobs)) {
+        const appleJobs = prevJobs.filter(j => j.source === 'apple');
+        prevAppleCount = appleJobs.length;
+        prevAppleIds = new Set(appleJobs.map(j => j.id));
+        prevGoogleCount = prevJobs.filter(j => j.source === 'google').length;
+        prevMicrosoftCount = prevJobs.filter(j => j.source === 'microsoft').length;
+        console.log(`  Incremental state: Apple ${prevAppleCount} (${prevAppleIds.size} IDs), Google ${prevGoogleCount}, Microsoft ${prevMicrosoftCount}`);
+      }
+    }
+  } catch (e) {
+    console.log(`  Incremental state: not loaded (${e.message}) — full fetch mode`);
+  }
+
   const withTimeout = (promise, ms, name) => {
     let timer;
     return Promise.race([
@@ -91,10 +113,10 @@ async function main() {
 
   console.log('Fetching supplemental lane: Google, Microsoft, Apple, ByteDance...');
   const [googleR, googleCaR, microsoftR, appleR, bytedanceR, amazonR] = await Promise.allSettled([
-    withTimeout(fetchAllGoogleJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
+    withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount, cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
     withTimeout(fetchGoogleCanadaJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 300_000, 'Google Canada'),
-    withTimeout(fetchAllMicrosoftJobs({ cachedDescriptionIds: microsoftCachedIds, fetchDetailsOnInitial: true }), 300_000, 'Microsoft'),
-    withTimeout(fetchAllAppleJobs({ previousJobCount: 201, previousJobIds: new Set(['_placeholder']), cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 300_000, 'Apple'),
+    withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount, cachedDescriptionIds: microsoftCachedIds, fetchDetailsOnInitial: true }), 300_000, 'Microsoft'),
+    withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds, cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 300_000, 'Apple'),
     withTimeout(fetchAllByteDanceJobs(), 120_000, 'ByteDance'),
     withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon'),
   ]);
