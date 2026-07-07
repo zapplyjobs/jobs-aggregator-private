@@ -87,6 +87,7 @@ async function main() {
   try {
     const prevJobsPath = path.join(DATA_DIR, 'supplemental-custom-jobs.json');
     if (fs.existsSync(prevJobsPath)) {
+      const prevJobs = JSON.parse(fs.readFileSync(prevJobsPath, 'utf8'));
       if (Array.isArray(prevJobs)) {
         const appleJobs = prevJobs.filter(j => j.source === 'apple');
         prevAppleCount = Math.max(appleJobs.length, 201); // Floor at routine threshold — prevents full-fetch mode (300 pages) on cold start
