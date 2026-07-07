@@ -11,6 +11,7 @@ const { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);
 const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
 const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
 const { fetchAllByteDanceJobs } = require(`${SHARED}/fetchers/bytedance`);
+const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
 
 const DATA_DIR = path.join(process.cwd(), '.github', 'data');
 const JOBS_FILE = path.join(DATA_DIR, 'supplemental-custom-jobs.json');
@@ -89,23 +90,26 @@ async function main() {
   };
 
   console.log('Fetching supplemental lane: Google, Microsoft, Apple, ByteDance...');
-  const [googleR, microsoftR, appleR, bytedanceR] = await Promise.allSettled([
+  const [googleR, microsoftR, appleR, bytedanceR, amazonR] = await Promise.allSettled([
     withTimeout(fetchAllGoogleJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
     withTimeout(fetchAllMicrosoftJobs({ cachedDescriptionIds: microsoftCachedIds, fetchDetailsOnInitial: true }), 300_000, 'Microsoft'),
     withTimeout(fetchAllAppleJobs({ previousJobCount: 1, previousJobIds: new Set(['_placeholder']), cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 180_000, 'Apple'),
     withTimeout(fetchAllByteDanceJobs(), 120_000, 'ByteDance'),
+    withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon'),
   ]);
 
   const google = googleR.status === 'fulfilled' ? googleR.value : [];
   const microsoft = microsoftR.status === 'fulfilled' ? microsoftR.value : [];
   const apple = appleR.status === 'fulfilled' ? appleR.value : [];
   const bytedance = bytedanceR.status === 'fulfilled' ? bytedanceR.value : [];
+  const amazon = amazonR.status === 'fulfilled' ? amazonR.value : [];
   if (googleR.status === 'rejected') console.log(`  ⚠️ Google: ${googleR.reason?.message || googleR.reason}`);
   if (microsoftR.status === 'rejected') console.log(`  ⚠️ Microsoft: ${microsoftR.reason?.message || microsoftR.reason}`);
   if (appleR.status === 'rejected') console.log(`  ⚠️ Apple: ${appleR.reason?.message || appleR.reason}`);
   if (bytedanceR.status === 'rejected') console.log(`  ⚠️ ByteDance: ${bytedanceR.reason?.message || bytedanceR.reason}`);
+  if (amazonR.status === 'rejected') console.log(`  ⚠️ Amazon: ${amazonR.reason?.message || amazonR.reason}`);
 
-  const groups = { google, microsoft, apple, bytedance };
+  const groups = { google, microsoft, apple, bytedance, amazon };
   const payload = Object.entries(groups).flatMap(([source, jobs]) =>
     jobs.map(job => ({
       id: job.id,
@@ -136,7 +140,7 @@ async function main() {
     },
     source: 'custom',
     sources: Object.fromEntries(
-      Object.entries({ google: google.length, microsoft: microsoft.length, apple: apple.length, bytedance: bytedance.length })
+      Object.entries({ google: google.length, microsoft: microsoft.length, apple: apple.length, bytedance: bytedance.length, amazon: amazon.length })
         .filter(([, count]) => count > 0)
     ),
     jobs_fetched: payload.length,
@@ -146,7 +150,7 @@ async function main() {
   fs.writeFileSync(JOBS_FILE, JSON.stringify(payload, null, 2), 'utf8');
   fs.writeFileSync(META_FILE, JSON.stringify(metadata, null, 2), 'utf8');
   console.log(`Custom supplemental lane wrote ${payload.length} jobs in ${Math.round(durationMs/1000)}s`);
-  console.log(`  Sources: google=${google.length}, microsoft=${microsoft.length}, apple=${apple.length}, bytedance=${bytedance.length}`);
+  console.log(`  Sources: google=${google.length}, microsoft=${microsoft.length}, apple=${apple.length}, bytedance=${bytedance.length}, amazon=${amazon.length}`);
 
   if (hasR2Env()) {
     try {

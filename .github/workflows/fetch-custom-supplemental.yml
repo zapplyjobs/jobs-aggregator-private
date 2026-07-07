@@ -90,7 +90,7 @@ jobs:
           assert contract.get('merge_mode') == 'separate_artifact'
           assert contract.get('visibility') == 'snapshot_only'
           declared = set(meta.get('sources', {}).keys())
-          assert declared <= {'google','microsoft','apple','bytedance'}, f"unexpected sources: {declared}"
+          assert declared <= {'google','microsoft','apple','bytedance','amazon'}, f"unexpected sources: {declared}"
           print('jobs', len(jobs))
           print('sources', meta['sources'])
           PY
