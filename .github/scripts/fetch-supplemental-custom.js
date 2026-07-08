@@ -82,7 +82,7 @@ async function main() {
   // Without this, every run is a FULL crawl (50 pages + all detail pages).
   // With this, runs are INCREMENTAL (1-2 pages + only new detail pages).
   let prevAppleCount = 0, prevAppleIds = new Set();
-  let prevGoogleCount = 0;
+  let prevGoogleCount = 0, prevGoogleIds = new Set();
   let prevMicrosoftCount = 0;
   try {
     const prevJobsPath = path.join(DATA_DIR, 'supplemental-custom-jobs.json');
@@ -90,15 +90,19 @@ async function main() {
       const prevJobs = JSON.parse(fs.readFileSync(prevJobsPath, 'utf8'));
       if (Array.isArray(prevJobs)) {
         const appleJobs = prevJobs.filter(j => j.source === 'apple');
-        prevAppleCount = Math.max(appleJobs.length, 201); // Floor at routine threshold — prevents full-fetch mode (300 pages) on cold start
+        prevAppleCount = Math.max(appleJobs.length, 201);
         prevAppleIds = new Set(appleJobs.map(j => j.id));
-        prevMicrosoftCount = Math.max(prevJobs.filter(j => j.source === 'microsoft').length, 1); // Floor at 1 — prevents Infinity-pages initial mode
-        console.log(`  Incremental state: Apple ${prevAppleCount} (${prevAppleIds.size} IDs), Google ${prevGoogleCount}, Microsoft ${prevMicrosoftCount}`);
+        // AGG-SLOWLANE-FRAGILITY-1: Floor all sources + extract Google IDs for page-1 skip
+        prevGoogleCount = Math.max(prevJobs.filter(j => j.source === 'google').length, 1);
+        prevGoogleIds = new Set(prevJobs.filter(j => j.source === 'google').map(j => j.id));
+        prevMicrosoftCount = Math.max(prevJobs.filter(j => j.source === 'microsoft').length, 1);
+        console.log(`  Incremental state: Apple ${prevAppleCount} (${prevAppleIds.size} IDs), Google ${prevGoogleCount} (${prevGoogleIds.size} IDs), Microsoft ${prevMicrosoftCount}`);
       }
     }
   } catch (e) {
-    console.log(`  Incremental state: not loaded (${e.message}) — full fetch mode`);
+    console.log(`  ⚠️ Incremental state: not loaded (${e.message}) — full fetch mode`);
   }
+  // AGG-SLOWLANE-FRAGILITY-1 Point 2: concurrency group queues runs — no overlap. Point 5: sidecar integrity below.
 
   const withTimeout = (promise, ms, name) => {
     let timer;
@@ -110,9 +114,8 @@ async function main() {
     ]).finally(() => clearTimeout(timer));
   };
 
-  console.log('Fetching supplemental lane: Google, Microsoft, Apple, ByteDance...');
   const [googleR, googleCaR, microsoftR, appleR, bytedanceR, amazonR] = await Promise.allSettled([
-    withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount, cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
+    withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount, previousJobIds: prevGoogleIds, cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
     withTimeout(fetchGoogleCanadaJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 300_000, 'Google Canada'),
     withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount, cachedDescriptionIds: microsoftCachedIds, fetchDetailsOnInitial: true }), 300_000, 'Microsoft'),
     withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds, cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 300_000, 'Apple'),
