@@ -2075,7 +2075,11 @@ function buildSourceVisibilitySummary(jobs) {
 }
 
 function buildDescriptionDeliverySummary(jobs, dataDir) {
-  const excludedSources = new Set(['enriched', 'workday', 'smartrecruiters']);
+  // AGG-DESCCOVERAGE-METRIC-1: removed stale 'workday' + 'smartrecruiters' exclusions.
+  // These were excluded when workday descriptions were not in the hot path (AGG-HOTPATH-1).
+  // Now that the backfill is running (Step 1b) and sidecars are uploaded to R2,
+  // the exclusion hides real coverage data from monitoring.
+  const excludedSources = new Set(['enriched']);
   const sidecarRows = {};
   const sidecarNonempty = {};
   const sidecarIds = new Map();
@@ -2083,9 +2087,7 @@ function buildDescriptionDeliverySummary(jobs, dataDir) {
   try {
     const files = fs.readdirSync(dataDir)
       .filter(f => /^descriptions-.+\.jsonl$/.test(f))
-      .filter(f => !f.startsWith('descriptions-enriched'))
-      .filter(f => !f.startsWith('descriptions-workday'))
-      .filter(f => !f.startsWith('descriptions-smartrecruiters'));
+      .filter(f => !f.startsWith('descriptions-enriched'));
     for (const fname of files) {
       const source = fname.replace(/^descriptions-/, '').replace(/-\d+\.jsonl$/, '').replace(/\.jsonl$/, '').toLowerCase();
       sidecarRows[source] = sidecarRows[source] || 0;
