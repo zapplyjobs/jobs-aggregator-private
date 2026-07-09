@@ -38,7 +38,10 @@ assert.strictEqual(summary.sources.apple.mode, 'none_visible');
 assert.strictEqual(summary.sources.apple.sidecar_rows, 0);
 assert.strictEqual(summary.sources.apple.final_rows, 1);
 
-assert.strictEqual(summary.sources.workday, undefined, 'workday should stay outside AGG sidecar truth because ENR owns its descriptions');
+// AGG-DESCCOVERAGE-METRIC-1: workday is now INCLUDED in the coverage summary (its descriptions
+// are in the hot path via backfill + R2 sidecars). No sidecar provided here → 'none_visible'.
+assert.strictEqual(summary.sources.workday.mode, 'none_visible', 'workday now tracked in coverage summary (AGG-DESCCOVERAGE-METRIC-1)');
+assert.strictEqual(summary.sources.workday.final_rows, 1);
 
 fs.rmSync(dir, { recursive: true, force: true });
 console.log('PASS description delivery summary');

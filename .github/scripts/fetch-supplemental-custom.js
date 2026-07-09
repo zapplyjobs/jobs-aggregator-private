@@ -48,7 +48,7 @@ async function loadIds(prefix) {
 
 function writeSidecar(filePath, jobs) {
   if (!jobs || jobs.length === 0) return 0;
-  const lines = jobs.filter(j => j.description).map(j =>
+  const lines = jobs.filter(j => j.description && j.description.trim()).map(j =>
     JSON.stringify({ id: j.id, description_text: j.description })
   ).join('\n') + '\n';
   fs.writeFileSync(filePath, lines, 'utf8');

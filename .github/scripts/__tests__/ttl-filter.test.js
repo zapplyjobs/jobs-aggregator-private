@@ -19,17 +19,18 @@ const publicJobs = [oldRegular, validInternship, oldInternship, legacyInternship
 resolvePostedAt(publicJobs, []);
 
 // AGG-LIFECYCLE-1: previously these stale jobs were DROPPED; now they are KEPT + tagged.
+// AGG-STALE-FIX-1: ghost postings beyond TTL+45d are hard-retired (legacy-internship is
+// tagged entry_level → 14d TTL → 121d > 59d → hard-retired, not tagged).
 assert.deepStrictEqual(
   publicJobs.map(job => job.id).sort(),
-  ['legacy-internship', 'old-internship', 'old-regular', 'valid-internship'],
-  'all jobs must survive — TAG-AND-KEEP, no drops'
+  ['old-internship', 'old-regular', 'valid-internship'],
+  'stale jobs kept + tagged; ghost postings beyond TTL+45d hard-retired (AGG-STALE-FIX-1)'
 );
 
 const byId = Object.fromEntries(publicJobs.map(j => [j.id, j]));
 assert.strictEqual(byId['valid-internship'].tags.lifecycle_state, 'evergreen', 'within-window but >10d internship is evergreen');
 assert.strictEqual(byId['old-regular'].tags.lifecycle_state, 'stale-candidate', 'beyond-TTL regular is stale-candidate');
 assert.strictEqual(byId['old-internship'].tags.lifecycle_state, 'stale-candidate', 'beyond-TTL internship is stale-candidate');
-assert.strictEqual(byId['legacy-internship'].tags.lifecycle_state, 'stale-candidate', 'beyond-TTL legacy internship is stale-candidate');
 for (const job of publicJobs) {
   assert.strictEqual(job.tags.lifecycle_version, LIFECYCLE_VERSION, `${job.id} must carry lifecycle_version`);
 }

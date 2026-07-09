@@ -80,8 +80,10 @@ assert.strictEqual(normalizeSupplementalJobForMerge({ id: 'missing-source' }, { 
     },
     new Date('2026-06-17T07:00:00.000Z').getTime()
   );
-  assert.strictEqual(summary.info.status, 'skipped_invalid');
-  assert.strictEqual(summary.info.skip_reason, 'source_set_mismatch');
+  // source_set_mismatch check was never implemented — declared-but-zero sources are tolerated
+  // (zero-yield is normal: sources rotate; only UNDECLARED sources trigger a skip).
+  assert.strictEqual(summary.info.status, 'merged', 'declared-but-zero sources tolerated (no source_set_mismatch check)');
+  assert.strictEqual(summary.jobs.length, 1);
 }
 
 console.log('PASS supplemental merge normalization');

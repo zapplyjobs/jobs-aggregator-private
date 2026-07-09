@@ -42,20 +42,21 @@ assert.strictEqual(isLifecycleHardRetired({ posted_at: null, tags: REG }), false
 
 // --- resolvePostedAt: current-run fresh / evergreen / stale-candidate ----------------
 {
-  // Current-run jobs are never hard-retired (they don't accumulate across runs); all are kept + tagged.
+  // Current-run jobs are kept + tagged, EXCEPT ghost postings beyond TTL+45d which are
+  // hard-retired upstream (AGG-STALE-FIX-1, operator-approved: ATS sources keep returning
+  // closed jobs with expired posted_at — these are dropped, not lifecycle-tagged).
   const jobs = [
     { id: 'f1', posted_at: daysAgo(2),  tags: { ...REG } },
     { id: 'e1', posted_at: daysAgo(12), tags: { ...REG } },
     { id: 's1', posted_at: daysAgo(20), tags: { ...REG } },
-    { id: 's2', posted_at: daysAgo(80), tags: { ...REG } }, // very old but current-run → kept
+    { id: 's2', posted_at: daysAgo(80), tags: { ...REG } }, // 80d > 14d TTL + 45d → hard-retired (ghost posting)
   ];
   resolvePostedAt(jobs, []);
-  assert.deepStrictEqual(jobs.map(j => j.id).sort(), ['e1', 'f1', 's1', 's2'], 'all current-run jobs kept (no current-run hard-retire)');
+  assert.deepStrictEqual(jobs.map(j => j.id).sort(), ['e1', 'f1', 's1'], 'current-run jobs kept except ghost postings beyond TTL+45d (AGG-STALE-FIX-1)');
   const byId = Object.fromEntries(jobs.map(j => [j.id, j]));
   assert.strictEqual(byId.f1.tags.lifecycle_state, 'fresh');
   assert.strictEqual(byId.e1.tags.lifecycle_state, 'evergreen');
   assert.strictEqual(byId.s1.tags.lifecycle_state, 'stale-candidate');
-  assert.strictEqual(byId.s2.tags.lifecycle_state, 'stale-candidate');
 }
 
 // --- mergeCarryForward: OPERATOR 2026-07-03 — dead is DROPPED upstream (reverses AGG-LIFECYCLE-1 tag-and-keep) ---
