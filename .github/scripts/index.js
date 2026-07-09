@@ -1624,14 +1624,16 @@ async function main() {
       console.log('📦 No expiring jobs this run');
     }
 
-    // AGG-PIPE-10: Filter senior-tagged jobs before writing output.
-    // Step 4 (senior-filter) runs before Step 5 (tag-engine), so tag-engine independently
-    // tags seniors that the filter missed. This write-step filter catches them at the output boundary.
-    const preFilterCount = publicJobs.length;
-    publicJobs = publicJobs.filter(job => job.tags?.employment !== 'senior');
-    const seniorLeaked = preFilterCount - publicJobs.length;
-    if (seniorLeaked > 0) {
-      console.log(`🛡️  AGG-PIPE-10: Filtered ${seniorLeaked} senior-tagged jobs from output (passed senior-filter but tagged senior by tag-engine)`);
+    // AGG-PIPE-10: RETIRED for EXPAND-1 Phase 2 (2026-07-09). Was a write-step safety filter that
+    // removed senior-TAGGED jobs (catching seniors Step 4's title/experience filter missed).
+    // Post-Phase-2 the pipeline senior filter is removed ENTIRELY — all jobs enter the pool;
+    // CONSUMERS filter by tags.employment (6 GitHub boards + Discord Phase 1; zapply.jobs
+    // isEarlyCareerJob; softwarejobs.dev all-levels by design — WANTS seniors). Keeping this
+    // filter would starve softwarejobs.dev's all-levels board + duplicate the consumer filters.
+    // Count for observability only (no removal):
+    const seniorTaggedInPool = publicJobs.filter(job => job.tags?.employment === 'senior').length;
+    if (seniorTaggedInPool > 0) {
+      console.log(`📊 AGG-PIPE-10 (Phase 2: filter RETIRED): ${seniorTaggedInPool} senior-tagged jobs remain in pool → consumers filter`);
     }
 
     // Write jobs (JSONL format)
