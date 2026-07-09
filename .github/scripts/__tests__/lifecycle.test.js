@@ -93,14 +93,14 @@ assert.strictEqual(isLifecycleHardRetired({ posted_at: null, tags: REG }), false
     new Set(), new Set(), [], new Set());
   assert.strictEqual(publicJobs.length, 0, 'ancient prior-run job hard-retired (anti-flood)');
 }
-// A senior prior-run job is still dropped (out of lifecycle scope), not tagged.
+// INF-EXPAND-1 Phase 2 (2026-07-09): senior prior-run jobs now CARRY FORWARD (pipeline senior
+// filter removed; consumers filter by tags.employment themselves). Pre-Phase-2 these were dropped.
 {
   const publicJobs = [];
   mergeCarryForward(publicJobs,
     [line({ id: 'sen-prior', source: 'greenhouse', title: 'Senior Software Engineer', posted_at: daysAgo(2), tags: { ...REG } })],
     new Set(), new Set(), [], new Set());
-  assert.strictEqual(publicJobs.length, 0, 'senior prior-run jobs still dropped (senior filter, out of scope)');
-  if (publicJobs[0]) assert.ok(!publicJobs[0].tags.lifecycle_state, 'senior jobs must not receive a lifecycle_state');
+  assert.strictEqual(publicJobs.length, 1, 'Phase 2: senior prior-run jobs carry forward (pipeline filter removed)');
 }
 // --- consumers replicate the pre-LIFECYCLE "dropped" set via {dead, stale-candidate} -
 {

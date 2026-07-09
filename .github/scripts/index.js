@@ -821,7 +821,6 @@ function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprint
       const job = JSON.parse(line);
       if (currentIds.has(job.id)) continue;                                       // dedup (unchanged)
       if (job.fingerprint && currentFingerprints.has(job.fingerprint)) { fpSkipCount++; continue; } // dedup
-      if (isSeniorJob(job)) { seniorDropped++; continue; }                        // senior filter (OUT OF SCOPE)
 
       // AGG-LIFECYCLE-1: build the carried-forward job once, then TAG-AND-KEEP.
       // (Previously the cases below each `continue`-DROPPED the job; now they keep + tag it.)
@@ -1319,13 +1318,23 @@ async function main() {
     _stepStart = Date.now();
     console.log('━'.repeat(60));
 
-    const { entryLevelJobs, seniorJobs, metrics: seniorFilterMetrics } = filterSeniorJobs(validJobs, companyOverrideMap);
+    // INF-EXPAND-1 Phase 2 (Option D, 2026-07-09): pipeline senior filter BYPASSED. All jobs enter
+    // the main pool; each consumer filters by tags.employment itself (6 GitHub boards + Discord =
+    // Phase 1 filters LIVE; zapply.jobs = isEarlyCareerJob; softwarejobs.dev = all-levels by design).
+    // filterSeniorJobs + senior-filter.js are KEPT for reference/rollback + observability: we still
+    // call it to MEASURE what would be filtered, but validJobs is the pool and seniorJobs is empty
+    // (so the shadow feed + seniorUsFold become no-ops — no double-count into us_jobs).
+    const _filterResult = filterSeniorJobs(validJobs, companyOverrideMap);
+    const entryLevelJobs = validJobs;
+    const seniorJobs = [];
+    const seniorFilterMetrics = _filterResult.metrics;
+    const _wouldBeSenior = _filterResult.seniorJobs.length;
 
     console.log('');
     printSeniorFilterSummary(seniorFilterMetrics);
     console.log('');
     const overrideCount = seniorFilterMetrics.override_applied || 0;
-    console.log(`✅ Step 4 complete: ${entryLevelJobs.length} entry-level jobs (${seniorJobs.length} senior filtered${overrideCount > 0 ? `, ${overrideCount} overrides applied` : ''})`);
+    console.log(`✅ Step 4 complete (Phase 2: senior filter BYPASSED): ${entryLevelJobs.length} jobs enter pool (all levels; ${_wouldBeSenior} would-have-been-senior → flow to consumers that filter)`);
     stageTimings.step4_filter_ms = Date.now() - _stepStart;
     console.log('');
 
