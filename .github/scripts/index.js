@@ -2323,7 +2323,7 @@ function buildG1Breakdown(jobs) {
 function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, pipelineTimestamps, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth, supplementalInputs }) {
   const bySource = {};
   const byEmploymentType = {};
-  const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0 };
+  const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0, senior: 0 };
   const byRemote = { remote: 0, onsite: 0 };
   const companyCounts = {};
   const companyDomains = {};  // DASH-4b: track domain distribution per company
@@ -2349,6 +2349,8 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
       byInternship.internship++;
     } else if (job.tags?.employment === 'entry_level') {
       byInternship['new-grad']++;
+    } else if (job.tags?.employment === 'senior' || job.tags?.employment === 'senior_level') {
+      byInternship.senior++;
     } else {
       byInternship.mid_level++;
     }

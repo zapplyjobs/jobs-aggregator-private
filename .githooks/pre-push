@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+# pre-push — run the parent-repo test suite locally (same set the CI gate runs) so test
+# failures are caught at push time, before reaching CI. Prevents the red-gate blind spot.
+# INF-CI-8.
+#
+# Enable once per clone:  git config core.hooksPath .githooks
+# (the gate remains the CI backstop; this is the local early-warning.)
+set -e
+bash "$(git rev-parse --show-toplevel)/.github/scripts/test.sh" || {
+  echo "pre-push: parent-repo tests FAILED — push aborted. Run 'bash .github/scripts/test.sh' to debug."
+  exit 1
+}

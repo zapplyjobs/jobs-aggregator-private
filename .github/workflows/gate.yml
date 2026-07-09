@@ -32,8 +32,4 @@ jobs:
         run: node --check .github/scripts/index.js
 
       - name: Run script tests
-        run: |
-          set -euo pipefail
-          for test_file in .github/scripts/__tests__/*.test.js; do
-            node "$test_file"
-          done
+        run: bash .github/scripts/test.sh
