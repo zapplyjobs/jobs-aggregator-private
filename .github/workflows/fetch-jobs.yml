@@ -51,7 +51,7 @@ jobs:
     - name: Create logs directory
       run: mkdir -p .github/logs .github/data
 
-    - name: "Seed all_jobs.json from R2 (fallback: GitHub)"
+    - name: "Seed all_jobs.json from R2 (private R2 only)"
       run: |
         echo "📥 Seeding previous all_jobs.json..."
         node -e "
@@ -65,18 +65,17 @@ jobs:
         }
         main().catch(e => { console.error('R2 error: ' + e.message); process.exit(1); });
         " && \
-          echo "✅ R2 seed OK: $(wc -l < .github/data/all_jobs.json) jobs" || \
-        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/all_jobs.json?t=$(date +%s)" \
-          -o .github/data/all_jobs.json && \
-          echo "✅ GitHub fallback: seeded $(wc -l < .github/data/all_jobs.json) jobs" || \
-          echo "⚠️ Could not seed all_jobs.json — starting fresh"
+          echo "✅ R2 seed OK: $(wc -l < .github/data/all_jobs.json) jobs" || {
+          echo "❌ Private R2 seed failed for all_jobs.json; public GitHub fallback disabled"
+          exit 1
+        }
       env:
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-    - name: "Seed descriptions-enriched from R2 (fallback: GitHub)"
+    - name: "Seed descriptions-enriched from R2 (private R2 only)"
       run: |
         echo "📥 Seeding enriched descriptions (WD/SR)..."
         # TAG-7: WD/SR descriptions needed before tagging (Step 5) for description fallback.
@@ -97,12 +96,7 @@ jobs:
             LINES=$(wc -l < ".github/data/${CHUNK_FILE}") && \
             TOTAL=$((TOTAL + LINES)) && \
             echo "  chunk ${CHUNK}: ${LINES} entries (R2)" || \
-            curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/${CHUNK_FILE}?t=$(date +%s)" \
-              -o ".github/data/${CHUNK_FILE}" 2>/dev/null && \
-              LINES=$(wc -l < ".github/data/${CHUNK_FILE}") && \
-              TOTAL=$((TOTAL + LINES)) && \
-              echo "  chunk ${CHUNK}: ${LINES} entries (GitHub)" || \
-              echo "  chunk ${CHUNK}: not found (skipped)"
+            echo "  chunk ${CHUNK}: not found in private R2 (skipped)"
         done
         [ $TOTAL -gt 0 ] && echo "✅ Seeded ${TOTAL} enriched descriptions total" || \
           echo "⚠️ No descriptions-enriched chunks found — description fallback will be inactive"
@@ -112,7 +106,7 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-    - name: "Seed descriptions-jsearch.jsonl from R2 (fallback: GitHub)"
+    - name: "Seed descriptions-jsearch.jsonl from R2 (private R2 only)"
       run: |
         echo "📥 Seeding JSearch description cache..."
         node -e "
@@ -124,17 +118,14 @@ jobs:
         }
         main().catch(() => process.exit(1));
         " && echo "✅ R2 seed OK: $(wc -l < .github/data/descriptions-jsearch.jsonl) entries" || \
-        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-jsearch.jsonl?t=$(date +%s)" \
-          -o .github/data/descriptions-jsearch.jsonl && \
-          echo "✅ GitHub fallback: $(wc -l < .github/data/descriptions-jsearch.jsonl) entries" || \
-          echo "⚠️ No descriptions-jsearch.jsonl yet — starting fresh"
+          echo "⚠️ No descriptions-jsearch.jsonl in private R2 — starting fresh"
       env:
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-    - name: "Seed descriptions-microsoft.jsonl from R2 (fallback: GitHub)"
+    - name: "Seed descriptions-microsoft.jsonl from R2 (private R2 only)"
       run: |
         echo "📥 Seeding Microsoft description cache..."
         # AGG-SPEED-4: Seed prior Microsoft descriptions so the fetcher can skip cached positions.
@@ -147,17 +138,14 @@ jobs:
         }
         main().catch(() => process.exit(1));
         " && echo "✅ R2 seed OK: $(wc -l < .github/data/descriptions-microsoft.jsonl) entries" || \
-        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-microsoft.jsonl?t=$(date +%s)" \
-          -o .github/data/descriptions-microsoft.jsonl && \
-          echo "✅ GitHub fallback: $(wc -l < .github/data/descriptions-microsoft.jsonl) entries" || \
-          echo "⚠️ No descriptions-microsoft.jsonl yet — starting fresh"
+          echo "⚠️ No descriptions-microsoft.jsonl in private R2 — starting fresh"
       env:
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-    - name: "Seed remaining description sidecars from R2 (fallback: GitHub)"
+    - name: "Seed remaining description sidecars from R2 (private R2 only)"
       run: |
         echo "📥 Seeding remaining description sidecars..."
         node - <<'NODE'
@@ -239,7 +227,7 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-    - name: "Seed filtered-samples.jsonl from R2 (fallback: GitHub)"
+    - name: "Seed filtered-samples.jsonl from R2 (private R2 only)"
       run: |
         echo "📥 Seeding filtered samples..."
         node -e "
@@ -251,17 +239,14 @@ jobs:
         }
         main().catch(() => process.exit(1));
         " && echo "✅ R2 seed OK: $(wc -l < .github/data/filtered-samples.jsonl) entries" || \
-        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/filtered-samples.jsonl?t=$(date +%s)" \
-          -o .github/data/filtered-samples.jsonl && \
-          echo "✅ GitHub fallback: $(wc -l < .github/data/filtered-samples.jsonl) entries" || \
-          echo "⚠️ No filtered-samples.jsonl yet — starting fresh"
+          echo "⚠️ No filtered-samples.jsonl in private R2 — starting fresh"
       env:
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-    - name: "Seed tag-history.jsonl from R2 (fallback: GitHub)"
+    - name: "Seed tag-history.jsonl from R2 (private R2 only)"
       run: |
         echo "📥 Seeding tag history..."
         node -e "
@@ -273,10 +258,7 @@ jobs:
         }
         main().catch(() => process.exit(1));
         " && echo "✅ R2 seed OK: $(wc -l < .github/data/tag-history.jsonl) entries" || \
-        curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/tag-history.jsonl?t=$(date +%s)" \
-          -o .github/data/tag-history.jsonl && \
-          echo "✅ GitHub fallback: $(wc -l < .github/data/tag-history.jsonl) entries" || \
-          echo "⚠️ No tag-history.jsonl yet — starting fresh"
+          echo "⚠️ No tag-history.jsonl in private R2 — starting fresh"
       env:
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -340,7 +322,7 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-    - name: "Seed descriptions-workday.jsonl from R2 (fallback: GitHub)"
+    - name: "Seed descriptions-workday.jsonl from R2 (private R2 only)"
       run: |
         echo "📥 Seeding WD description cache (AGG-FETCH-11)..."
         node -e "
@@ -358,10 +340,7 @@ jobs:
         main().catch(e => { console.error('R2 seed error: ' + e.message); process.exit(1); });
         " && \
           echo "✅ R2 seed OK: $(wc -l < .github/data/descriptions-workday.jsonl) descriptions" || \
-          curl -sf "https://raw.githubusercontent.com/zapplyjobs/jobs-data-2026/main/.github/data/descriptions-workday.jsonl?t=$(date +%s)" \
-            -o .github/data/descriptions-workday.jsonl && \
-          echo "✅ GitHub fallback: $(wc -l < .github/data/descriptions-workday.jsonl 2>/dev/null || echo 0) entries" || \
-          echo "⚠️ No descriptions-workday.jsonl yet — starting fresh (first run will build it)"
+          echo "⚠️ No descriptions-workday.jsonl in private R2 — starting fresh (first run will build it)"
       env:
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
