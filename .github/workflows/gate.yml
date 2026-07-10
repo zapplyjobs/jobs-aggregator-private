@@ -33,3 +33,15 @@ jobs:
 
       - name: Run script tests
         run: bash .github/scripts/test.sh
+
+      - name: Closed-pipe gate (no data in public repo — INF-GOV-REPOWHITELIST-1)
+        # Hard rule: public repos hold ONLY code + thin config + CI. Data → R2/Supabase.
+        # Fail if any .github/data/ file is tracked (would re-create the dumping ground).
+        run: |
+          data_files=$(git ls-files '.github/data/*' 2>/dev/null)
+          if [ -n "$data_files" ]; then
+            echo "❌ CLOSED-PIPE GATE FAILED: data files tracked in this public repo (move to R2/Supabase per the hard rule):"
+            echo "$data_files"
+            exit 1
+          fi
+          echo "✅ no .github/data files tracked (closed-pipe OK)"
