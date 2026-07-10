@@ -86,22 +86,31 @@ jobs:
           # Sanity check
           node -e "const d = JSON.parse(require('fs').readFileSync('/tmp/review-data/general-review.json','utf8')); console.log('US General:', d.summary.us_general, '/', d.summary.us_total, '=', d.summary.us_general_rate + '%')"
 
-      - name: Push to jobs-data-2026
+      - name: Upload general-review.json to R2 (INF-R2-GITCUTOVER-1)
+        # Was: cross-repo push to jobs-data-2026 (kept general-review.json in public git).
+        # Now: upload to R2 directly; the zjp-data-proxy Worker serves it from there. The file
+        # is untracked from jobs-data-2026, so it no longer lives in public git.
         env:
-          GH_PAT: ${{ secrets.GH_PAT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
         run: |
-          git clone --depth=1 "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-data-2026.git" /tmp/jobs-data-2026-push
-          cp /tmp/review-data/general-review.json /tmp/jobs-data-2026-push/.github/data/general-review.json
-
-          cd /tmp/jobs-data-2026-push
-          git config user.email "bot@zapplyjobs.com"
-          git config user.name "Aggregator Bot"
-          git add .github/data/general-review.json
-          git diff --cached --quiet && echo "No changes to commit" && exit 0
-          git commit -m "chore: update general-review.json [skip ci]"
-          for i in 1 2 3; do
-            git pull --rebase origin main && git push && break
-            echo "Push attempt $i failed, retrying..."
-            sleep 5
-          done
-          echo "✅ general-review.json pushed to jobs-data-2026"
+          cd .github/scripts/shared
+          node - <<'NODE'
+          const fs = require('fs');
+          const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+          const client = new S3Client({
+            region: 'auto',
+            endpoint: process.env.R2_ENDPOINT,
+            credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY },
+          });
+          const body = fs.readFileSync('/tmp/review-data/general-review.json');
+          client.send(new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: 'data/general-review.json',
+            Body: body,
+            ContentType: 'application/json',
+          })).then(() => console.log('✅ UPLOADED_R2:data/general-review.json (' + body.length + ' bytes)'))
+            .catch(e => { console.error('FAIL: ' + e.message); process.exit(1); });
+          NODE
