@@ -1141,7 +1141,7 @@ async function main() {
       HOTPATH_DEMOTED_FETCHERS.has('Apple')
         ? Promise.resolve([])
         : withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds, cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 1200_000, 'Apple'),
-      withTimeout(fetchAllTwoSigmaJobs(), 30_000, 'Two Sigma'),
+      withTimeout(fetchAllTwoSigmaJobs(), 120_000, 'Two Sigma'),
       withTimeout(fetchAllUberJobs(), 60_000, 'Uber'),
       HOTPATH_DEMOTED_FETCHERS.has('Google')
         ? Promise.resolve([])
