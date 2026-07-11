@@ -61,6 +61,10 @@ jobs:
           const result = await r2.downloadToFile('all_jobs.json', '.github/data/all_jobs.json');
           if (result) {
             console.log('R2_OK:' + Math.round(result.size/1024) + 'KB');
+            // Also seed dedupe-store.json (dedup state — needs to persist across runs via R2)
+            const dedupeResult = await r2.downloadToFile('dedupe-store.json', '.github/data/dedupe-store.json');
+            if (dedupeResult) { console.log('R2_OK dedupe-store: ' + Math.round(dedupeResult.size/1024) + 'KB'); }
+            else { console.log('R2_SKIP dedupe-store: not found (first run or empty)'); }
           } else { process.exit(1); }
         }
         main().catch(e => { console.error('R2 error: ' + e.message); process.exit(1); });

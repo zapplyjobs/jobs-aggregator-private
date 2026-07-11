@@ -43,3 +43,4 @@ Thumbs.db
 
 # Rolling filtered samples are an audit artifact, persisted via R2 when needed.
 .github/data/filtered-samples.jsonl.github/data/all_jobs.json
+.github/data/dedupe-store.json
