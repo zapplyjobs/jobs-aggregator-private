@@ -704,6 +704,7 @@ jobs:
             'canada-tech-summary.json',
             'canada-jobs.jsonl',
             'canada-all-summary.json',
+            'canada-internships.jsonl',
             'jobs-metadata.json',
             'dedupe-store.json',
             'wd-totals-cache.json',

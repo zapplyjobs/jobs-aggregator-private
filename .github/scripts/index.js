@@ -238,6 +238,7 @@ const CANADA_TECH_INTERNSHIPS_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-int
 const CANADA_TECH_SUMMARY_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-summary.json');
 const CANADA_ALL_JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'canada-jobs.jsonl');
 const CANADA_ALL_SUMMARY_OUTPUT_FILE = path.join(DATA_DIR, 'canada-all-summary.json');
+const CANADA_ALL_INTERNSHIPS_OUTPUT_FILE = path.join(DATA_DIR, 'canada-internships.jsonl');
 
 // Sentinel cue regexes — used ONLY by buildCanadaSentinelChecks (the FP guard), NEVER for tagging
 // (the tag-engine owns canada detection via hasCanadaLocation). The US cue flags a canada-tagged
@@ -374,6 +375,15 @@ async function writeCanadaInternshipsFeed(jobs) {
   const entryLevelCount = internshipsJobs.filter(job => job?.tags?.employment === 'entry_level').length;
   console.log(`🇨🇦 CANADA-LANE: internships feed ${internshipsJobs.length} jobs (${entryLevelCount} entry-level, ${internshipCount} internships) → canada-tech-internships.jsonl`);
   return { total: internshipsJobs.length, entry_level: entryLevelCount, internships: internshipCount };
+}
+// Canada ALL internships lane: broad internship feed from ALL Canada jobs (not just tech).
+// INF-CANADA-INTERNSHIP-FEED-1: matches the US Internships-2027 pattern (all categories).
+async function writeCanadaAllInternshipsFeed(jobs) {
+  const canadaAllJobs = jobs.filter(isCanadaJob);
+  const internshipsJobs = canadaAllJobs.filter(job => isInternshipJob(job));
+  await writeJobsJSONL(internshipsJobs, CANADA_ALL_INTERNSHIPS_OUTPUT_FILE);
+  console.log(`🇨🇦 CANADA-LANE: ALL internships feed ${internshipsJobs.length} jobs → canada-internships.jsonl`);
+  return { total: internshipsJobs.length };
 }
 // AGG-CANADAFEED-1: ALL-Canada feed (broadens canada-tech → all domains, tech-prioritized).
 // Additive shadow feed alongside canada-tech-* (unchanged, back-compat). Independent of tech feeds.
@@ -1730,6 +1740,13 @@ async function main() {
       };
       await writeMetadata(degradedAll, CANADA_ALL_SUMMARY_OUTPUT_FILE);
       console.warn(`⚠️ CANADA-LANE (all): all-canada feed failed, wrote EMPTY fallback (non-blocking): ${e.message}`);
+    }
+    // INF-CANADA-INTERNSHIP-FEED-1: broad Canada internships (all domains, not just tech)
+    try {
+      await writeCanadaAllInternshipsFeed(publicJobs);
+    } catch (e) {
+      await writeJobsJSONL([], CANADA_ALL_INTERNSHIPS_OUTPUT_FILE);
+      console.warn(`⚠️ CANADA-LANE: all-internships feed failed, wrote EMPTY fallback (non-blocking): ${e.message}`);
     }
 
     // Write metadata
