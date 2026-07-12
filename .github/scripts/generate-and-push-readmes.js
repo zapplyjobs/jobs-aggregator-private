@@ -124,6 +124,7 @@ async function main() {
   console.log(`Found ${configs.length} board configs\n`);
 
   let ok = 0, fail = 0;
+  const boardCounts = [];
 
   for (const config of configs) {
     const repo = config.repo || config._file;
@@ -166,6 +167,7 @@ async function main() {
       pushReadme(repo, readmeContent);
       console.log(`  ✅ Pushed README (${jobs.length} jobs, ${Object.keys(stats.totalByCompany).length} companies)`);
       ok++;
+      boardCounts.push({ repo, count: jobs.length, companies: Object.keys(stats.totalByCompany).length, timestamp: new Date().toISOString() });
 
     } catch (error) {
       console.error(`  ❌ ${error.message}`);
@@ -176,6 +178,11 @@ async function main() {
   console.log(`\n${'═'.repeat(43)}`);
   console.log(`  Done: ${ok} succeeded, ${fail} failed`);
   console.log(`${'═'.repeat(43)}`);
+
+  // Write board counts for monitoring (consumer_count_zero_health will read from R2)
+  const countsPath = path.join(DATA_DIR, 'board-counts.json');
+  fs.writeFileSync(countsPath, JSON.stringify(boardCounts, null, 2));
+  console.log(`\n📊 Board counts written to ${path.relative(process.cwd(), countsPath)}`);
 
   // Clean up temp
   fs.rmSync(TEMP_DIR, { recursive: true, force: true });
