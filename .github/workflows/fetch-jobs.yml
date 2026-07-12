@@ -802,6 +802,8 @@ jobs:
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
         GH_TOKEN: ${{ secrets.GH_PAT }}
+        DISCORD_TEAM_TOKEN: ${{ secrets.DISCORD_TEAM_TOKEN }}
+        DISCORD_PIPELINE_ALERT_CHANNEL_ID: ${{ secrets.DISCORD_PIPELINE_ALERT_CHANNEL_ID }}
       run: |
         cd .github/scripts/consumer && npm install --silent
         cd $GITHUB_WORKSPACE
