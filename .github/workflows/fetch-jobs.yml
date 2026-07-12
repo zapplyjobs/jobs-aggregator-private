@@ -1,7 +1,9 @@
 name: Fetch All Jobs
 
 on:
-  workflow_dispatch:  # Triggered by job-board-cron-worker (Cloudflare) every 15 min
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'  # Every 15 min (GitHub native schedule — replaces Cloudflare Worker dispatch)
 
 # Prevent concurrent runs
 concurrency:
