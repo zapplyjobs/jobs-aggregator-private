@@ -1,0 +1,785 @@
+{
+  "version": 1,
+  "repoPrefix": "ngj",
+  "headingImageAlt": "New Grad Jobs 2027",
+  "title": "New Grad Jobs 2027",
+  "tagline": "",
+  "jobCountBadgeLabel": "New Grad Jobs",
+  "descriptionLine1": "\ud83d\ude80 New grad, intern/co-op, and adjacent early-career roles across tech, finance, healthcare, and more, updated in real time.",
+  "descriptionLine2": "",
+  "noteType": "TIP",
+  "noteText": "\ud83d\udee0 Help us grow! Add new jobs by submitting an issue! View contributing steps [here](CONTRIBUTING-GUIDE.md).",
+  "jobsSectionHeader": "Fresh New Grad Jobs 2027",
+  "features": {
+    "internships": false,
+    "moreResources": true
+  },
+  "defaultCategory": "other",
+  "filters": {
+    "locations": [
+      "us"
+    ]
+  },
+  "activeWindowDays": 14,
+  "repo": "New-Grad-Jobs-2027",
+  "boardName": "new_grad_jobs_2027",
+  "categories": {
+    "software_engineering": {
+      "title": "Software Engineering",
+      "emoji": "\ud83d\udcbb",
+      "keywords": [
+        "software engineer",
+        "software developer",
+        "software development",
+        "swe",
+        "backend engineer",
+        "backend developer",
+        "frontend engineer",
+        "frontend developer",
+        "full stack",
+        "fullstack",
+        "web developer",
+        "web engineer",
+        "mobile engineer",
+        "mobile developer",
+        "ios engineer",
+        "android engineer",
+        "application developer",
+        "application engineer",
+        "platform developer",
+        "platform engineer",
+        "java developer",
+        "python developer",
+        "javascript developer",
+        "android developer",
+        "ios developer",
+        "it engineer",
+        "embedded software",
+        "robotics software",
+        "firmware developer",
+        "devops",
+        "devops engineer",
+        "site reliability",
+        "sre",
+        "infrastructure engineer",
+        "cloud engineer",
+        "reliability engineer",
+        "cloud architect",
+        "network engineer",
+        "system administrator",
+        "systems administrator",
+        "it administrator",
+        "it infrastructure",
+        "product designer",
+        "ux designer",
+        "ui designer",
+        "product manager",
+        "technical product manager",
+        "product analyst",
+        "product owner",
+        "user experience",
+        "interaction designer"
+      ]
+    },
+    "data_ai": {
+      "title": "Data, AI & Research",
+      "emoji": "\ud83e\udd16",
+      "keywords": [
+        "machine learning",
+        "ml engineer",
+        "ai engineer",
+        "artificial intelligence",
+        "deep learning",
+        "computer vision",
+        "nlp engineer",
+        "natural language",
+        "data scientist",
+        "data science",
+        "data engineer",
+        "research scientist",
+        "applied scientist",
+        "applied researcher",
+        "analytics engineer",
+        "data analyst",
+        "business analyst",
+        "business intelligence",
+        "quantitative",
+        "research engineer",
+        "data analytics",
+        "data integration engineer",
+        "data platform"
+      ]
+    },
+    "security_engineering": {
+      "title": "Security Engineering",
+      "emoji": "\ud83d\udd12",
+      "keywords": [
+        "security engineer",
+        "security software",
+        "product security",
+        "cybersecurity",
+        "cyber security",
+        "information security",
+        "appsec",
+        "netsec",
+        "penetration tester",
+        "vulnerability",
+        "cryptography engineer",
+        "security analyst",
+        "soc analyst",
+        "threat engineer",
+        "security architect"
+      ]
+    },
+    "hardware_systems": {
+      "title": "Hardware & Systems Engineering",
+      "emoji": "\u2699\ufe0f",
+      "keywords": [
+        "hardware engineer",
+        "electrical engineer",
+        "electronics engineer",
+        "fpga",
+        "rfic",
+        "asic",
+        "silicon engineer",
+        "chip design",
+        "rf engineer",
+        "photonics",
+        "power engineer",
+        "signal processing",
+        "embedded engineer",
+        "embedded systems",
+        "firmware engineer",
+        "mechanical engineer",
+        "aerospace engineer",
+        "systems engineer",
+        "propulsion engineer",
+        "aerodynamics",
+        "structural engineer",
+        "thermal engineer",
+        "manufacturing engineer",
+        "process engineer",
+        "test engineer",
+        "quality engineer",
+        "validation engineer",
+        "vehicle autonomy",
+        "air vehicle",
+        "air dominance",
+        "robotics engineer",
+        "controls engineer",
+        "avionics",
+        "electrical harness",
+        "industrial engineer",
+        "supply chain engineer"
+      ]
+    },
+    "business_operations": {
+      "title": "Business & Operations",
+      "emoji": "\ud83d\udcca",
+      "keywords": [
+        "account executive",
+        "sales engineer",
+        "sales development",
+        "enterprise sales",
+        "solutions consultant",
+        "business development",
+        "account manager",
+        "account coordinator",
+        "account development",
+        "sales executive",
+        "sales representative",
+        "market development",
+        "customer success",
+        "revenue operations",
+        "sales associate",
+        "operations specialist",
+        "operations associate",
+        "operations coordinator",
+        "operations analyst",
+        "operations engineer",
+        "technical operations",
+        "it specialist",
+        "it analyst",
+        "service technician",
+        "field technician",
+        "lab technician",
+        "technician",
+        "technical support",
+        "support engineer",
+        "solutions engineer",
+        "implementation consultant",
+        "technical consultant",
+        "program coordinator",
+        "project coordinator",
+        "logistics",
+        "procurement",
+        "supply chain",
+        "recruiter",
+        "recruiting",
+        "talent acquisition",
+        "facilities",
+        "salesforce administrator"
+      ]
+    },
+    "other": {
+      "title": "Other Jobs",
+      "emoji": "\ud83d\udcc2",
+      "keywords": [
+        "registered nurse",
+        "travel nurse",
+        "nurse rn",
+        "nurse lpn",
+        "nurse cna",
+        "~rn",
+        "lpn ",
+        "cna ",
+        "med surg",
+        "telemetry",
+        "stepdown",
+        "nursing",
+        "nurse practitioner",
+        "nurse residency",
+        "new grad rn",
+        "clinical nurse",
+        "icu nurse",
+        "er nurse",
+        "or nurse",
+        "perioperative",
+        "surgical nurse",
+        "med/surg",
+        "rn ms",
+        "tele rn"
+      ]
+    }
+  },
+  "companies": {
+    "faang_plus": [
+      {
+        "name": "Google",
+        "emoji": "\ud83d\udfe2",
+        "career_url": "https://careers.google.com",
+        "api_names": [
+          "google",
+          "alphabet",
+          "youtube",
+          "waymo",
+          "deepmind"
+        ]
+      },
+      {
+        "name": "Apple",
+        "emoji": "\ud83c\udf4e",
+        "career_url": "https://jobs.apple.com",
+        "api_names": [
+          "apple"
+        ]
+      },
+      {
+        "name": "Microsoft",
+        "emoji": "\ud83d\udfe6",
+        "career_url": "https://careers.microsoft.com",
+        "api_names": [
+          "microsoft",
+          "xbox",
+          "linkedin"
+        ]
+      },
+      {
+        "name": "Amazon",
+        "emoji": "\ud83d\udce6",
+        "career_url": "https://amazon.jobs",
+        "api_names": [
+          "amazon",
+          "aws",
+          "prime video",
+          "amazon mgm",
+          "whole foods"
+        ]
+      },
+      {
+        "name": "Meta",
+        "emoji": "\ud83d\udd35",
+        "career_url": "https://careers.meta.com",
+        "api_names": [
+          "meta",
+          "facebook",
+          "instagram",
+          "whatsapp"
+        ]
+      },
+      {
+        "name": "Netflix",
+        "emoji": "\ud83c\udfac",
+        "career_url": "https://jobs.netflix.com",
+        "api_names": [
+          "netflix"
+        ]
+      },
+      {
+        "name": "Tesla",
+        "emoji": "\u26a1",
+        "career_url": "https://careers.tesla.com",
+        "api_names": [
+          "tesla"
+        ]
+      },
+      {
+        "name": "Nvidia",
+        "emoji": "\ud83c\udfae",
+        "career_url": "https://careers.nvidia.com",
+        "api_names": [
+          "nvidia"
+        ]
+      }
+    ],
+    "top_tech": [
+      {
+        "name": "Salesforce",
+        "emoji": "\u2601\ufe0f",
+        "career_url": "https://careers.salesforce.com",
+        "api_names": [
+          "salesforce",
+          "tableau",
+          "slack"
+        ]
+      },
+      {
+        "name": "Adobe",
+        "emoji": "\ud83c\udfa8",
+        "career_url": "https://careers.adobe.com",
+        "api_names": [
+          "adobe"
+        ]
+      },
+      {
+        "name": "Oracle",
+        "emoji": "\ud83d\udd34",
+        "career_url": "https://careers.oracle.com",
+        "api_names": [
+          "oracle"
+        ]
+      },
+      {
+        "name": "IBM",
+        "emoji": "\ud83d\udd35",
+        "career_url": "https://careers.ibm.com",
+        "api_names": [
+          "ibm",
+          "red hat"
+        ]
+      },
+      {
+        "name": "Intel",
+        "emoji": "\ud83d\udd37",
+        "career_url": "https://jobs.intel.com",
+        "api_names": [
+          "intel"
+        ]
+      },
+      {
+        "name": "AMD",
+        "emoji": "\ud83d\udd36",
+        "career_url": "https://careers.amd.com",
+        "api_names": [
+          "amd"
+        ]
+      },
+      {
+        "name": "Qualcomm",
+        "emoji": "\ud83d\udcf1",
+        "career_url": "https://careers.qualcomm.com",
+        "api_names": [
+          "qualcomm"
+        ]
+      },
+      {
+        "name": "VMware",
+        "emoji": "\u2601\ufe0f",
+        "career_url": "https://careers.vmware.com",
+        "api_names": [
+          "vmware"
+        ]
+      }
+    ],
+    "unicorn_startups": [
+      {
+        "name": "OpenAI",
+        "emoji": "\ud83e\udd16",
+        "career_url": "https://openai.com/careers",
+        "api_names": [
+          "openai"
+        ]
+      },
+      {
+        "name": "Anthropic",
+        "emoji": "\ud83e\udde0",
+        "career_url": "https://anthropic.com/careers",
+        "api_names": [
+          "anthropic"
+        ]
+      },
+      {
+        "name": "Stripe",
+        "emoji": "\ud83d\udcb3",
+        "career_url": "https://stripe.com/jobs",
+        "api_names": [
+          "stripe"
+        ]
+      },
+      {
+        "name": "Databricks",
+        "emoji": "\ud83d\udcca",
+        "career_url": "https://databricks.com/careers",
+        "api_names": [
+          "databricks"
+        ]
+      },
+      {
+        "name": "Snowflake",
+        "emoji": "\u2744\ufe0f",
+        "career_url": "https://careers.snowflake.com",
+        "api_names": [
+          "snowflake"
+        ]
+      },
+      {
+        "name": "Palantir",
+        "emoji": "\ud83d\udc41\ufe0f",
+        "career_url": "https://palantir.com/careers",
+        "api_names": [
+          "palantir"
+        ]
+      },
+      {
+        "name": "SpaceX",
+        "emoji": "\ud83d\ude80",
+        "career_url": "https://spacex.com/careers",
+        "api_names": [
+          "spacex"
+        ]
+      },
+      {
+        "name": "Figma",
+        "emoji": "\ud83c\udfa8",
+        "career_url": "https://figma.com/careers",
+        "api_names": [
+          "figma"
+        ]
+      },
+      {
+        "name": "Notion",
+        "emoji": "\ud83d\udcdd",
+        "career_url": "https://notion.so/careers",
+        "api_names": [
+          "notion"
+        ]
+      },
+      {
+        "name": "Discord",
+        "emoji": "\ud83c\udfae",
+        "career_url": "https://discord.com/careers",
+        "api_names": [
+          "discord"
+        ]
+      }
+    ],
+    "fintech": [
+      {
+        "name": "Coinbase",
+        "emoji": "\u20bf",
+        "career_url": "https://coinbase.com/careers",
+        "api_names": [
+          "coinbase"
+        ]
+      },
+      {
+        "name": "Robinhood",
+        "emoji": "\ud83d\udcc8",
+        "career_url": "https://careers.robinhood.com",
+        "api_names": [
+          "robinhood"
+        ]
+      },
+      {
+        "name": "Square",
+        "emoji": "\ud83d\udfeb",
+        "career_url": "https://careers.block.xyz",
+        "api_names": [
+          "square",
+          "block",
+          "cash app"
+        ]
+      },
+      {
+        "name": "Plaid",
+        "emoji": "\ud83c\udfe6",
+        "career_url": "https://plaid.com/careers",
+        "api_names": [
+          "plaid"
+        ]
+      },
+      {
+        "name": "Affirm",
+        "emoji": "\ud83d\udcb0",
+        "career_url": "https://affirm.com/careers",
+        "api_names": [
+          "affirm"
+        ]
+      }
+    ],
+    "unicorns_mobility": [
+      {
+        "name": "Uber",
+        "emoji": "\ud83d\ude97",
+        "career_url": "https://careers.uber.com",
+        "api_names": [
+          "uber"
+        ]
+      },
+      {
+        "name": "Lyft",
+        "emoji": "\ud83d\udefb",
+        "career_url": "https://lyft.com/careers",
+        "api_names": [
+          "lyft"
+        ]
+      },
+      {
+        "name": "Airbnb",
+        "emoji": "\ud83c\udfe0",
+        "career_url": "https://careers.airbnb.com",
+        "api_names": [
+          "airbnb"
+        ]
+      },
+      {
+        "name": "DoorDash",
+        "emoji": "\ud83d\udeaa",
+        "career_url": "https://careers.doordash.com",
+        "api_names": [
+          "doordash"
+        ]
+      }
+    ],
+    "media_entertainment": [
+      {
+        "name": "Spotify",
+        "emoji": "\ud83c\udfb5",
+        "career_url": "https://careers.spotify.com",
+        "api_names": [
+          "spotify"
+        ]
+      },
+      {
+        "name": "TikTok",
+        "emoji": "\ud83c\udfac",
+        "career_url": "https://careers.tiktok.com",
+        "api_names": [
+          "tiktok",
+          "bytedance"
+        ]
+      },
+      {
+        "name": "Snap",
+        "emoji": "\ud83d\udc7b",
+        "career_url": "https://snap.com/careers",
+        "api_names": [
+          "snap",
+          "snapchat"
+        ]
+      },
+      {
+        "name": "Pinterest",
+        "emoji": "\ud83d\udccc",
+        "career_url": "https://careers.pinterest.com",
+        "api_names": [
+          "pinterest"
+        ]
+      },
+      {
+        "name": "Reddit",
+        "emoji": "\ud83e\udd16",
+        "career_url": "https://reddit.com/careers",
+        "api_names": [
+          "reddit"
+        ]
+      },
+      {
+        "name": "Twitch",
+        "emoji": "\ud83c\udfae",
+        "career_url": "https://twitch.tv/jobs",
+        "api_names": [
+          "twitch"
+        ]
+      }
+    ],
+    "enterprise_saas": [
+      {
+        "name": "Atlassian",
+        "emoji": "\u26a1",
+        "career_url": "https://atlassian.com/careers",
+        "api_names": [
+          "atlassian"
+        ]
+      },
+      {
+        "name": "ServiceNow",
+        "emoji": "\ud83d\udd27",
+        "career_url": "https://careers.servicenow.com",
+        "api_names": [
+          "servicenow"
+        ]
+      },
+      {
+        "name": "Workday",
+        "emoji": "\ud83d\udcc5",
+        "career_url": "https://workday.com/careers",
+        "api_names": [
+          "workday"
+        ]
+      },
+      {
+        "name": "Zoom",
+        "emoji": "\ud83d\udcf9",
+        "career_url": "https://careers.zoom.us",
+        "api_names": [
+          "zoom"
+        ]
+      },
+      {
+        "name": "Slack",
+        "emoji": "\ud83d\udcac",
+        "career_url": "https://slack.com/careers",
+        "api_names": [
+          "slack"
+        ]
+      },
+      {
+        "name": "Asana",
+        "emoji": "\ud83d\udccb",
+        "career_url": "https://asana.com/careers",
+        "api_names": [
+          "asana"
+        ]
+      },
+      {
+        "name": "Monday.com",
+        "emoji": "\ud83d\udcca",
+        "career_url": "https://monday.com/careers",
+        "api_names": [
+          "monday"
+        ]
+      }
+    ],
+    "emerging_unicorns": [
+      {
+        "name": "Canva",
+        "emoji": "\ud83c\udfa8",
+        "career_url": "https://canva.com/careers",
+        "api_names": [
+          "canva"
+        ]
+      },
+      {
+        "name": "Miro",
+        "emoji": "\ud83d\udcd0",
+        "career_url": "https://miro.com/careers",
+        "api_names": [
+          "miro"
+        ]
+      },
+      {
+        "name": "Gitlab",
+        "emoji": "\ud83e\udd8a",
+        "career_url": "https://about.gitlab.com/careers",
+        "api_names": [
+          "gitlab"
+        ]
+      },
+      {
+        "name": "GitHub",
+        "emoji": "\ud83d\udc19",
+        "career_url": "https://github.com/careers",
+        "api_names": [
+          "github"
+        ]
+      },
+      {
+        "name": "Vercel",
+        "emoji": "\u25b2",
+        "career_url": "https://vercel.com/careers",
+        "api_names": [
+          "vercel"
+        ]
+      },
+      {
+        "name": "Supabase",
+        "emoji": "\ud83d\uddc4\ufe0f",
+        "career_url": "https://supabase.com/careers",
+        "api_names": [
+          "supabase"
+        ]
+      }
+    ],
+    "gaming": [
+      {
+        "name": "Epic Games",
+        "emoji": "\ud83c\udfae",
+        "career_url": "https://epicgames.com/careers",
+        "api_names": [
+          "epic games"
+        ]
+      },
+      {
+        "name": "Riot Games",
+        "emoji": "\u2694\ufe0f",
+        "career_url": "https://riotgames.com/careers",
+        "api_names": [
+          "riot games"
+        ]
+      },
+      {
+        "name": "Unity",
+        "emoji": "\ud83d\udd37",
+        "career_url": "https://unity.com/careers",
+        "api_names": [
+          "unity"
+        ]
+      },
+      {
+        "name": "Roblox",
+        "emoji": "\ud83d\udfe9",
+        "career_url": "https://careers.roblox.com",
+        "api_names": [
+          "roblox"
+        ]
+      }
+    ],
+    "cybersecurity": [
+      {
+        "name": "CrowdStrike",
+        "emoji": "\ud83d\udee1\ufe0f",
+        "career_url": "https://crowdstrike.com/careers",
+        "api_names": [
+          "crowdstrike"
+        ]
+      },
+      {
+        "name": "Okta",
+        "emoji": "\ud83d\udd10",
+        "career_url": "https://okta.com/careers",
+        "api_names": [
+          "okta"
+        ]
+      },
+      {
+        "name": "Palo Alto Networks",
+        "emoji": "\ud83d\udd12",
+        "career_url": "https://paloaltonetworks.com/careers",
+        "api_names": [
+          "palo alto networks"
+        ]
+      }
+    ]
+  }
+}

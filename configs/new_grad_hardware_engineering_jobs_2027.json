@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "repoPrefix": "hej",
+  "headingImageAlt": "Hardware Engineering Jobs 2027 - Illustration of people working on hardware.",
+  "title": "Hardware Engineering Jobs 2027",
+  "tagline": "",
+  "jobCountBadgeLabel": "Hardware Jobs",
+  "descriptionLine1": "\ud83d\ude80 Hardware, embedded systems, and EE jobs for new graduates, updated in real time.",
+  "descriptionLine2": "",
+  "noteType": "TIP",
+  "noteText": "\ud83d\udee0 Help us grow! Add new jobs by submitting an issue! View contributing steps [here](CONTRIBUTING-GUIDE.md).",
+  "jobsSectionHeader": "Fresh Hardware Engineering Jobs 2027",
+  "features": {
+    "internships": false,
+    "moreResources": true
+  },
+  "defaultCategory": "hardware_engineer",
+  "filters": {
+    "domains": [
+      "hardware"
+    ],
+    "locations": [
+      "us"
+    ]
+  },
+  "activeWindowDays": 14,
+  "repo": "New-Grad-Hardware-Engineering-Jobs-2027",
+  "boardName": "new_grad_hardware_engineering_jobs_2027",
+  "categories": {
+    "hardware_engineer": {
+      "title": "Hardware Engineer",
+      "emoji": "\u26a1",
+      "keywords": [
+        "hardware engineer",
+        "electrical engineer",
+        "computer engineer",
+        "pcb engineer",
+        "circuit engineer",
+        "hardware design engineer",
+        "board design engineer",
+        "systems engineer"
+      ]
+    },
+    "fpga_asic": {
+      "title": "FPGA/ASIC",
+      "emoji": "\ud83d\udd32",
+      "keywords": [
+        "fpga",
+        "asic",
+        "vhdl",
+        "verilog",
+        "digital design",
+        "soc",
+        "firmware engineer",
+        "rtl design",
+        "synthesis",
+        "timing analysis",
+        "fpga engineer",
+        "asic engineer",
+        "digital design engineer"
+      ]
+    },
+    "embedded_systems": {
+      "title": "Embedded Systems",
+      "emoji": "\ud83d\udd0c",
+      "keywords": [
+        "embedded",
+        "firmware",
+        "microcontroller",
+        "rtos",
+        "iot",
+        "bare metal",
+        "device driver",
+        "embedded software",
+        "embedded systems engineer",
+        "firmware engineer",
+        "embedded developer"
+      ]
+    },
+    "electrical_engineer": {
+      "title": "Electrical Engineer",
+      "emoji": "\ud83d\udd0b",
+      "keywords": [
+        "electrical engineer",
+        "power electronics",
+        "analog",
+        "mixed signal",
+        "validation engineer",
+        "test engineer",
+        "power engineer",
+        "analog design",
+        "mixed signal design",
+        "circuit design",
+        "electrical design engineer"
+      ]
+    },
+    "validation_engineer": {
+      "title": "Validation Engineer",
+      "emoji": "\u2705",
+      "keywords": [
+        "validation",
+        "test engineer",
+        "quality engineer",
+        "silicon validation",
+        "hardware test",
+        "post-silicon",
+        "pre-silicon validation",
+        "validation engineer",
+        "hardware validation",
+        "test development",
+        "quality assurance"
+      ]
+    }
+  }
+}

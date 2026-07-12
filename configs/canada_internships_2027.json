@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "repoPrefix": "can",
+  "buttonPrefix": "int-can",
+  "headingImageAlt": "Canada Internships 2027",
+  "title": "Canada Internships 2027",
+  "tagline": "",
+  "jobCountBadgeLabel": "Total Internships",
+  "descriptionLine1": "\ud83d\ude80 Internships and co-ops across tech, business, healthcare, and more for students in Canada, sourced live and updated in real time.",
+  "descriptionLine2": "",
+  "noteType": "TIP",
+  "noteText": "\ud83d\udee0 Help us grow! Add new jobs by submitting an issue! View contributing steps [here](CONTRIBUTING-GUIDE.md).",
+  "jobsSectionHeader": "Fresh Canada Internships 2027",
+  "features": {
+    "internships": false,
+    "moreResources": true
+  },
+  "defaultCategory": "other_internships",
+  "feedKey": "canada-tech-internships.jsonl",
+  "r2Prefix": "data/",
+  "filters": {
+    "locations": [
+      "canada"
+    ]
+  },
+  "activeWindowDays": 120,
+  "contributorLocation": "Canada",
+  "repo": "Canada-Internships-2027",
+  "boardName": "canada_internships_2027",
+  "categories": {
+    "software": {
+      "title": "Software Engineering",
+      "emoji": "\ud83d\udcbb",
+      "keywords": [
+        "software engineer",
+        "developer",
+        "backend",
+        "frontend",
+        "full stack",
+        "devops",
+        "sre",
+        "cloud",
+        "security",
+        "embedded",
+        "systems engineer"
+      ]
+    },
+    "hardware": {
+      "title": "Hardware & Systems",
+      "emoji": "\u2699\ufe0f",
+      "keywords": [
+        "hardware engineer",
+        "electrical",
+        "fpga",
+        "asic",
+        "validation",
+        "test engineer",
+        "power systems"
+      ]
+    },
+    "data_science": {
+      "title": "Data Science & Analytics",
+      "emoji": "\ud83d\udd2c",
+      "keywords": [
+        "data scientist",
+        "data analyst",
+        "machine learning",
+        "analytics",
+        "research scientist",
+        "actuarial",
+        "strategy analyst"
+      ]
+    },
+    "ai": {
+      "title": "AI / ML",
+      "emoji": "\ud83e\udd16",
+      "keywords": [
+        "artificial intelligence",
+        "ai",
+        "llm",
+        "ml",
+        "machine learning"
+      ]
+    },
+    "operations": {
+      "title": "Operations & Support",
+      "emoji": "\ud83d\udee0\ufe0f",
+      "keywords": [
+        "operations",
+        "support",
+        "customer success",
+        "field service",
+        "supply chain",
+        "program manager"
+      ]
+    },
+    "other": {
+      "title": "Other Tech Roles",
+      "emoji": "\ud83d\udcc2",
+      "keywords": []
+    }
+  },
+  "companies": {}
+}

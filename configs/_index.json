@@ -1,0 +1,112 @@
+[
+  {
+    "board": "canada_internships_2027",
+    "repo": "Canada-Internships-2027",
+    "title": "Canada Internships 2027",
+    "filters": {
+      "locations": [
+        "canada"
+      ]
+    },
+    "feedKey": "canada-tech-internships.jsonl",
+    "has_categories": true,
+    "has_companies": true
+  },
+  {
+    "board": "canada_jobs_2027",
+    "repo": "Canada-Jobs-2027",
+    "title": "Canada Jobs 2027",
+    "filters": {
+      "locations": [
+        "canada"
+      ]
+    },
+    "feedKey": "canada-jobs.jsonl",
+    "has_categories": true,
+    "has_companies": true
+  },
+  {
+    "board": "internships_2027",
+    "repo": "Internships-2027",
+    "title": "Internships 2027",
+    "filters": {
+      "locations": [
+        "us"
+      ],
+      "employment": "internship"
+    },
+    "feedKey": "N/A",
+    "has_categories": true,
+    "has_companies": true
+  },
+  {
+    "board": "new_grad_data_science_jobs_2027",
+    "repo": "New-Grad-Data-Science-Jobs-2027",
+    "title": "Data Science Jobs 2027",
+    "filters": {
+      "domains": [
+        "data_science"
+      ],
+      "locations": [
+        "us"
+      ]
+    },
+    "feedKey": "N/A",
+    "has_categories": true,
+    "has_companies": false
+  },
+  {
+    "board": "new_grad_hardware_engineering_jobs_2027",
+    "repo": "New-Grad-Hardware-Engineering-Jobs-2027",
+    "title": "Hardware Engineering Jobs 2027",
+    "filters": {
+      "domains": [
+        "hardware"
+      ],
+      "locations": [
+        "us"
+      ]
+    },
+    "feedKey": "N/A",
+    "has_categories": true,
+    "has_companies": false
+  },
+  {
+    "board": "new_grad_healthcare_jobs_2027",
+    "repo": "New-Grad-Healthcare-Jobs-2027",
+    "title": "Healthcare Jobs 2027",
+    "filters": {
+      "domains": [
+        "healthcare"
+      ],
+      "locations": [
+        "us"
+      ]
+    },
+    "feedKey": "N/A",
+    "has_categories": true,
+    "has_companies": false
+  },
+  {
+    "board": "new_grad_jobs_2027",
+    "repo": "New-Grad-Jobs-2027",
+    "title": "New Grad Jobs 2027",
+    "filters": {
+      "locations": [
+        "us"
+      ]
+    },
+    "feedKey": "N/A",
+    "has_categories": true,
+    "has_companies": true
+  },
+  {
+    "board": "new_grad_software_engineering_jobs_2027",
+    "repo": "New-Grad-Software-Engineering-Jobs-2027",
+    "title": "Software Engineering Jobs 2027",
+    "filters": {},
+    "feedKey": "N/A",
+    "has_categories": true,
+    "has_companies": false
+  }
+]
