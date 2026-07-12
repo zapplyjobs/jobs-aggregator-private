@@ -5,3 +5,6 @@
 [submodule ".github/scripts/aggregator"]
 	path = .github/scripts/aggregator
 	url = https://github.com/zapplyjobs/job-board-aggregator.git
+[submodule ".github/scripts/consumer"]
+	path = .github/scripts/consumer
+	url = https://github.com/zapplyjobs/job-board-consumer.git
