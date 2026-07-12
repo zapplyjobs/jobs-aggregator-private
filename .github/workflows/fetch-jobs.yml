@@ -807,6 +807,29 @@ jobs:
         cd $GITHUB_WORKSPACE
         node .github/scripts/generate-and-push-readmes.js
 
+
+    - name: Upload board-counts.json to R2
+      if: success() && github.ref_name == 'main'
+      continue-on-error: true
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      run: |
+        if [ -f .github/data/board-counts.json ]; then
+          node -e "
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          const fs = require('fs');
+          async function main() {
+            const r2 = createR2Client({ prefix: 'data/' });
+            const body = fs.readFileSync('.github/data/board-counts.json');
+            await r2.uploadRaw('board-counts.json', body, 'application/json');
+            console.log(' Uploaded board-counts.json to R2');
+          }
+          main().catch(e => { console.error(e.message); process.exit(1); });
+          "
+        fi
     - name: Trigger jobs-data public snapshot refresh
       if: success() && github.ref_name == 'main'
       run: |
