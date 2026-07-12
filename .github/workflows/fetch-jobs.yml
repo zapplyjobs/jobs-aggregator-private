@@ -70,7 +70,6 @@ jobs:
               const countsResult = await r2.downloadToFile('board-counts.json', '.github/data/board-counts.json');
               if (countsResult) { console.log('R2_OK board-counts: ' + Math.round(countsResult.size/1024) + 'KB'); }
             } catch { console.log('R2_SKIP board-counts: not found (first run)'); }
-            else { console.log('R2_SKIP dedupe-store: not found (first run or empty)'); }
           } else { process.exit(1); }
         }
         main().catch(e => { console.error('R2 error: ' + e.message); process.exit(1); });
