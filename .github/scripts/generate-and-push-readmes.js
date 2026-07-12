@@ -49,7 +49,10 @@ function loadJobsForBoard(config) {
     console.warn('  ⚠️ all_jobs.json not found');
     return [];
   }
-  const allJobs = JSON.parse(fs.readFileSync(allJobsPath, 'utf8'));
+  const allJobsRaw = fs.readFileSync(allJobsPath, 'utf8').trim();
+  let allJobs;
+  try { allJobs = JSON.parse(allJobsRaw); }
+  catch { allJobs = allJobsRaw.split(/\n+/).filter(Boolean).map(l => JSON.parse(l)); }
   return filterJobs(allJobs, config.filters || {});
 }
 
