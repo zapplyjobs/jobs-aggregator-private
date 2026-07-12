@@ -114,18 +114,7 @@ jobs:
         run: |
           gh api repos/zapplyjobs/jobs-aggregator-private/actions/workflows/234555372/disable --method PUT --silent && echo "Disabled: aggregator/Fetch All Jobs" || echo "WARN: Could not disable"
           gh api repos/zapplyjobs/jobs-data-2026/actions/workflows/239692001/disable --method PUT --silent && echo "Disabled: jobs-data/Enrich Jobs" || echo "WARN: Could not disable"
-          declare -A CONSUMER_WORKFLOWS=(
-            ["New-Grad-Jobs-2027"]="172507830"
-            ["Internships-2027"]="197229424"
-            ["New-Grad-Software-Engineering-Jobs-2027"]="194987480"
-            ["New-Grad-Data-Science-Jobs-2027"]="181160192"
-            ["New-Grad-Hardware-Engineering-Jobs-2027"]="181164092"
-            ["New-Grad-Healthcare-Jobs-2027"]="189226548"
-          )
-          for REPO in "${!CONSUMER_WORKFLOWS[@]}"; do
-            WF_ID="${CONSUMER_WORKFLOWS[$REPO]}"
-            gh api "repos/zapplyjobs/$REPO/actions/workflows/$WF_ID/disable" --method PUT --silent && echo "Disabled: $REPO/Update Jobs" || echo "WARN: Could not disable $REPO"
-          done
+          # Consumer repos are pure display (Phase 4) — no workflows to disable
 
       - name: Bump target repos
         id: bump
@@ -257,24 +246,10 @@ jobs:
 
           gh api repos/zapplyjobs/jobs-aggregator-private/actions/workflows/234555372/enable --method PUT --silent && echo "Enabled: aggregator/Fetch All Jobs" || true
           gh api repos/zapplyjobs/jobs-data-2026/actions/workflows/239692001/enable --method PUT --silent && echo "Enabled: jobs-data/Enrich Jobs" || true
-          declare -A CONSUMER_WORKFLOWS=(
-            ["New-Grad-Jobs-2027"]="172507830"
-            ["Internships-2027"]="197229424"
-            ["New-Grad-Software-Engineering-Jobs-2027"]="194987480"
-            ["New-Grad-Data-Science-Jobs-2027"]="181160192"
-            ["New-Grad-Hardware-Engineering-Jobs-2027"]="181164092"
-            ["New-Grad-Healthcare-Jobs-2027"]="189226548"
-          )
-          for REPO in "${!CONSUMER_WORKFLOWS[@]}"; do
-            WF_ID="${CONSUMER_WORKFLOWS[$REPO]}"
-            gh api "repos/zapplyjobs/$REPO/actions/workflows/$WF_ID/enable" --method PUT --silent && echo "Enabled: $REPO/Update Jobs" || true
-          done
+          # Consumer repos are pure display (Phase 4) — no workflows to re-enable
 
           verify_active "jobs-aggregator-private" "234555372" "aggregator/Fetch All Jobs"
           verify_active "jobs-data-2026" "239692001" "jobs-data/Enrich Jobs"
-          for REPO in "${!CONSUMER_WORKFLOWS[@]}"; do
-            verify_active "$REPO" "${CONSUMER_WORKFLOWS[$REPO]}" "$REPO/Update Jobs"
-          done
 
           if [ "$REENABLE_FAIL" -gt 0 ]; then
             echo "::error::$REENABLE_FAIL workflow(s) were not active after re-enable"
