@@ -147,6 +147,7 @@ async function main() {
 
   let ok = 0, fail = 0;
   const boardCounts = [];
+  const failedRepos = [];
 
   // Load previous counts for drop detection
   const prevCountsPath = path.join(DATA_DIR, 'board-counts.json');
@@ -217,12 +218,16 @@ async function main() {
     } catch (error) {
       console.error(`  ❌ ${error.message}`);
       fail++;
+      failedRepos.push(repo);
     }
   }
 
   console.log(`\n${'═'.repeat(43)}`);
   console.log(`  Done: ${ok} succeeded, ${fail} failed`);
-  console.log(`${'═'.repeat(43)}`);
+  if (fail > 0) {
+    console.warn(`  ⚠️ Failed boards: ${failedRepos.join(', ')}`);
+    sendDiscordAlert('pipeline-push', `${fail}/${ok + fail} boards failed to push: ${failedRepos.join(', ')}`);
+  }
 
   // Write board counts for monitoring (consumer_count_zero_health will read from R2)
   const countsPath = path.join(DATA_DIR, 'board-counts.json');
