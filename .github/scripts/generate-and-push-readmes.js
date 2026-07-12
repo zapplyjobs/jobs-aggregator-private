@@ -12,7 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { createReadmeGenerator } = require('./.github/scripts/consumer/lib/readme-generator');
+const { createReadmeGenerator } = require(path.join(__dirname, 'consumer/lib/readme-generator'));
 
 const CONFIGS_DIR = path.join(process.cwd(), 'configs');
 const DATA_DIR = path.join(process.cwd(), '.github', 'data');
