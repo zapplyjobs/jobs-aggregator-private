@@ -98,15 +98,18 @@ function pushReadme(repo, readmeContent) {
   } catch (e) {
     throw new Error(`Failed to get README SHA for ${repo}: ${e.message}`);
   }
-  // Push via Contents API
-  const tmpFile = path.join(TEMP_DIR, 'readme-content.b64');
-  fs.writeFileSync(tmpFile, content);
+  // Write request body to file (avoids command-line argument length limits for large READMEs)
+  const body = JSON.stringify({
+    message: 'auto: regenerate README from pipeline (centralized)',
+    content: content,
+    sha: sha,
+    branch: 'main'
+  });
+  const bodyFile = path.join(TEMP_DIR, 'push-body.json');
+  fs.writeFileSync(bodyFile, body);
+  // Push via --input (reads body from file, not command-line args)
   execSync(
-    `gh api repos/zapplyjobs/${repo}/contents/README.md -X PUT ` +
-    `-f message="auto: regenerate README from pipeline (centralized)" ` +
-    `-f content="$(cat '${tmpFile}')" ` +
-    `-f sha="${sha}" ` +
-    `-f branch="main"`,
+    `gh api repos/zapplyjobs/${repo}/contents/README.md -X PUT --input ${bodyFile}`,
     { encoding: 'utf8', stdio: 'pipe' }
   );
 }
