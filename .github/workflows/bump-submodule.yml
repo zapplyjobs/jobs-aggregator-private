@@ -81,7 +81,7 @@ jobs:
 
           case "$SUBMODULE_NAME" in
             shared)
-              echo "repos=zapplyjobs/jobs-aggregator-private zapplyjobs/jobs-data-2026 zapplyjobs/New-Grad-Jobs-2027 zapplyjobs/Internships-2027 zapplyjobs/New-Grad-Software-Engineering-Jobs-2027 zapplyjobs/New-Grad-Data-Science-Jobs-2027 zapplyjobs/New-Grad-Hardware-Engineering-Jobs-2027 zapplyjobs/New-Grad-Healthcare-Jobs-2027" >> "$GITHUB_OUTPUT"
+              echo "repos=zapplyjobs/jobs-aggregator-private zapplyjobs/jobs-data-2026" >> "$GITHUB_OUTPUT"
               ;;
             aggregator)
               echo "repos=zapplyjobs/jobs-aggregator-private" >> "$GITHUB_OUTPUT"
@@ -90,7 +90,7 @@ jobs:
               echo "repos=zapplyjobs/jobs-data-2026" >> "$GITHUB_OUTPUT"
               ;;
             consumer)
-              echo "repos=zapplyjobs/New-Grad-Jobs-2027 zapplyjobs/Internships-2027 zapplyjobs/New-Grad-Software-Engineering-Jobs-2027 zapplyjobs/New-Grad-Data-Science-Jobs-2027 zapplyjobs/New-Grad-Hardware-Engineering-Jobs-2027 zapplyjobs/New-Grad-Healthcare-Jobs-2027" >> "$GITHUB_OUTPUT"
+              echo "repos=zapplyjobs/jobs-aggregator-private" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "::error::Unknown submodule: $SUBMODULE_NAME"
