@@ -716,6 +716,7 @@ jobs:
             'wd-family-cache.json',
             'filtered-samples.jsonl',
             'tag-history.jsonl',
+            'board-counts.json',
           ];
           const requiredFiles = new Set(files);
 
