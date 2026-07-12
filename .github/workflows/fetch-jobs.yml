@@ -788,6 +788,16 @@ jobs:
         GITHUB_RUN_ID: ${{ github.run_id }}
 
 
+    - name: Generate + push consumer board READMEs
+      if: success() && github.ref_name == 'main'
+      continue-on-error: true
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+      run: |
+        cd .github/scripts/consumer && npm install --silent
+        cd $GITHUB_WORKSPACE
+        node .github/scripts/generate-and-push-readmes.js
+
     - name: Trigger jobs-data public snapshot refresh
       if: success() && github.ref_name == 'main'
       run: |
