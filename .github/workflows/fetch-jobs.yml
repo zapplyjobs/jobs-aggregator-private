@@ -2,8 +2,6 @@ name: Fetch All Jobs
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '*/15 * * * *'  # Every 15 min (GitHub native schedule — replaces Cloudflare Worker dispatch)
 
 # Prevent concurrent runs
 concurrency:
@@ -1024,3 +1022,17 @@ jobs:
           -H "Authorization: Bot ${DISCORD_TOKEN}" \
           -H "Content-Type: application/json" \
           -d "$PAYLOAD" || echo "Discord alert failed (non-blocking)"
+
+    - name: Heartbeat — dispatch next run
+      if: success() && github.ref_name == 'main'
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+      run: |
+        curl -sf -X POST \
+          "https://api.github.com/repos/zapplyjobs/jobs-aggregator-private/actions/workflows/fetch-jobs.yml/dispatches" \
+          -H "Authorization: Bearer ${GH_PAT}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          -d '{"ref":"main"}' \
+          && echo "💓 Heartbeat: dispatched next pipeline run" \
+          || echo "⚠️ Heartbeat dispatch failed (non-blocking — Worker cron will catch up)"
