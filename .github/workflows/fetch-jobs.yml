@@ -49,7 +49,9 @@ jobs:
       run: cd .github/scripts/shared && [ -f lib/aggregator/processors/tag-engine.js ] && node lib/__tests__/tag-engine.test.js || echo "⚠️ tag-engine.js not decrypted — skipping tests"
 
     - name: Create logs directory
-      run: mkdir -p .github/logs .github/data
+      run: |
+        mkdir -p .github/logs .github/data
+        date -u +%s > .github/data/workflow-start.txt
 
     - name: "Seed all_jobs.json from R2 (private R2 only)"
       run: |
@@ -201,26 +203,31 @@ jobs:
           fs.mkdirSync(DATA_DIR, { recursive: true });
           const r2 = createR2Client({ prefix: 'data/' });
           let seeded = 0;
+          const BATCH = 5; // AGG-RUNTIME-ALERT-1: parallel downloads instead of sequential
           try {
             const objects = await r2.list('descriptions-');
-            for (const obj of objects) {
-              const name = path.basename(obj.key || '');
-              if (!/^descriptions-.*\.jsonl$/.test(name)) continue;
-              const target = path.join(DATA_DIR, name);
-              if (fs.existsSync(target)) continue;
-              const result = await r2.downloadToFile(name, target);
-              if (result) seeded++;
+            for (let i = 0; i < objects.length; i += BATCH) {
+              await Promise.all(objects.slice(i, i + BATCH).map(async (obj) => {
+                const name = path.basename(obj.key || '');
+                if (!/^descriptions-.*\.jsonl$/.test(name)) return;
+                const target = path.join(DATA_DIR, name);
+                if (fs.existsSync(target)) return;
+                const result = await r2.downloadToFile(name, target);
+                if (result) seeded++;
+              }));
             }
           } catch {}
           let ghSeeded = 0;
           try {
             const listing = await getJson('https://api.github.com/repos/zapplyjobs/jobs-data-2026/contents/.github/data');
-            for (const item of listing) {
-              if (!item || !/^descriptions-.*\.jsonl$/.test(item.name || '')) continue;
-              const target = path.join(DATA_DIR, item.name);
-              if (fs.existsSync(target)) continue;
-              const ok = await download(item.download_url, target);
-              if (ok) ghSeeded++;
+            for (let i = 0; i < listing.length; i += BATCH) {
+              await Promise.all(listing.slice(i, i + BATCH).map(async (item) => {
+                if (!item || !/^descriptions-.*\.jsonl$/.test(item.name || '')) return;
+                const target = path.join(DATA_DIR, item.name);
+                if (fs.existsSync(target)) return;
+                const ok = await download(item.download_url, target);
+                if (ok) ghSeeded++;
+              }));
             }
           } catch {}
           console.log(`SEEDED_R2:${seeded}`);
@@ -794,6 +801,31 @@ jobs:
         GITHUB_RUN_ID: ${{ github.run_id }}
 
 
+    - name: Log total workflow time
+      if: always()
+      run: |
+        START=$(cat .github/data/workflow-start.txt 2>/dev/null || echo 0)
+        NOW=$(date -u +%s)
+        ELAPSED=$((NOW - START))
+        MIN=$((ELAPSED / 60))
+        SEC=$((ELAPSED % 60))
+        echo "⏱️ Total workflow time to heartbeat: ${ELAPSED}s (${MIN}min ${SEC}s)"
+        echo "WORKFLOW_TOTAL_SECONDS=${ELAPSED}" >> $GITHUB_ENV
+
+    - name: Heartbeat — dispatch next run (early, before READMEs/archive)
+      if: success() && github.ref_name == 'main'
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+      run: |
+        curl -sf -X POST \
+          "https://api.github.com/repos/zapplyjobs/jobs-aggregator-private/actions/workflows/fetch-jobs.yml/dispatches" \
+          -H "Authorization: Bearer ${GH_PAT}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          -d '{"ref":"main"}' \
+          && echo "💓 Heartbeat: dispatched next pipeline run (early — READMEs/archive run after)" \
+          || echo "⚠️ Heartbeat dispatch failed (non-blocking — Worker cron will catch up)"
+
     - name: Generate + push consumer board READMEs
       if: success() && github.ref_name == 'main'
       continue-on-error: true
@@ -1023,16 +1055,5 @@ jobs:
           -H "Content-Type: application/json" \
           -d "$PAYLOAD" || echo "Discord alert failed (non-blocking)"
 
-    - name: Heartbeat — dispatch next run
-      if: success() && github.ref_name == 'main'
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-      run: |
-        curl -sf -X POST \
-          "https://api.github.com/repos/zapplyjobs/jobs-aggregator-private/actions/workflows/fetch-jobs.yml/dispatches" \
-          -H "Authorization: Bearer ${GH_PAT}" \
-          -H "Accept: application/vnd.github+json" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          -d '{"ref":"main"}' \
-          && echo "💓 Heartbeat: dispatched next pipeline run" \
-          || echo "⚠️ Heartbeat dispatch failed (non-blocking — Worker cron will catch up)"
+    # Heartbeat moved earlier (after R2 upload) to reduce cycle time (AGG-RUNTIME-ALERT-1)
+    # READMEs + archive now run after the heartbeat — they don't block the next run.
