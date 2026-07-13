@@ -39,6 +39,7 @@ const { fetchAllDeshawJobs } = require(`${SHARED}/fetchers/deshaw`);
 const { applyFamilyCache, buildFamilyCache } = require(`${SHARED}/fetchers/workday`);
 const { fetchSRDescriptions } = require(`${SHARED}/fetchers/smartrecruiters-descriptions`);
 const { fetchWorkdayDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
+const { fromDescription } = require(`${SHARED}/fetchers/salary`);
 
 
 // Import processors
@@ -1537,6 +1538,27 @@ async function main() {
     stageTimings.step8b_sidecars_ms = Date.now() - _stepStart;
     pipelineTimestamps.sidecars_written_at = new Date().toISOString();
     console.log('');
+    // AGG-SALARY-TEXT-INTEGRATION-1: Extract salary from description text for jobs
+    // without structured salary (ashby/lever already have it from the fetcher).
+    // ENR built + tested fromDescription() (30 tests, <0.3% false-positive).
+    // Runs before STRIP_FIELDS so descriptions are still on the job objects.
+    const _salaryStart = Date.now();
+    let _descSalaryCount = 0;
+    for (const job of sortedJobs) {
+      if (job.salaryMin == null && job.description) {
+        const plainText = typeof job.description === 'string'
+          ? job.description.replace(/<[^>]*>/g, ' ').replace(/&[a-z]+;/gi, ' ')
+          : '';
+        const extracted = fromDescription(plainText);
+        if (extracted.salaryMin != null) {
+          job.salaryMin = extracted.salaryMin;
+          job.salaryMax = extracted.salaryMax;
+          job.salaryCurrency = extracted.salaryCurrency;
+          _descSalaryCount++;
+        }
+      }
+    }
+    console.log(`💰 Step 8c: Salary from description text — ${_descSalaryCount} jobs extracted (${((Date.now() - _salaryStart) / 1000).toFixed(1)}s)`);
 
     // Step 9: Write output files
     console.log('💾 Step 9: Writing output files...');
