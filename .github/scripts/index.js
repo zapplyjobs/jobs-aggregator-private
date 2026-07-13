@@ -1257,16 +1257,17 @@ async function main() {
     // The fetcher self-caps at MAX_PER_RUN=200 (~80s), prioritizes US jobs, and caches via
     // descriptions-workday.jsonl (seeded from R2 + uploaded each run) -> backfills over ~2 days.
     // GUARD: monitor first runs' wall-time; revert to skipping if it breaches 8 min.
+    const _skipDesc = process.env.SKIP_DESC_BACKFILL === '1';
     const wdJobs = allJobs.filter(j => j.source === 'workday');
     if (wdJobs.length > 0) {
-      const wdDescriptions = await fetchWorkdayDescriptions(wdJobs, DATA_DIR);
+      const wdDescriptions = await fetchWorkdayDescriptions(wdJobs, DATA_DIR, { skipFetch: _skipDesc });
       injectDescriptions(wdJobs, wdDescriptions, 'WD');
     } else {
       console.log('📄 Step 1b: No WD jobs this run — skipping description fetch');
     }
     const srJobs = allJobs.filter(j => j.source === 'smartrecruiters');
     if (srJobs.length > 0) {
-      const srDescriptions = await fetchSRDescriptions(srJobs, DATA_DIR);
+      const srDescriptions = await fetchSRDescriptions(srJobs, DATA_DIR, { skipFetch: _skipDesc });
       injectDescriptions(srJobs, srDescriptions, 'SR');
     } else {
       console.log('📄 SR descriptions: No SmartRecruiters jobs this run — skipping description fetch');
