@@ -1258,10 +1258,13 @@ async function main() {
     // descriptions-workday.jsonl (seeded from R2 + uploaded each run) -> backfills over ~2 days.
     // GUARD: monitor first runs' wall-time; revert to skipping if it breaches 8 min.
     const _skipDesc = process.env.SKIP_DESC_BACKFILL === '1';
+    let _wdDescBacklog = 0, _wdDescCached = 0;
     const wdJobs = allJobs.filter(j => j.source === 'workday');
     if (wdJobs.length > 0) {
       const wdDescriptions = await fetchWorkdayDescriptions(wdJobs, DATA_DIR, { skipFetch: _skipDesc });
       injectDescriptions(wdJobs, wdDescriptions, 'WD');
+      _wdDescBacklog = wdJobs.filter(j => !wdDescriptions.has(j.id)).length;
+      _wdDescCached = wdDescriptions.size;
     } else {
       console.log('📄 Step 1b: No WD jobs this run — skipping description fetch');
     }
@@ -1849,6 +1852,7 @@ async function main() {
       fetcherHealth,
       supplementalInputs: supplementalInputs.inputs,
     });
+    metadata.desc_backlog = { wd_pending: _wdDescBacklog, wd_cached: _wdDescCached };
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     // Step 9c: build / refresh Workday family cache for future runs. Output is already written, so
