@@ -20,14 +20,6 @@ jobs:
       SKIP_WD_FAMILY_CACHE_BUILD: 1
 
     steps:
-    - name: Determine desc backfill cadence
-      run: |
-        if [ $(( ${{ github.run_number }} % 3 )) -ne 0 ]; then
-          echo "SKIP_DESC_BACKFILL=1" >> $GITHUB_ENV
-          echo "📄 Desc backfill: SKIPPED this run (full fetch every 3rd run)"
-        else
-          echo "📄 Desc backfill: FULL FETCH this run"
-        fi
     - name: Checkout repository
       uses: actions/checkout@v5
       with:
