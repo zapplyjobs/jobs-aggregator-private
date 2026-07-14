@@ -2446,6 +2446,19 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
     }
   }
 
+  // AGG-PERSOURCE-STAGES-1: Per-source pipeline stage counts for DASH Source Journey.
+  const sourceJourney = {};
+  for (const src of new Set([
+    ...Object.keys(fetchResults || {}),
+    ...Object.keys(seniorFilterMetrics?.by_source || {}),
+    ...Object.keys(bySource),
+  ])) {
+    sourceJourney[src] = {
+      fetched: (fetchResults || {})[src] || 0,
+      senior_filtered: (seniorFilterMetrics?.by_source || {})[src] || 0,
+      final: bySource[src] || 0,
+    };
+  }
   return {
     version: '1.0',
     generated: new Date().toISOString(),
@@ -2456,6 +2469,7 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
     duplicates_removed: duplicateCount,
 
     by_source: bySource,
+    source_journey: sourceJourney,
     by_employment_type: byEmploymentType,
     by_job_type: byInternship,
     by_location: byRemote,
