@@ -825,6 +825,19 @@ jobs:
           -d '{"ref":"main"}' \
           && echo "💓 Heartbeat: dispatched next pipeline run (early — READMEs/archive run after)" \
           || echo "⚠️ Heartbeat dispatch failed (non-blocking — Worker cron will catch up)"
+ 
+    - name: Trigger enrichment (wave link — eliminates avg 7.5min enrich wait)
+      if: success() && github.ref_name == 'main'
+      run: |
+        curl -sf -X POST "https://api.github.com/repos/zapplyjobs/jobs-data-2026/actions/workflows/enrich-jobs.yml/dispatches" \
+          -H "Authorization: Bearer ${GH_PAT}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          -d '{"ref":"main"}' \
+          && echo "✅ Triggered enrichment (wave link)" \
+          || echo "⚠️ Enrichment dispatch failed (non-blocking — Worker cron will catch up)"
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
 
     - name: Generate + push consumer board READMEs
       if: success() && github.ref_name == 'main'
