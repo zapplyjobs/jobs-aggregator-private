@@ -2373,6 +2373,8 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
   const byRemote = { remote: 0, onsite: 0 };
   const companyCounts = {};
   const companyDomains = {};  // DASH-4b: track domain distribution per company
+  const bySourceDomain = {};  // AGG-CROSSTAB-1: source × domain cross-tab
+  const bySourceJobType = {}; // AGG-CROSSTAB-1: source × job_type cross-tab
 
   const now = Date.now();
   const freshness = { last_1h: 0, last_6h: 0, last_24h: 0, last_48h: 0 };
@@ -2380,6 +2382,14 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
   for (const job of jobs) {
     // Count by source
     bySource[job.source] = (bySource[job.source] || 0) + 1;
+    // AGG-CROSSTAB-1: cross-dimensional breakdowns for DASH filtering
+    if (!bySourceDomain[job.source]) bySourceDomain[job.source] = {};
+    for (const d of (job.tags?.domains || [])) {
+      bySourceDomain[job.source][d] = (bySourceDomain[job.source][d] || 0) + 1;
+    }
+    if (!bySourceJobType[job.source]) bySourceJobType[job.source] = {};
+    const _jt = job.tags?.employment || 'unknown';
+    bySourceJobType[job.source][_jt] = (bySourceJobType[job.source][_jt] || 0) + 1;
 
     // Count by employment type (AGG-DATA-13: normalize to canonical forms)
     // AGG-PIPE-13: shared EMPLOYMENT_NORMALIZE_MAP (includes compound types)
@@ -2474,6 +2484,8 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
 
     by_source: bySource,
     source_journey: sourceJourney,
+    by_source_domain: bySourceDomain,
+    by_source_job_type: bySourceJobType,
     by_employment_type: byEmploymentType,
     by_job_type: byInternship,
     by_location: byRemote,
