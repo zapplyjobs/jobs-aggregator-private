@@ -2473,6 +2473,13 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
       final: bySource[src] || 0,
     };
   }
+
+  // AGG-DEADLINK-PUBLISH-1: Read link-health.json (produced by pre-metadata workflow step)
+  let linkHealth = [];
+  try {
+    const lhPath = path.join(DATA_DIR, 'link-health.json');
+    if (fs.existsSync(lhPath)) linkHealth = JSON.parse(fs.readFileSync(lhPath, 'utf8'));
+  } catch {}
   return {
     version: '1.0',
     generated: new Date().toISOString(),
@@ -2488,6 +2495,7 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
     by_source_job_type: bySourceJobType,
     by_employment_type: byEmploymentType,
     by_job_type: byInternship,
+    link_health: linkHealth,
     by_location: byRemote,
 
     ats_stats: getATSUsageStats(),

@@ -696,7 +696,7 @@ jobs:
         fi
 
 
-    - name: Generate dead-links.json for DASH (AGG-DEADLINK-PUBLISH-1)
+    - name: Generate link-health data for metadata (AGG-DEADLINK-PUBLISH-1)
       if: success()
       run: |
         node -e "
@@ -706,31 +706,31 @@ jobs:
         const DATA_DIR = '.github/data';
         const r2 = createR2Client({ prefix: 'data/' });
         (async () => {
-          const deadLinks = [];
-          // Read stale-job artifacts from R2 (produced by check-link-health workflow)
+          const linkHealth = [];
+          // Read stale-job artifacts from R2 (produced by check-link-health workflow, 6-hour cron)
           for (const file of ['stale-job-tombstones.json', 'stale-job-candidates.json']) {
             const local = path.join(DATA_DIR, file);
             const ok = await r2.downloadToFile(file, local);
             if (!ok) { console.log('  ' + file + ': not available'); continue; }
             const data = JSON.parse(fs.readFileSync(local, 'utf8'));
-            const items = data.tombstones || data.dead || data.candidates || [];
+            const items = data.tombstones || data.dead || [];
             for (const item of items) {
               if (!item.url) continue;
-              deadLinks.push({
-                repo: item.source || 'unknown',
+              linkHealth.push({
+                repo: item.source || item.group || 'unknown',
                 url: item.url,
-                status: (item.lifecycle_state === 'dead_confirmed' || file.includes('tombstone')) ? 'dead' : 'stale',
-                last_checked: item.last_seen || item.first_seen || new Date().toISOString(),
+                status: item.latest_status || 'dead',
+                last_checked: item.last_dead_seen_at || item.first_dead_seen_at || null,
                 http_code: item.latest_code || null,
                 company: item.company_name || null,
                 title: (item.title || '').slice(0, 80),
               });
             }
           }
-          const out = path.join(DATA_DIR, 'dead-links.json');
-          fs.writeFileSync(out, JSON.stringify(deadLinks, null, 2));
-          console.log('📋 dead-links.json: ' + deadLinks.length + ' entries');
-        })().catch(e => { console.error('⚠️ dead-links generation failed (non-blocking): ' + e.message); });
+          // Write locally for generateMetadata to read (not published as separate file)
+          fs.writeFileSync(path.join(DATA_DIR, 'link-health.json'), JSON.stringify(linkHealth));
+          console.log('📋 link-health: ' + linkHealth.length + ' dead links found');
+        })().catch(e => { console.error('⚠️ link-health generation failed (non-blocking): ' + e.message); });
         "
 
     - name: Upload data to R2 (additive)
@@ -765,7 +765,6 @@ jobs:
             'wd-family-cache.json',
             'filtered-samples.jsonl',
             'tag-history.jsonl',
-            'dead-links.json',
           ];
           const requiredFiles = new Set(files);
 
