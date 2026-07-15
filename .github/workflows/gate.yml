@@ -19,6 +19,19 @@ jobs:
           fetch-depth: 1
           submodules: recursive
           token: ${{ secrets.GH_PAT }}
+      - name: Check for large files (>5MB)
+        run: |
+          LARGE_FILES=$(find . -not -path './.git/*' -not -path '*/node_modules/*' -type f -size +5M 2>/dev/null)
+          if [ -n "$LARGE_FILES" ]; then
+            echo "::error::Files larger than 5MB detected — use R2 or Git LFS instead of committing:"
+            echo "$LARGE_FILES" | while read f; do
+              SIZE=$(du -h "$f" | cut -f1)
+              echo "::error::$SIZE $f"
+            done
+            exit 1
+          else
+            echo "✅ No files larger than 5MB"
+          fi
 
       - uses: actions/setup-node@v5
         with:
