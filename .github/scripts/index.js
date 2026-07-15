@@ -1141,12 +1141,22 @@ async function main() {
         if (cachedCount > 0) console.log(`  WD incremental cache: ${cachedCount} tenants`);
       }
     } catch (e) { /* first run or corrupt cache */ }
+    // AGG-MAXJOBS-ROTATE-1: Load WD segment rotation cache
+    const WD_SEGMENT_CACHE = path.join(DATA_DIR, 'wd-segment-cache.json');
+    let wdSegmentCache = {};
+    try {
+      if (fs.existsSync(WD_SEGMENT_CACHE)) {
+        wdSegmentCache = JSON.parse(fs.readFileSync(WD_SEGMENT_CACHE, 'utf8'));
+        const rotated = Object.keys(wdSegmentCache).filter(k => wdSegmentCache[k] > 0).length;
+        if (rotated > 0) console.log(`  WD segment cache: ${rotated} tenants with active rotation`);
+      }
+    } catch (e) { /* first run or corrupt cache */ }
 
     // Phase A+B: Run ATS and custom fetchers in parallel (AGG-SPEED-5)
     // ~5.5 min savings: max(PhaseA, PhaseB) instead of PhaseA + PhaseB
     console.log('  Phase A+B: ATS + custom fetchers (parallel)...');
     const [phaseAResult, ...phaseBSettled] = await Promise.allSettled([
-      withTimeout(fetchFromAllATS({ wdPreviousTotals }), 720_000, 'ATS'),
+      withTimeout(fetchFromAllATS({ wdPreviousTotals, wdSegmentCache }), 720_000, 'ATS'),
       withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon'),
       withTimeout(fetchAllNetflixJobs(), 60_000, 'Netflix'),
       HOTPATH_DEMOTED_FETCHERS.has('Apple')
@@ -1187,6 +1197,10 @@ async function main() {
     if (atsResult.wdCurrentTotals && Object.keys(atsResult.wdCurrentTotals).length > 0) {
       fs.writeFileSync(WD_TOTALS_CACHE, JSON.stringify(atsResult.wdCurrentTotals, null, 2));
       console.log(`  WD totals cache saved: ${Object.keys(atsResult.wdCurrentTotals).length} tenants`);
+    }
+    // AGG-MAXJOBS-ROTATE-1: Save WD segment rotation cache
+    if (atsResult.wdSegmentCache) {
+      try { fs.writeFileSync(WD_SEGMENT_CACHE, JSON.stringify(atsResult.wdSegmentCache, null, 2)); } catch (e) {}
     }
 
     // Collect custom fetcher results
