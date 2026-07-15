@@ -454,6 +454,46 @@ jobs:
         fi
         echo "✅ All integrity checks passed"
 
+    - name: Generate link-health data for metadata (AGG-DEADLINK-PUBLISH-1)
+      continue-on-error: true
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      run: |
+        node -e "
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        const fs = require('fs');
+        const path = require('path');
+        const DATA_DIR = '.github/data';
+        const r2 = createR2Client({ prefix: 'data/' });
+        (async () => {
+          const linkHealth = [];
+          for (const file of ['stale-job-tombstones.json', 'stale-job-candidates.json']) {
+            const local = path.join(DATA_DIR, file);
+            const ok = await r2.downloadToFile(file, local);
+            if (!ok) { console.log('  ' + file + ': not available'); continue; }
+            const data = JSON.parse(fs.readFileSync(local, 'utf8'));
+            const items = data.tombstones || data.dead || [];
+            for (const item of items) {
+              if (!item.url) continue;
+              linkHealth.push({
+                repo: item.source || item.group || 'unknown',
+                url: item.url,
+                status: item.latest_status || 'dead',
+                last_checked: item.last_dead_seen_at || item.first_dead_seen_at || null,
+                http_code: item.latest_code || null,
+                company: item.company_name || null,
+                title: (item.title || '').slice(0, 80),
+              });
+            }
+          }
+          fs.writeFileSync(path.join(DATA_DIR, 'link-health.json'), JSON.stringify(linkHealth));
+          console.log('📋 link-health: ' + linkHealth.length + ' dead links found');
+        })().catch(e => { console.error('⚠️ link-health generation failed (non-blocking): ' + e.message); });
+        "
+
     - name: Fetch jobs from all sources
       run: set -o pipefail; node .github/scripts/index.js 2>&1 | tee .github/logs/fetch.log
       env:
@@ -695,49 +735,6 @@ jobs:
           exit 1
         fi
 
-
-    - name: Generate link-health data for metadata (AGG-DEADLINK-PUBLISH-1)
-      if: success()
-      continue-on-error: true
-      env:
-        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
-      run: |
-        node -e "
-        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-        const fs = require('fs');
-        const path = require('path');
-        const DATA_DIR = '.github/data';
-        const r2 = createR2Client({ prefix: 'data/' });
-        (async () => {
-          const linkHealth = [];
-          // Read stale-job artifacts from R2 (produced by check-link-health workflow, 6-hour cron)
-          for (const file of ['stale-job-tombstones.json', 'stale-job-candidates.json']) {
-            const local = path.join(DATA_DIR, file);
-            const ok = await r2.downloadToFile(file, local);
-            if (!ok) { console.log('  ' + file + ': not available'); continue; }
-            const data = JSON.parse(fs.readFileSync(local, 'utf8'));
-            const items = data.tombstones || data.dead || [];
-            for (const item of items) {
-              if (!item.url) continue;
-              linkHealth.push({
-                repo: item.source || item.group || 'unknown',
-                url: item.url,
-                status: item.latest_status || 'dead',
-                last_checked: item.last_dead_seen_at || item.first_dead_seen_at || null,
-                http_code: item.latest_code || null,
-                company: item.company_name || null,
-                title: (item.title || '').slice(0, 80),
-              });
-            }
-          }
-          // Write locally for generateMetadata to read (not published as separate file)
-          fs.writeFileSync(path.join(DATA_DIR, 'link-health.json'), JSON.stringify(linkHealth));
-          console.log('📋 link-health: ' + linkHealth.length + ' dead links found');
-        })().catch(e => { console.error('⚠️ link-health generation failed (non-blocking): ' + e.message); });
-        "
 
     - name: Upload data to R2 (additive)
       if: success()
