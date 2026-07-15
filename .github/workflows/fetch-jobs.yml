@@ -794,9 +794,20 @@ jobs:
           const sidecars = fs.readdirSync(dataDir).filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
           for (const s of sidecars) files.push(s);
 
-          // AGG-SPEED-9: Upload in parallel with concurrency 5
-          const CONCURRENCY = 5;
-          let ok = 0, fail = 0, required_files_failed = 0;
+          // AGG-SPEED-9: Upload in parallel with concurrency 10 (raised from 5)
+          // AGG-R2-UPLOADSPEED-1: Skip unchanged files via size check (one list() call)
+          const CONCURRENCY = 10;
+          let ok = 0, fail = 0, required_files_failed = 0, skipped = 0, uploadedBytes = 0;
+
+          // Fetch all remote sizes in one API call (avoids 39 individual HEAD requests)
+          const remoteSizes = {};
+          try {
+            const remoteObjects = await r2.list('');
+            for (const obj of remoteObjects) {
+              const name = (obj.key || '').replace(/^data\//, '');
+              if (name) remoteSizes[name] = obj.size;
+            }
+          } catch (e) { console.warn('R2 list failed — will upload all files: ' + e.message); }
 
           function markFailure(file, message) {
             fail++;
@@ -812,7 +823,16 @@ jobs:
               return;
             }
             try {
+              // AGG-R2-UPLOADSPEED-1: Skip if local size matches remote (file unchanged)
+              const localSize = fs.statSync(fp).size;
+              if (remoteSizes[file] === localSize) {
+                skipped++;
+                console.log('SKIP (unchanged): ' + file + ' (' + Math.round(localSize / 1024 / 1024 * 10) / 10 + ' MB)');
+                ok++;
+                return;
+              }
               const data = fs.readFileSync(fp, 'utf8');
+              uploadedBytes += localSize;
               const isJson = file.endsWith('.json');
               const uploaded = isJson
                 ? await r2.uploadRaw(file, data, 'application/json')
@@ -827,7 +847,7 @@ jobs:
           }
 
           await r2.writeManifest({ files_uploaded: ok, files_failed: fail, required_files_failed, pipeline_run: process.env.GITHUB_RUN_ID });
-          console.log('R2 upload done: ' + ok + ' ok, ' + fail + ' failed');
+          console.log('R2 upload done: ' + ok + ' ok, ' + fail + ' failed, ' + skipped + ' skipped (unchanged), ' + Math.round(uploadedBytes / 1024 / 1024) + ' MB uploaded');
           // R2-prune superseded sidecars (AGG-R2-SINGLEFILE-1): delete R2 copies of files the
           // producer removed locally as stale. Manifest-driven — never blanket-deletes; only runs
           // when this run's required uploads succeeded. Old ATS descriptions (D2) are never listed.
