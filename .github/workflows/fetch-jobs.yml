@@ -696,6 +696,43 @@ jobs:
         fi
 
 
+    - name: Generate dead-links.json for DASH (AGG-DEADLINK-PUBLISH-1)
+      if: success()
+      run: |
+        node -e "
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        const fs = require('fs');
+        const path = require('path');
+        const DATA_DIR = '.github/data';
+        const r2 = createR2Client({ prefix: 'data/' });
+        (async () => {
+          const deadLinks = [];
+          // Read stale-job artifacts from R2 (produced by check-link-health workflow)
+          for (const file of ['stale-job-tombstones.json', 'stale-job-candidates.json']) {
+            const local = path.join(DATA_DIR, file);
+            const ok = await r2.downloadToFile(file, local);
+            if (!ok) { console.log('  ' + file + ': not available'); continue; }
+            const data = JSON.parse(fs.readFileSync(local, 'utf8'));
+            const items = data.tombstones || data.dead || data.candidates || [];
+            for (const item of items) {
+              if (!item.url) continue;
+              deadLinks.push({
+                repo: item.source || 'unknown',
+                url: item.url,
+                status: (item.lifecycle_state === 'dead_confirmed' || file.includes('tombstone')) ? 'dead' : 'stale',
+                last_checked: item.last_seen || item.first_seen || new Date().toISOString(),
+                http_code: item.latest_code || null,
+                company: item.company_name || null,
+                title: (item.title || '').slice(0, 80),
+              });
+            }
+          }
+          const out = path.join(DATA_DIR, 'dead-links.json');
+          fs.writeFileSync(out, JSON.stringify(deadLinks, null, 2));
+          console.log('📋 dead-links.json: ' + deadLinks.length + ' entries');
+        })().catch(e => { console.error('⚠️ dead-links generation failed (non-blocking): ' + e.message); });
+        "
+
     - name: Upload data to R2 (additive)
       if: success()
       # continue-on-error removed — R2 upload failures now visible (INF-BLOAT-5)
@@ -728,6 +765,7 @@ jobs:
             'wd-family-cache.json',
             'filtered-samples.jsonl',
             'tag-history.jsonl',
+            'dead-links.json',
           ];
           const requiredFiles = new Set(files);
 
