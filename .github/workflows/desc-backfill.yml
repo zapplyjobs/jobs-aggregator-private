@@ -1,0 +1,101 @@
+name: Description Backfill (WD)
+
+# AGG-DESC-ASYNC-1: Workday description backfill decoupled from the main fetch pipeline.
+# The main fetch-jobs workflow sets SKIP_WD_DESC_BACKFILL=1 + writes wd-desc-queue.jsonl
+# (pending WD jobs with _raw fields, pre-strip). This workflow reads the queue, fetches
+# up to 1000 descriptions, appends to descriptions-workday.jsonl, and uploads to R2.
+# Runs every 10 min — clears the ~23K backlog faster than the old inline backfill
+# while removing 132-173s from the main fetch hot path.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      NODE_OPTIONS: --max-old-space-size=2048
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 1
+          submodules: recursive
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Fix submodule index
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Seed sidecar + queue from R2
+        run: |
+          node -e "
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          async function main() {
+            const r2 = createR2Client({ prefix: 'data/' });
+            const sidecar = await r2.downloadToFile('descriptions-workday.jsonl', '.github/data/descriptions-workday.jsonl');
+            console.log('sidecar:', sidecar ? Math.round(sidecar.size/1024) + 'KB' : 'not found (starting fresh)');
+            const queue = await r2.downloadToFile('wd-desc-queue.jsonl', '.github/data/wd-desc-queue.jsonl');
+            if (!queue) { console.log('No queue file — nothing to backfill this cycle'); process.exit(0); }
+            console.log('queue:', Math.round(queue.size/1024) + 'KB');
+          }
+          main().catch(e => { console.error('Seed error:', e.message); process.exit(1); });
+          "
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
+      - name: Fetch WD descriptions
+        run: |
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          const { fetchWorkdayDescriptions } = require('./.github/scripts/aggregator/lib/fetchers/workday-descriptions');
+          const DATA_DIR = '.github/data';
+          const queuePath = path.join(DATA_DIR, 'wd-desc-queue.jsonl');
+          if (!fs.existsSync(queuePath)) { console.log('No queue — exiting'); process.exit(0); }
+          const queueLines = fs.readFileSync(queuePath, 'utf8').trim().split('\n').filter(Boolean);
+          // Reconstruct WD job objects from the queue (fetchWorkdayDescriptions needs _raw fields)
+          const wdJobs = queueLines.map(line => {
+            const q = JSON.parse(line);
+            return { id: q.id, location: q.location || '', _raw: { externalPath: q.externalPath, baseUrl: q.baseUrl, site: q.site } };
+          });
+          console.log('Queue:', wdJobs.length, 'WD jobs pending description');
+          const start = Date.now();
+          fetchWorkdayDescriptions(wdJobs, DATA_DIR).then(desc => {
+            const elapsed = Math.round((Date.now() - start) / 1000);
+            console.log('Done:', desc.size, 'descriptions cached (' + elapsed + 's)');
+          }).catch(e => { console.error('Fetch error:', e.message); process.exit(1); });
+          "
+
+      - name: Upload updated sidecar to R2
+        run: |
+          node -e "
+          const fs = require('fs');
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          async function main() {
+            const r2 = createR2Client({ prefix: 'data/' });
+            const data = fs.readFileSync('.github/data/descriptions-workday.jsonl');
+            const ok = await r2.uploadRaw('descriptions-workday.jsonl', data, 'application/x-jsonlines');
+            console.log('Upload:', ok ? 'OK' : 'FAILED');
+          }
+          main().catch(e => { console.error('Upload error:', e.message); process.exit(1); });
+          "
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}

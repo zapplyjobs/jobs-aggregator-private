@@ -18,6 +18,7 @@ jobs:
     env:
       NODE_OPTIONS: --max-old-space-size=6144
       SKIP_WD_FAMILY_CACHE_BUILD: 1
+      SKIP_WD_DESC_BACKFILL: '1'  # AGG-DESC-ASYNC-1: WD desc backfill moved to separate workflow
 
     steps:
     - name: Checkout repository
@@ -791,8 +792,10 @@ jobs:
           const requiredFiles = new Set(files);
 
           // Add description sidecars
-          const sidecars = fs.readdirSync(dataDir).filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
+          const sidecars = fs.readdirSync(dataDir).filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl') && f !== 'descriptions-workday.jsonl');  // AGG-DESC-ASYNC-1: WD sidecar now owned by separate desc-backfill workflow (avoid upload race)
           for (const s of sidecars) files.push(s);
+          // AGG-DESC-ASYNC-1: WD desc queue for separate backfill workflow (non-required)
+          if (fs.existsSync(path.join(dataDir, 'wd-desc-queue.jsonl'))) files.push('wd-desc-queue.jsonl');
 
           // AGG-SPEED-9: Upload in parallel with concurrency 10 (raised from 5)
           // AGG-R2-UPLOADSPEED-1: Skip unchanged files via size check (one list() call)

@@ -1272,14 +1272,25 @@ async function main() {
     // descriptions-workday.jsonl (seeded from R2 + uploaded each run) -> backfills over ~2 days.
     // GUARD: monitor first runs' wall-time; revert to skipping if it breaches 8 min.
     const _skipDesc = process.env.SKIP_DESC_BACKFILL === '1';
+    const _skipWdDesc = process.env.SKIP_WD_DESC_BACKFILL === '1';  // AGG-DESC-ASYNC-1: WD-only skip (separate workflow backfills)
     let _wdDescBacklog = 0, _wdDescCached = 0;
     const _step1bStart = Date.now();
     const wdJobs = allJobs.filter(j => j.source === 'workday');
     if (wdJobs.length > 0) {
-      const wdDescriptions = await fetchWorkdayDescriptions(wdJobs, DATA_DIR, { skipFetch: _skipDesc });
+      const wdDescriptions = await fetchWorkdayDescriptions(wdJobs, DATA_DIR, { skipFetch: _skipWdDesc });
       injectDescriptions(wdJobs, wdDescriptions, 'WD');
       _wdDescBacklog = wdJobs.filter(j => !wdDescriptions.has(j.id)).length;
       _wdDescCached = wdDescriptions.size;
+      // AGG-DESC-ASYNC-1: when WD desc backfill is skipped, write pending jobs (with _raw,
+      // pre-strip) to a queue file for the separate desc-backfill workflow to consume.
+      if (_skipWdDesc) {
+        const _wdPending = wdJobs.filter(j => !wdDescriptions.has(j.id) && j._raw && j._raw.externalPath && j._raw.baseUrl && j._raw.site);
+        if (_wdPending.length > 0) {
+          const _qLines = _wdPending.map(j => JSON.stringify({ id: j.id, externalPath: j._raw.externalPath, baseUrl: j._raw.baseUrl, site: j._raw.site, location: j.location || '' }));
+          fs.writeFileSync(path.join(DATA_DIR, 'wd-desc-queue.jsonl'), _qLines.join('\n') + '\n', 'utf8');
+          console.log(`📄 Wrote ${_wdPending.length} pending WD jobs → wd-desc-queue.jsonl (separate desc-backfill workflow will fetch)`);
+        }
+      }
     } else {
       console.log('📄 Step 1b: No WD jobs this run — skipping description fetch');
     }
