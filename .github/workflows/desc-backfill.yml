@@ -1,11 +1,12 @@
-name: Description Backfill (WD)
+name: Description Backfill (WD+SR)
 
-# AGG-DESC-ASYNC-1: Workday description backfill decoupled from the main fetch pipeline.
-# The main fetch-jobs workflow sets SKIP_WD_DESC_BACKFILL=1 + writes wd-desc-queue.jsonl
-# (pending WD jobs with _raw fields, pre-strip). This workflow reads the queue, fetches
-# up to 1000 descriptions, appends to descriptions-workday.jsonl, and uploads to R2.
-# Runs every 10 min — clears the ~23K backlog faster than the old inline backfill
-# while removing 132-173s from the main fetch hot path.
+# AGG-DESC-ASYNC-1: Workday + SmartRecruiters description backfill decoupled from
+# the main fetch pipeline. The main fetch-jobs workflow sets SKIP_WD_DESC_BACKFILL=1 +
+# SKIP_SR_DESC_BACKFILL=1 + writes wd-desc-queue.jsonl (pending WD jobs with _raw).
+# This workflow reads the WD queue (fetchWorkdayDescriptions) + reads all_jobs.json
+# for SR jobs (fetchSRDescriptions), fetches up to 1000 descriptions each, appends
+# to the sidecars, and uploads to R2. Runs every 10 min — clears backlogs faster
+# while removing ~160s from the main fetch hot path.
 
 on:
   schedule:
@@ -41,17 +42,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Seed sidecar + queue from R2
+      - name: Seed sidecars + queue + all_jobs from R2
         run: |
           node -e "
           const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
           async function main() {
             const r2 = createR2Client({ prefix: 'data/' });
-            const sidecar = await r2.downloadToFile('descriptions-workday.jsonl', '.github/data/descriptions-workday.jsonl');
-            console.log('sidecar:', sidecar ? Math.round(sidecar.size/1024) + 'KB' : 'not found (starting fresh)');
+            const wd = await r2.downloadToFile('descriptions-workday.jsonl', '.github/data/descriptions-workday.jsonl');
+            console.log('wd sidecar:', wd ? Math.round(wd.size/1024) + 'KB' : 'not found');
+            const sr = await r2.downloadToFile('descriptions-smartrecruiters.jsonl', '.github/data/descriptions-smartrecruiters.jsonl');
+            console.log('sr sidecar:', sr ? Math.round(sr.size/1024) + 'KB' : 'not found');
             const queue = await r2.downloadToFile('wd-desc-queue.jsonl', '.github/data/wd-desc-queue.jsonl');
-            if (!queue) { console.log('No queue file — nothing to backfill this cycle'); process.exit(0); }
-            console.log('queue:', Math.round(queue.size/1024) + 'KB');
+            console.log('wd queue:', queue ? Math.round(queue.size/1024) + 'KB' : 'not found');
+            const allJobs = await r2.downloadToFile('all_jobs.json', '.github/data/all_jobs.json');
+            console.log('all_jobs:', allJobs ? Math.round(allJobs.size/1024) + 'KB' : 'not found');
           }
           main().catch(e => { console.error('Seed error:', e.message); process.exit(1); });
           "
@@ -69,31 +73,52 @@ jobs:
           const { fetchWorkdayDescriptions } = require('./.github/scripts/aggregator/lib/fetchers/workday-descriptions');
           const DATA_DIR = '.github/data';
           const queuePath = path.join(DATA_DIR, 'wd-desc-queue.jsonl');
-          if (!fs.existsSync(queuePath)) { console.log('No queue — exiting'); process.exit(0); }
+          if (!fs.existsSync(queuePath)) { console.log('No WD queue — skipping WD backfill'); process.exit(0); }
           const queueLines = fs.readFileSync(queuePath, 'utf8').trim().split('\n').filter(Boolean);
-          // Reconstruct WD job objects from the queue (fetchWorkdayDescriptions needs _raw fields)
           const wdJobs = queueLines.map(line => {
             const q = JSON.parse(line);
             return { id: q.id, location: q.location || '', _raw: { externalPath: q.externalPath, baseUrl: q.baseUrl, site: q.site } };
           });
-          console.log('Queue:', wdJobs.length, 'WD jobs pending description');
+          console.log('WD queue:', wdJobs.length, 'jobs pending');
           const start = Date.now();
           fetchWorkdayDescriptions(wdJobs, DATA_DIR).then(desc => {
-            const elapsed = Math.round((Date.now() - start) / 1000);
-            console.log('Done:', desc.size, 'descriptions cached (' + elapsed + 's)');
-          }).catch(e => { console.error('Fetch error:', e.message); process.exit(1); });
+            console.log('WD done:', desc.size, 'cached (' + Math.round((Date.now()-start)/1000) + 's)');
+          }).catch(e => { console.error('WD fetch error:', e.message); });
           "
 
-      - name: Upload updated sidecar to R2
+      - name: Fetch SR descriptions
+        run: |
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          const { fetchSRDescriptions } = require('./.github/scripts/aggregator/lib/fetchers/smartrecruiters-descriptions');
+          const DATA_DIR = '.github/data';
+          const allJobsPath = path.join(DATA_DIR, 'all_jobs.json');
+          if (!fs.existsSync(allJobsPath)) { console.log('No all_jobs.json — skipping SR backfill'); process.exit(0); }
+          const srJobs = fs.readFileSync(allJobsPath, 'utf8').trim().split('\n').filter(Boolean)
+            .map(line => { try { return JSON.parse(line); } catch { return null; } })
+            .filter(j => j && j.source === 'smartrecruiters' && j.company_slug);
+          console.log('SR jobs:', srJobs.length, 'total');
+          const start = Date.now();
+          fetchSRDescriptions(srJobs, DATA_DIR).then(desc => {
+            console.log('SR done:', desc.size, 'cached (' + Math.round((Date.now()-start)/1000) + 's)');
+          }).catch(e => { console.error('SR fetch error:', e.message); });
+          "
+
+      - name: Upload updated sidecars to R2
         run: |
           node -e "
           const fs = require('fs');
           const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
           async function main() {
             const r2 = createR2Client({ prefix: 'data/' });
-            const data = fs.readFileSync('.github/data/descriptions-workday.jsonl');
-            const ok = await r2.uploadRaw('descriptions-workday.jsonl', data, 'application/x-jsonlines');
-            console.log('Upload:', ok ? 'OK' : 'FAILED');
+            for (const f of ['descriptions-workday.jsonl', 'descriptions-smartrecruiters.jsonl']) {
+              const fp = '.github/data/' + f;
+              if (fs.existsSync(fp)) {
+                const ok = await r2.uploadRaw(f, fs.readFileSync(fp), 'application/x-jsonlines');
+                console.log(f + ':', ok ? 'OK' : 'FAILED');
+              }
+            }
           }
           main().catch(e => { console.error('Upload error:', e.message); process.exit(1); });
           "

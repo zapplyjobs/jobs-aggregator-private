@@ -19,6 +19,7 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=6144
       SKIP_WD_FAMILY_CACHE_BUILD: 1
       SKIP_WD_DESC_BACKFILL: '1'  # AGG-DESC-ASYNC-1: WD desc backfill moved to separate workflow
+      SKIP_SR_DESC_BACKFILL: '1'  # AGG-DESC-ASYNC-1: SR desc backfill moved to separate workflow
 
     steps:
     - name: Checkout repository
@@ -792,7 +793,7 @@ jobs:
           const requiredFiles = new Set(files);
 
           // Add description sidecars
-          const sidecars = fs.readdirSync(dataDir).filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl') && f !== 'descriptions-workday.jsonl');  // AGG-DESC-ASYNC-1: WD sidecar now owned by separate desc-backfill workflow (avoid upload race)
+          const sidecars = fs.readdirSync(dataDir).filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl') && !['descriptions-workday.jsonl', 'descriptions-smartrecruiters.jsonl'].includes(f));  // AGG-DESC-ASYNC-1: WD + SR sidecars owned by separate desc-backfill workflow
           for (const s of sidecars) files.push(s);
           // AGG-DESC-ASYNC-1: WD desc queue for separate backfill workflow (non-required)
           if (fs.existsSync(path.join(dataDir, 'wd-desc-queue.jsonl'))) files.push('wd-desc-queue.jsonl');

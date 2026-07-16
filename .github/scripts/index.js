@@ -1273,6 +1273,7 @@ async function main() {
     // GUARD: monitor first runs' wall-time; revert to skipping if it breaches 8 min.
     const _skipDesc = process.env.SKIP_DESC_BACKFILL === '1';
     const _skipWdDesc = process.env.SKIP_WD_DESC_BACKFILL === '1';  // AGG-DESC-ASYNC-1: WD-only skip (separate workflow backfills)
+    const _skipSrDesc = process.env.SKIP_SR_DESC_BACKFILL === '1';  // AGG-DESC-ASYNC-1: SR desc also decoupled
     let _wdDescBacklog = 0, _wdDescCached = 0;
     const _step1bStart = Date.now();
     const wdJobs = allJobs.filter(j => j.source === 'workday');
@@ -1296,7 +1297,7 @@ async function main() {
     }
     const srJobs = allJobs.filter(j => j.source === 'smartrecruiters');
     if (srJobs.length > 0) {
-      const srDescriptions = await fetchSRDescriptions(srJobs, DATA_DIR, { skipFetch: _skipDesc });
+      const srDescriptions = await fetchSRDescriptions(srJobs, DATA_DIR, { skipFetch: _skipSrDesc });
       injectDescriptions(srJobs, srDescriptions, 'SR');
     } else {
       console.log('📄 SR descriptions: No SmartRecruiters jobs this run — skipping description fetch');
