@@ -1273,6 +1273,7 @@ async function main() {
     // GUARD: monitor first runs' wall-time; revert to skipping if it breaches 8 min.
     const _skipDesc = process.env.SKIP_DESC_BACKFILL === '1';
     let _wdDescBacklog = 0, _wdDescCached = 0;
+    const _step1bStart = Date.now();
     const wdJobs = allJobs.filter(j => j.source === 'workday');
     if (wdJobs.length > 0) {
       const wdDescriptions = await fetchWorkdayDescriptions(wdJobs, DATA_DIR, { skipFetch: _skipDesc });
@@ -1289,6 +1290,8 @@ async function main() {
     } else {
       console.log('📄 SR descriptions: No SmartRecruiters jobs this run — skipping description fetch');
     }
+    stageTimings.step1b_desc_backfill_ms = Date.now() - _step1bStart;
+    console.log(`⏱️  Step 1b (desc backfill WD+SR): ${stageTimings.step1b_desc_backfill_ms}ms`);
     console.log('');
 
 
@@ -1453,6 +1456,7 @@ async function main() {
     // This re-injects them from per-source sidecar files so the description-fallback layer can classify.
     // Guard: !job.description prevents double-injection for freshly-fetched jobs with inline descriptions.
     // TAG-9 S237: expanded from enriched-only to ALL sidecars — 1,317 additional jobs gain descriptions.
+    const _step4cStart = Date.now();
     const descSidecarFiles = fs.readdirSync(DATA_DIR)
       .filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
     if (descSidecarFiles.length > 0) {
@@ -1491,6 +1495,8 @@ async function main() {
     } else {
       console.log('📄 Step 4c: No description sidecar files found — description fallback inactive');
     }
+    stageTimings.step4c_desc_inject_ms = Date.now() - _step4cStart;
+    console.log(`⏱️  Step 4c (desc sidecar inject): ${stageTimings.step4c_desc_inject_ms}ms`);
     console.log('');
 
     // Step 5: Apply tags
@@ -1597,6 +1603,7 @@ async function main() {
 
     // Merge previous all_jobs.json into current run (rolling window — TTL from deduplicator)
     // Jobs from prior runs that weren't re-fetched this run are preserved until their TTL expires.
+    const _step9MergeStart = Date.now();
     if (fs.existsSync(JOBS_OUTPUT_FILE)) {
       const currentIds = new Set(publicJobs.map(j => j.id));
       // Fingerprint guard: prevents re-injection of jobs that changed ID (e.g. WD-ID-BUG fix)
@@ -1623,6 +1630,8 @@ async function main() {
       const _orphanDropped = dropOrphanJobs(publicJobs, _activeWd, _activeSR);
       if (_orphanDropped > 0) console.log(`🧹 AGG-STALEUPSTREAM-1: dropped ${_orphanDropped} ORPHAN jobs upstream (company no longer in active workday/smartrecruiters config + not fetched >14d) — no longer reach all_jobs/R2/consumers.`);
     }
+    stageTimings.step9_carryforward_ms = Date.now() - _step9MergeStart;
+    console.log(`⏱️  Step 9 (carry-forward merge + orphan-drop): ${stageTimings.step9_carryforward_ms}ms`);
 
     // AGG-STALEUPSTREAM-1 (2026-07-04): Freshness SLA metric — make the stale-candidate residue's age
     // VISIBLE every run. The 4.6-day silent rot recurred because nothing measured this; if p50/max climb,
@@ -2080,6 +2089,9 @@ function buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimest
       step8_sort_ms: stageTimings.step8_sort_ms || 0,
       step8b_sidecars_ms: stageTimings.step8b_sidecars_ms || 0,
       step9_write_ms: stageTimings.step9_write_ms || 0,
+      step1b_desc_backfill_ms: stageTimings.step1b_desc_backfill_ms || 0,
+      step4c_desc_inject_ms: stageTimings.step4c_desc_inject_ms || 0,
+      step9_carryforward_ms: stageTimings.step9_carryforward_ms || 0,
       // step12_commit_ms removed (AGG-R2-CANONICAL-1): git commit step deleted
     },
   };
