@@ -894,22 +894,9 @@ jobs:
         ELAPSED=$((NOW - START))
         MIN=$((ELAPSED / 60))
         SEC=$((ELAPSED % 60))
-        echo "⏱️ Total workflow time to heartbeat: ${ELAPSED}s (${MIN}min ${SEC}s)"
+        echo "⏱️ Total workflow time: ${ELAPSED}s (${MIN}min ${SEC}s)"
         echo "WORKFLOW_TOTAL_SECONDS=${ELAPSED}" >> $GITHUB_ENV
 
-    - name: Heartbeat — dispatch next run (early, before READMEs/archive)
-      if: success() && github.ref_name == 'main'
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-      run: |
-        curl -sf -X POST \
-          "https://api.github.com/repos/zapplyjobs/jobs-aggregator-private/actions/workflows/fetch-jobs.yml/dispatches" \
-          -H "Authorization: Bearer ${GH_PAT}" \
-          -H "Accept: application/vnd.github+json" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          -d '{"ref":"main"}' \
-          && echo "💓 Heartbeat: dispatched next pipeline run (early — READMEs/archive run after)" \
-          || echo "⚠️ Heartbeat dispatch failed (non-blocking — Worker cron will catch up)"
  
     - name: Trigger enrichment (wave link — eliminates avg 7.5min enrich wait)
       if: success() && github.ref_name == 'main'
