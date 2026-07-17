@@ -1202,6 +1202,9 @@ async function main() {
     if (atsResult.wdSegmentCache) {
       try { fs.writeFileSync(WD_SEGMENT_CACHE, JSON.stringify(atsResult.wdSegmentCache, null, 2)); } catch (e) {}
     }
+    // AGG-WD-429MONITOR-1: Track WD rate-limit responses
+    const wdRateLimited = atsResult.wdRateLimited || 0;
+    if (wdRateLimited > 0) console.log(`   ⚠️  WD rate-limited (429): ${wdRateLimited} responses — investigate Cloudflare rules`);
 
     // Collect custom fetcher results
     const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'Microsoft', 'Oracle', 'AMD', 'TikTok', 'D.E. Shaw'];
@@ -1888,6 +1891,7 @@ async function main() {
       supplementalInputs: supplementalInputs.inputs,
     });
     metadata.desc_backlog = { wd_pending: _wdDescBacklog, wd_cached: _wdDescCached };
+    metadata.wd_rate_limited_count = wdRateLimited;  // AGG-WD-429MONITOR-1
     await writeMetadata(metadata, METADATA_OUTPUT_FILE);
 
     // Step 9c: build / refresh Workday family cache for future runs. Output is already written, so
