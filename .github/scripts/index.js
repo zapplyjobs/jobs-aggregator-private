@@ -1660,8 +1660,16 @@ async function main() {
         const _p50 = _pct(0.5), _p90 = _pct(0.9), _max = _agesH[_agesH.length - 1];
         console.log(`📊 FRESHNESS SLA: ${_staleResidue.length} stale-candidate in pool | age(h) p50=${_p50.toFixed(1)} p90=${_p90.toFixed(1)} max=${_max.toFixed(1)} — investigate if p50/max climb (rotate-coverage-gap signal)`);
         // AGG-STALEUPSTREAM-1: breach check -> write freshness-status.json for the workflow alert step.
-        // Thresholds dry-run-validated (recent runs: normal p50=1.2-1.9h, max=13.7d). Alert at p50>12h
-        // (bulk staleness = rotate/cleanup degradation) OR max>15d/360h (orphan/carry-forward past the bound).
+        // THRESHOLD RATIONALE (AGG-FRESHNESS-12H-1, reviewed 2026-07-17):
+        //   12h = ~6-10x the A208-calibrated normal p50 (1.2-1.9h). Diagnostic threshold, not a user-protection SLA.
+        //   Fires when carry-forward stale-candidates with old fetched_at accumulate (typically after
+        //   incremental cache engages following a full-fetch period — carry-forward jobs age naturally at 1h/hour).
+        //   stale-candidate = posted_at > TTL (age-based via classifyAgeLifecycle, NOT URL-health-based).
+        //   The metric CANNOT: distinguish cache-engagement from rotate degradation, tell if URLs are dead,
+        //   or cross-reference link-health data. stale-candidate jobs ARE published to consumers (not filtered).
+        //   For real degradation detection, track lifecycle.distribution.stale-candidate COUNT trend (count
+        //   growing = problem; count stable + age fluctuating = normal). Full system review: AGG-METRICS-REVIEW-1.
+        //   Also alert at max>15d/360h (orphan/carry-forward past the bound).
         const _ALERT_P50_H = 12, _ALERT_MAX_H = 360;
         let _breached = false, _reason = '';
         if (_p50 > _ALERT_P50_H) { _breached = true; _reason = `p50 ${_p50.toFixed(1)}h > ${_ALERT_P50_H}h (bulk staleness — rotate/cleanup degradation?)`; }
