@@ -829,9 +829,13 @@ jobs:
               return;
             }
             try {
-              // AGG-R2-UPLOADSPEED-1: Skip if local size matches remote (file unchanged)
+              // AGG-R2-UPLOADSPEED-1: Skip if local size matches remote (file unchanged).
+              // EXCEPT: files whose content changes every run without changing size
+              // (timestamps are fixed-length ISO, counts can have same digit count).
+              // These MUST always upload or R2 serves stale data.
+              const ALWAYS_UPLOAD = new Set(['jobs-metadata.json', 'wd-totals-cache.json', 'board-counts.json']);
               const localSize = fs.statSync(fp).size;
-              if (remoteSizes[file] === localSize) {
+              if (!ALWAYS_UPLOAD.has(file) && remoteSizes[file] === localSize) {
                 skipped++;
                 console.log('SKIP (unchanged): ' + file + ' (' + Math.round(localSize / 1024 / 1024 * 10) / 10 + ' MB)');
                 ok++;
