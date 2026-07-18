@@ -1666,16 +1666,25 @@ async function main() {
         //   incremental cache engages following a full-fetch period — carry-forward jobs age naturally at 1h/hour).
         //   stale-candidate = posted_at > TTL (age-based via classifyAgeLifecycle, NOT URL-health-based).
         //   The metric CANNOT: distinguish cache-engagement from rotate degradation, tell if URLs are dead,
-        //   or cross-reference link-health data. stale-candidate jobs ARE published to consumers (not filtered).
+        //   or cross-reference link-health data. stale-candidate jobs in all_jobs.json are filtered by ALL consumers (discord-poster.js, aggregator-consumer.js, sjd API).
         //   For real degradation detection, track lifecycle.distribution.stale-candidate COUNT trend (count
         //   growing = problem; count stable + age fluctuating = normal). Full system review: AGG-METRICS-REVIEW-1.
         //   Also alert at max>15d/360h (orphan/carry-forward past the bound).
-        const _ALERT_P50_H = 12, _ALERT_MAX_H = 360;
+        // THRESHOLD FIX (AGG-FRESHNESS-12H-1 + AGG-METRICS-REVIEW-1, 2026-07-18):
+        //   p50 >12h alone is NOT a breach signal — carry-forward stale-candidates age naturally
+        //   past 12h after every full-fetch period. This fired every run, creating Discord noise.
+        //   Now require BOTH: p50 >12h AND stale-candidate ratio >25% of pool.
+        //   Normal: ~13% stale-candidate, p50 climbs with aging — no alert.
+        //   Problem: >25% stale-candidate + high p50 = rotate/cleanup degraded — alert.
+        //   max>360h (orphan past 15-day bound) remains a standalone breach signal.
+        const _ALERT_P50_H = 12, _ALERT_MAX_H = 360, _ALERT_STALE_RATIO = 0.25;
+        const _staleRatio = _staleResidue.length / publicJobs.length;
         let _breached = false, _reason = '';
-        if (_p50 > _ALERT_P50_H) { _breached = true; _reason = `p50 ${_p50.toFixed(1)}h > ${_ALERT_P50_H}h (bulk staleness — rotate/cleanup degradation?)`; }
+        if (_p50 > _ALERT_P50_H && _staleRatio > _ALERT_STALE_RATIO) { _breached = true; _reason = `p50 ${_p50.toFixed(1)}h > ${_ALERT_P50_H}h AND stale-candidate ${(_staleRatio * 100).toFixed(1)}% > ${_ALERT_STALE_RATIO * 100}% (rotate/cleanup degraded — count accumulating + aging)`; }
         else if (_max > _ALERT_MAX_H) { _breached = true; _reason = `max ${_max.toFixed(1)}h > ${_ALERT_MAX_H}h/15d (orphan/carry-forward past the bound — cleanup broken?)`; }
-        try { fs.writeFileSync(path.join(DATA_DIR, 'freshness-status.json'), JSON.stringify({ breached: _breached, reason: _reason, p50: +_p50.toFixed(1), p90: +_p90.toFixed(1), max: +_max.toFixed(1), staleCount: _staleResidue.length, checkedAt: new Date().toISOString() }, null, 2)); } catch (e) { console.log(`   (freshness-status.json write skipped: ${e.message})`); }
+        try { fs.writeFileSync(path.join(DATA_DIR, 'freshness-status.json'), JSON.stringify({ breached: _breached, reason: _reason, p50: +_p50.toFixed(1), p90: +_p90.toFixed(1), max: +_max.toFixed(1), staleCount: _staleResidue.length, staleRatio: +(_staleRatio * 100).toFixed(1), checkedAt: new Date().toISOString() }, null, 2)); } catch (e) { console.log(`   (freshness-status.json write skipped: ${e.message})`); }
         if (_breached) console.log(`⚠️  FRESHNESS ALERT (AGG-STALEUPSTREAM-1): ${_reason} — staleness bound breached; investigate rotate coverage + orphan cleanup.`);
+        else if (_p50 > _ALERT_P50_H) console.log(`📊 FRESHNESS DIAGNOSTIC (non-breaching): p50 ${_p50.toFixed(1)}h > ${_ALERT_P50_H}h but stale-candidate ratio ${(_staleRatio * 100).toFixed(1)}% ≤ ${_ALERT_STALE_RATIO * 100}% — normal carry-forward aging, not degradation.`);
       }
     }
 
