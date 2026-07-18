@@ -963,17 +963,6 @@ async function main() {
   const stageTimings = {};
   const pipelineTimestamps = { started_at: new Date(startTime).toISOString() };
 
-  // AGG-PREVIOUS-CYCLE-TIMESTAMP-1: read prior run's completion timestamp for DASH cycle-time.
-  // Marker file is seeded from R2 by fetch-jobs.yml. First run after deploy = null (no marker yet).
-  let prevRunCompletedAt = null;
-  try {
-    const _cycleStatePath = path.join(DATA_DIR, 'pipeline-cycle-state.json');
-    if (fs.existsSync(_cycleStatePath)) {
-      const _cycleState = JSON.parse(fs.readFileSync(_cycleStatePath, 'utf8'));
-      prevRunCompletedAt = _cycleState.last_completed_at || null;
-    }
-  } catch (_) { /* first run or corrupt marker — leave null */ }
-
   console.log('🚀 Jobs Data Fetcher - Starting...');
   console.log('═'.repeat(60));
   console.log(`Mode: ${isDryRun ? 'DRY RUN (no commits)' : 'NORMAL'}`);
@@ -1847,16 +1836,6 @@ async function main() {
     const duration = Date.now() - startTime;
     stageTimings.step9_write_ms = Date.now() - _stepStart;
     pipelineTimestamps.output_ready_at = new Date().toISOString();
-    // AGG-PREVIOUS-CYCLE-TIMESTAMP-1: persist this run's completion timestamp for the NEXT run.
-    // Tiny marker file (seeded from R2 by fetch-jobs.yml at startup). Same pattern as
-    // freshness-status.json / wd-totals-cache.json.
-    try {
-      fs.writeFileSync(path.join(DATA_DIR, 'pipeline-cycle-state.json'), JSON.stringify({
-        last_completed_at: pipelineTimestamps.output_ready_at,
-        run_started_at: pipelineTimestamps.started_at,
-        written_at: new Date().toISOString(),
-      }, null, 2));
-    } catch (e) { console.log(`   (pipeline-cycle-state.json write skipped: ${e.message})`); }
     // Build fetch_results: per-source counts from current fetch attempts (before carry-forward).
     // Demoted hot-path sources are intentionally absent: they were not attempted in this
     // workflow, so reporting 0 would create a false "source fetch failure" alert.
@@ -2126,13 +2105,12 @@ const SOURCE_TIER_POLICY = {
 
 const TECH_US_DOMAINS = new Set(['software', 'data_science', 'hardware', 'ai', 'finance']);
 
-function buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps, prevRunCompletedAt = null }) {
+function buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps }) {
   return {
     pipeline_started_at: new Date(startTime).toISOString(),
     fetch_completed_at: pipelineTimestamps.fetch_completed_at || null,
     sidecars_written_at: pipelineTimestamps.sidecars_written_at || null,
     output_ready_at: pipelineTimestamps.output_ready_at || null,
-    previous_run_completed_at: prevRunCompletedAt,  // AGG-PREVIOUS-CYCLE-TIMESTAMP-1: prior run's output_ready_at (DASH cycle-time)
     total_runtime_ms: duration,
     step_timings_ms: {
       step1_fetch_ms: stageTimings.step1_fetch_ms || 0,
@@ -2609,7 +2587,7 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
     description_delivery: buildDescriptionDeliverySummary(jobs, DATA_DIR),
 
     // AGG latency markers: producer-owned timing anchors for downstream latency measurement.
-    latency_markers: buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps, prevRunCompletedAt }),
+    latency_markers: buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps }),
 
     // Tag statistics (Phase 1)
     tag_stats: tagStats,

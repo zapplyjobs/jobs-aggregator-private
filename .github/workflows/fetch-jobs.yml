@@ -90,23 +90,6 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-    - name: "Seed pipeline-cycle-state.json from R2 (AGG-PREVIOUS-CYCLE-TIMESTAMP-1)"
-      run: |
-        node -e "
-        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-        async function main() {
-          const r2 = createR2Client({ prefix: 'data/' });
-          const result = await r2.downloadToFile('pipeline-cycle-state.json', '.github/data/pipeline-cycle-state.json');
-          console.log(result ? 'R2_OK pipeline-cycle-state.json' : 'R2_MISS (first run after deploy — expected)');
-        }
-        main().catch(() => process.exit(0));  // non-fatal: missing marker = first run
-        "
-      env:
-        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
-
     - name: "Seed descriptions-enriched from R2 (private R2 only)"
       run: |
         echo "📥 Seeding enriched descriptions (WD/SR)..."
@@ -808,7 +791,6 @@ jobs:
             'filtered-samples.jsonl',
             'tag-history.jsonl',
             'wd-segment-cache.json',
-            'pipeline-cycle-state.json',  // AGG-PREVIOUS-CYCLE-TIMESTAMP-1: marker for DASH cycle-time (seeded from R2 at startup)
           ];
           const requiredFiles = new Set(files);
 
