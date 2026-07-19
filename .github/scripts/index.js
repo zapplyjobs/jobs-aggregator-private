@@ -963,6 +963,19 @@ async function main() {
   const stageTimings = {};
   const pipelineTimestamps = { started_at: new Date(startTime).toISOString() };
 
+  // AGG-PREVIOUS-CYCLE-TIMESTAMP-1 v3: read prior run's completion timestamp.
+  // Seeded from R2 by fetch-jobs.yml "Seed pipeline-cycle-state.json" step.
+  // First run (file absent) → null → field publishes as null; self-bootstraps next cycle.
+  // v3 lesson: declared in main() and PASSED explicitly to generateMetadata (v2 used a
+  // closure reference across function boundaries → ReferenceError at runtime, not at parse).
+  let prevRunCompletedAt = null;
+  try {
+    const _cycleStatePath = path.join(DATA_DIR, 'pipeline-cycle-state.json');
+    if (fs.existsSync(_cycleStatePath)) {
+      prevRunCompletedAt = JSON.parse(fs.readFileSync(_cycleStatePath, 'utf8')).last_completed_at || null;
+    }
+  } catch (_cycleErr) { /* non-fatal: first run or corrupt marker */ }
+
   console.log('🚀 Jobs Data Fetcher - Starting...');
   console.log('═'.repeat(60));
   console.log(`Mode: ${isDryRun ? 'DRY RUN (no commits)' : 'NORMAL'}`);
@@ -1906,6 +1919,7 @@ async function main() {
       fetchResults,
       fetcherHealth,
       supplementalInputs: supplementalInputs.inputs,
+      prevRunCompletedAt,
     });
     metadata.desc_backlog = { wd_pending: _wdDescBacklog, wd_cached: _wdDescCached };
     metadata.wd_rate_limited_count = wdRateLimited;  // AGG-WD-429MONITOR-1
@@ -1985,6 +1999,16 @@ async function main() {
     // committed locally to the Actions runner but was NEVER pushed (no git push step
     // for the main repo in the workflow). R2 upload (Step 10) is the sole persistence.
     // Removed per operator directive: "no git fallback — crutch that does more harm than good."
+
+    // AGG-PREVIOUS-CYCLE-TIMESTAMP-1 v3: persist this run's completion for next cycle's seed.
+    // Written BEFORE success banner/exit. Optional upload in fetch-jobs.yml pushes to R2.
+    // Non-fatal on write failure (next run just won't see this cycle's end time).
+    try {
+      fs.writeFileSync(
+        path.join(DATA_DIR, 'pipeline-cycle-state.json'),
+        JSON.stringify({ last_completed_at: pipelineTimestamps.output_ready_at || new Date().toISOString() })
+      );
+    } catch (_writeErr) { /* non-fatal */ }
 
     console.log('');
     console.log('═'.repeat(60));
@@ -2105,12 +2129,13 @@ const SOURCE_TIER_POLICY = {
 
 const TECH_US_DOMAINS = new Set(['software', 'data_science', 'hardware', 'ai', 'finance']);
 
-function buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps }) {
+function buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps, prevRunCompletedAt = null }) {
   return {
     pipeline_started_at: new Date(startTime).toISOString(),
     fetch_completed_at: pipelineTimestamps.fetch_completed_at || null,
     sidecars_written_at: pipelineTimestamps.sidecars_written_at || null,
     output_ready_at: pipelineTimestamps.output_ready_at || null,
+    previous_run_completed_at: prevRunCompletedAt || null,  // AGG-PREVIOUS-CYCLE-TIMESTAMP-1
     total_runtime_ms: duration,
     step_timings_ms: {
       step1_fetch_ms: stageTimings.step1_fetch_ms || 0,
@@ -2425,7 +2450,7 @@ function buildG1Breakdown(jobs) {
   };
 }
 
-function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, pipelineTimestamps, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth, supplementalInputs }) {
+function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, pipelineTimestamps, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth, supplementalInputs, prevRunCompletedAt = null }) {
   const bySource = {};
   const byEmploymentType = {};
   const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0, senior: 0 };
@@ -2587,7 +2612,7 @@ function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, durati
     description_delivery: buildDescriptionDeliverySummary(jobs, DATA_DIR),
 
     // AGG latency markers: producer-owned timing anchors for downstream latency measurement.
-    latency_markers: buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps }),
+    latency_markers: buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps, prevRunCompletedAt }),
 
     // Tag statistics (Phase 1)
     tag_stats: tagStats,
@@ -2702,4 +2727,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, resolvePostedAt, mergeCarryForward, dropOrphanJobs, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, buildMidLevelTechFeed, buildMidLevelTechSummary, buildSeniorTechFeed, buildSeniorTechSummary, buildCanadaTechFeed, buildCanadaInternshipsFeed, buildCanadaSentinelChecks, buildCanadaAllFeed, activePublicWindowTs, applicableTtlMs, classifyAgeLifecycle, isLifecycleHardRetired, LIFECYCLE_VERSION, LIFECYCLE_EVERGREEN_THRESHOLD_DAYS, injectDescriptions };
+module.exports = { main, resolvePostedAt, mergeCarryForward, dropOrphanJobs, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, buildMidLevelTechFeed, buildMidLevelTechSummary, buildSeniorTechFeed, buildSeniorTechSummary, buildCanadaTechFeed, buildCanadaInternshipsFeed, buildCanadaSentinelChecks, buildCanadaAllFeed, activePublicWindowTs, applicableTtlMs, classifyAgeLifecycle, isLifecycleHardRetired, LIFECYCLE_VERSION, LIFECYCLE_EVERGREEN_THRESHOLD_DAYS, injectDescriptions, generateMetadata, buildLatencyMarkers };

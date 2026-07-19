@@ -121,6 +121,26 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
+    - name: "Seed pipeline-cycle-state.json from R2 (AGG-PREVIOUS-CYCLE-TIMESTAMP-1)"
+      run: |
+        echo "📥 Seeding pipeline-cycle-state.json (prior run completion timestamp)..."
+        node -e "
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          const result = await r2.downloadToFile('pipeline-cycle-state.json', '.github/data/pipeline-cycle-state.json');
+          if (result) { console.log('R2_OK'); } else { process.exit(1); }
+        }
+        main().catch(() => process.exit(1));
+        " 2>/dev/null && \
+          echo "✅ Seeded pipeline-cycle-state.json" || \
+          echo "⚠️ No pipeline-cycle-state.json in R2 yet — first run after deploy (previous_run_completed_at=null this cycle, self-bootstraps next run)"
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
     - name: "Seed descriptions-jsearch.jsonl from R2 (private R2 only)"
       run: |
         echo "📥 Seeding JSearch description cache..."
@@ -799,6 +819,8 @@ jobs:
           for (const s of sidecars) files.push(s);
           // AGG-DESC-ASYNC-1: WD desc queue for separate backfill workflow (non-required)
           if (fs.existsSync(path.join(dataDir, 'wd-desc-queue.jsonl'))) files.push('wd-desc-queue.jsonl');
+          // AGG-PREVIOUS-CYCLE-TIMESTAMP-1: cycle-state marker (non-required, written by index.js at end of main)
+          if (fs.existsSync(path.join(dataDir, 'pipeline-cycle-state.json'))) files.push('pipeline-cycle-state.json');
 
           // AGG-SPEED-9: Upload in parallel with concurrency 10 (raised from 5)
           // AGG-R2-UPLOADSPEED-1: Skip unchanged files via size check (one list() call)
