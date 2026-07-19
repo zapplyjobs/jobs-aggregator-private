@@ -855,7 +855,7 @@ jobs:
               // EXCEPT: files whose content changes every run without changing size
               // (timestamps are fixed-length ISO, counts can have same digit count).
               // These MUST always upload or R2 serves stale data.
-              const ALWAYS_UPLOAD = new Set(['jobs-metadata.json', 'wd-totals-cache.json', 'board-counts.json']);
+              const ALWAYS_UPLOAD = new Set(['jobs-metadata.json', 'wd-totals-cache.json', 'board-counts.json', 'pipeline-cycle-state.json']);  // AGG-PREVIOUS-CYCLE-TIMESTAMP-1: 48-byte marker, fixed-length ISO ts → size never changes
               const localSize = fs.statSync(fp).size;
               if (!ALWAYS_UPLOAD.has(file) && remoteSizes[file] === localSize) {
                 skipped++;
