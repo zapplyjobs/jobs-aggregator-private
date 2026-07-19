@@ -852,16 +852,12 @@ jobs:
             }
             try {
               // AGG-R2-UPLOADSPEED-1: Skip if local size matches remote (file unchanged).
-              // EXCEPT files in ALWAYS_UPLOAD (explicit list — content changes at constant size) AND
-              // AGG-SIZECHECK-AUDIT-1 (2026-07-19): EXCEPT files < SMALL_FILE_THRESHOLD.
-              // Small files often change content at constant byte size (fixed-length ISO timestamps,
-              // fixed-width counts, JSON with same-digit numbers). The size-check optimization is
-              // only meaningful for large files (where upload bandwidth matters). Always uploading
-              // small files costs negligible bandwidth and eliminates the silent-stale-R2 class.
-              // Caught in production: 10+ files stale 1-4 DAYS in R2 while AGG wrote fresh each cycle.
-              const SMALL_FILE_THRESHOLD = 1024 * 1024;  // 1 MB
+              // EXCEPT: files whose content changes every run without changing size
+              // (timestamps are fixed-length ISO, counts can have same digit count).
+              // These MUST always upload or R2 serves stale data.
+              const ALWAYS_UPLOAD = new Set(['jobs-metadata.json', 'wd-totals-cache.json', 'board-counts.json', 'pipeline-cycle-state.json']);  // AGG-PREVIOUS-CYCLE-TIMESTAMP-1: 48-byte marker, fixed-length ISO ts → size never changes
               const localSize = fs.statSync(fp).size;
-              if (!ALWAYS_UPLOAD.has(file) && localSize >= SMALL_FILE_THRESHOLD && remoteSizes[file] === localSize) {
+              if (!ALWAYS_UPLOAD.has(file) && remoteSizes[file] === localSize) {
                 skipped++;
                 console.log('SKIP (unchanged): ' + file + ' (' + Math.round(localSize / 1024 / 1024 * 10) / 10 + ' MB)');
                 ok++;
