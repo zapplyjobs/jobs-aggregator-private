@@ -89,6 +89,22 @@ jobs:
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+    - name: "Seed pipeline-cycle-state.json from R2 (AGG-PREVIOUS-CYCLE-TIMESTAMP-1)"
+      run: |
+        node -e "
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          const result = await r2.downloadToFile('pipeline-cycle-state.json', '.github/data/pipeline-cycle-state.json');
+          console.log(result ? 'R2_OK' : 'R2_MISS (first run after deploy — expected)');
+        }
+        main().catch(() => process.exit(0));
+        "
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
     - name: "Seed descriptions-enriched from R2 (private R2 only)"
       run: |
@@ -798,6 +814,7 @@ jobs:
           const sidecars = fs.readdirSync(dataDir).filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl') && !['descriptions-workday.jsonl', 'descriptions-smartrecruiters.jsonl'].includes(f));  // AGG-DESC-ASYNC-1: WD + SR sidecars owned by separate desc-backfill workflow
           for (const s of sidecars) files.push(s);
           // AGG-DESC-ASYNC-1: WD desc queue for separate backfill workflow (non-required)
+          if (fs.existsSync(path.join(dataDir, 'pipeline-cycle-state.json'))) files.push('pipeline-cycle-state.json');
           if (fs.existsSync(path.join(dataDir, 'wd-desc-queue.jsonl'))) files.push('wd-desc-queue.jsonl');
 
           // AGG-SPEED-9: Upload in parallel with concurrency 10 (raised from 5)
