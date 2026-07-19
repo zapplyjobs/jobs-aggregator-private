@@ -901,6 +901,34 @@ jobs:
           if (required_files_failed > 0) {
             throw new Error('Required R2 upload failures: ' + required_files_failed);
           }
+          // AGG-R2STALE-MONITOR-1 (2026-07-19): post-upload freshness audit. Lists every R2 file's
+          // age + flags any REQUIRED file older than 2 cycles (30 min). Catches silent staleness
+          // regardless of cause (size-check regression, future bug, R2 eventual-consistency lag).
+          // Defense-in-depth on top of AGG-SIZECHECK-AUDIT-1. Writes r2-freshness.json (read by
+          // JBP check pipeline-alert; AGG owns the artifact, JBP owns the alarm).
+          try {
+            const STALE_THRESHOLD_MS = 30 * 60 * 1000;  // 30 min = 2 pipeline cycles
+            const postObjects = await r2.list('');
+            const now = Date.now();
+            const fileAudit = {};
+            const staleRequired = [];
+            for (const obj of postObjects) {
+              const name = (obj.key || '').replace(/^data\//, '');
+              if (!name) continue;
+              const lm = obj.lastModified ? new Date(obj.lastModified).getTime() : 0;
+              const ageMs = now - lm;
+              const isReq = requiredFiles.has(name);
+              const fresh = ageMs < STALE_THRESHOLD_MS;
+              fileAudit[name] = { last_modified: obj.lastModified ? new Date(obj.lastModified).toISOString() : null, age_seconds: Math.round(ageMs / 1000), size: obj.size, required: isReq, fresh };
+              if (isReq && !fresh) staleRequired.push({ name, age_minutes: Math.round(ageMs / 60000) });
+            }
+            const audit = { audit_at: new Date().toISOString(), run_id: process.env.GITHUB_RUN_ID || null, stale_threshold_minutes: 30, total_files: Object.keys(fileAudit).length, stale_required_count: staleRequired.length, stale_required_files: staleRequired, fresh: staleRequired.length === 0 };
+            fs.writeFileSync(path.join(dataDir, 'r2-freshness.json'), JSON.stringify({ ...audit, files: fileAudit }, null, 2));
+            await r2.uploadRaw('r2-freshness.json', JSON.stringify(audit, null, 2), 'application/json');  // upload summary only (full per-file detail in the data/ copy)
+            console.log(`📊 AGG-R2STALE-MONITOR-1: freshness audit — ${audit.total_files} files, ${staleRequired.length} stale required ${staleRequired.length > 0 ? '(⚠️ ' + staleRequired.map(s => s.name + '=' + s.age_minutes + 'm').join(', ') + ')' : '(✓ all fresh)'}`);
+          } catch (e) {
+            console.warn('⚠️ R2 freshness audit failed (non-blocking): ' + e.message);
+          }
         }
         main().catch(e => { console.error('R2 fatal: ' + e.message); process.exit(1); });
         "
