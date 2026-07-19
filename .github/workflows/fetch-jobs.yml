@@ -857,7 +857,7 @@ jobs:
               // These MUST always upload or R2 serves stale data.
               const ALWAYS_UPLOAD = new Set(['jobs-metadata.json', 'wd-totals-cache.json', 'board-counts.json', 'pipeline-cycle-state.json']);  // AGG-PREVIOUS-CYCLE-TIMESTAMP-1: 48-byte marker, fixed-length ISO ts → size never changes
               const localSize = fs.statSync(fp).size;
-              if (!ALWAYS_UPLOAD.has(file) && remoteSizes[file] === localSize) {
+              if (!ALWAYS_UPLOAD.has(file) && localSize >= (1024 * 1024) && remoteSizes[file] === localSize) {  // AGG-SIZECHECK-AUDIT-1: only size-skip files >=1MB (small files change content at constant byte size)
                 skipped++;
                 console.log('SKIP (unchanged): ' + file + ' (' + Math.round(localSize / 1024 / 1024 * 10) / 10 + ' MB)');
                 ok++;
