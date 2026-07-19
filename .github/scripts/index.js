@@ -754,7 +754,25 @@ function loadSupplementalInputs(nowMs = Date.now()) {
         continue;
       }
       for (const source of summary.sourcesUsed) sourcesUsed.add(source);
-      appendAll(jobs, summary.jobs);
+      // AGG-BYTECODE-SIDECAR-GAP-1 (2026-07-19): supplemental lane's purpose is to feed
+      // HOTPATH_DEMOTED_FETCHERS (apple/google/microsoft/oracle). Other sources here are
+      // producer bugs — 100% ID overlap with the main fetcher causes merge conflicts where
+      // the description-less supplemental version wins over the main-fetch version, and
+      // sidecar writer correctly skips (no description) → check-32 alarm fires.
+      // Filter at ingest; producer-side fix is a separate task.
+      const _beforeFilter = summary.jobs.length;
+      const _filtered = summary.jobs.filter(j => HOTPATH_DEMOTED_SOURCES.has((j.source || '').toLowerCase()));
+      const _dropped = _beforeFilter - _filtered.length;
+      if (_dropped > 0) {
+        const _droppedSources = {};
+        for (const j of summary.jobs) {
+          if (!HOTPATH_DEMOTED_SOURCES.has((j.source || '').toLowerCase())) {
+            _droppedSources[j.source || '(none)'] = (_droppedSources[j.source || '(none)'] || 0) + 1;
+          }
+        }
+        console.log(`   🔧 Supplemental ${lane.lane}: filtered ${_dropped} non-demoted jobs (kept ${_filtered.length}/${_beforeFilter}; dropped: ${Object.entries(_droppedSources).map(([k,v]) => `${k}=${v}`).join(', ')})`);
+      }
+      appendAll(jobs, _filtered);
     } catch (e) {
       inputs[lane.lane] = {
         status: 'skipped_invalid',
