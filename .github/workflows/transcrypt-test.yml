@@ -18,20 +18,23 @@ jobs:
           chmod +x /tmp/transcrypt
           sudo mv /tmp/transcrypt /usr/local/bin/transcrypt
 
-      - name: Test A — standard git checkout
+      - name: Unlock encrypted files
         run: |
           echo "Y" | transcrypt --cipher aes-256-cbc --password "$TRANSCRYPT_PASSWORD" --force
           git checkout -- .
-          echo "=== APPROACH A: git checkout -- . ==="
+          echo "=== AFTER UNLOCK (before submodule fix) ==="
           head -1 .github/scripts/index.js
         env:
           TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
 
-      - name: Test B — rm .git/index + checkout
+      - name: Fix submodule index (SUSPECTED CULPRIT)
         run: |
-          rm .git/index
-          git checkout HEAD -- .
-          echo "=== APPROACH B: rm .git/index + git checkout HEAD -- . ==="
+          git submodule sync --recursive
+          git submodule update --init --force --recursive
+          echo "=== AFTER SUBMODULE FIX ==="
           head -1 .github/scripts/index.js
-        env:
-          TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
+
+      - name: Final check
+        run: |
+          echo "=== FINAL STATE ==="
+          head -1 .github/scripts/index.js
