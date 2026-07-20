@@ -1,35 +1,31 @@
-U2FsdGVkX1+FDntfKFxk3mtUTTKaz7WI4K0ZQltlDnFN092wQwMfkQkIE+W/uhms
-pXZpDZCnEUooFl8uJWVTzFAlzj5Yv4uG6WSgvJOhO4kd7HJueB16zaVKMR/Dll2j
-N3aZIsVS6Qyc0wspfyt3Q4ayrsxEZfecRYRAnvhOKcvO20qYMpvFFmQZpSrEIwtt
-StQ5oVLB2NY/hjXLcL9K1QLp9GbtQlbNbxbCeCBWG2SvJGyG+cNe7j9IqXXkAO5S
-LwaSHlIaxP68x+ggPRJhWQy7moM360t/tRH4vI7dus3+ZKoDBPD1TpzsKDGiK1GO
-zvA7HjyRXJYsWW+7ZEhHsmSR84njmzK+R2PmzJK+dzo795SLxOnrrH1ytG2OFWT4
-C4IGZC+Byuh0PGXjPHpcRqPN9ise8ajweInwNrdIORXbQKiTTHWvsfDlBMzY3qYH
-RdmXTUncmg92YkQUHsuxIRTCO2QWkUsR9qgIxwQXzMmIt3bKP3LzvGqqoFBwh+mZ
-0+OhQnrQDQrheDSXJORBiCALWTFjy7uXcKX0Kp5vGoRZNf0R001Ubv1fbCG6ZydF
-MhsxqTuL7XzVv9w1EObtNM68uzYlQEE+gik9vT5C5J71EVltEo8cjH6UNcKPHVTP
-7+lLzWRkl9O/Q+77TlTeVdnM/nDZfD6szvqiEb2UbltnjjJAeiXTlYGwyiiRt1Dh
-OixlldRlozqzKymL6DRt8+NpczUj1k45ATHKJqrBBDIex9Z4K3YB3tyQsZjla5cg
-9DFm2mtY0v1HJycTLFER3A5rq8j+JVNcGbtzyXlfHPq2LuBRJqdOo/tsXYV0Dfdz
-P5j0k9Ri/vn/KwTyvDyEup98O5E49/WzZRsvpU0w0VsWuenuuJF4ornCQ2jSNM2S
-EkwSe31sYnO4ZYk+XeV6iL8Mlu6wi5bYOGic7fZOAUO8UR4OwAplFg2ul98hE2tL
-v06xIlJkM+oQXvDde2l4p2juTVes1i7vZn6Ra8a0mpsABQf3TMAx3j4VGxpq92rm
-jq2ZNodxLhb15soB0Ompi7/ojgDMuetxUyjasWdB3R7/gsKKPFNrpTpngOMuaTXm
-NoXZUCsmQiwC3m8/5LlE07JDnP+eKL8PacV8/se/vJtIkUtCfzgiOA7mw0ZflWnC
-IA4XDFia/r77PiRn8OnUCqcs+lX0aHuZRUj5zsJ1+jHpN5TCvoGyVKQ+GUEDeDAX
-Iqqw2NwoCeyr+Yvl1KXhavwIFINJit1ZX5Bxd/UcibVzlrEhF06is8OH1ngCQE2B
-l/2pmm8zCkLb0CsjiTbyJNRh7L6FMEfd+75dmpYiEvJJQ9wM+Q5PPa34maeZDtGb
-8KSHwu5izXl3d2GO85jAx9MgjiVIBzvHT1KbIOV6oJ1gpEzU5l6lIt97eeX2hI89
-UnclZ84NWSCWBxAgyz5SxBoMekziDUjg4RVigqpN3UWrDzIzdghceBWsjw4OclUJ
-JIaDhfRDJ4vpRcW/yXX4kfkwGeLUB5GSJcBm+F6Ih4uYXsnPo9JSbVguKiizIQMb
-R/hE4K48a/wCvpimzu/CVPoBH8+2BGMNkweTBP3p73+6JmWUdD+RKlaBe/XuRIks
-qu2Y26df20Epwg0NEWfYKtEeZ3c7cEtJBF/Isf5r4Ga86ieUSQHgyF1qmExDfBUm
-LF/utTxoqobJVoNZJAnTCwMYZWlMkqAc5epDPXLmmQdTwUyP2myDK8PWEnjExugW
-vbl3fjANgd0EhF0PmmFOtBv9oxGxeqBLASTMZpwdmksM/uszPAEsmKPF3FAJqbyq
-weppztT9Tc4iBT4RRjr0xgQHSoRc+Gd5BsicSbys09kZ2oqW8mQamW5mzOv6w9qL
-/oUWT9CVhdnwOjq6lhYWMZBmkjro34T7Xgr2pUXKHcxs3+wz6Q6NBQQVLM7JWIGy
-aozEes62ZPBYbHMKT04w3h27TM0B9Wfd6OOT+d6YSm1lM8vpanjm9c7qnH4uv4hf
-jsxS7ezy5D0/6XmCHvxUUk+dElEaCsjG+ymP3ya3MTHiDmpQcpoRqjDdtM/NsXb9
-9d1oeJdPaZKFHvPRiMlzumkYmqVn2pS77V3g/8C2pS/7gm6ks6bcbAh1eyiev43y
-eCB6Un/7W36e9l6MNTmUn+0R3dAv1PXT4uIkPXWUjLRfX9ep37SktsC0pSaSwtv1
-k/UUN5IARZwph7nxdebDCQ==
+#!/usr/bin/env node
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { parseJsonOrNdjson, isCurrentUsTechOracle, loadCurrentBoardPriorityIds } = require('../fetch-supplemental-oracle');
+
+assert.deepStrictEqual(parseJsonOrNdjson(JSON.stringify([{ id: 'a' }])), [{ id: 'a' }]);
+assert.deepStrictEqual(parseJsonOrNdjson('{"id":"a"}\n{"id":"b"}\n'), [{ id: 'a' }, { id: 'b' }]);
+
+assert.strictEqual(isCurrentUsTechOracle({ source: 'oracle', tags: { locations: ['us'], domains: ['software'] } }), true);
+assert.strictEqual(isCurrentUsTechOracle({ source: 'oracle', tags: { locations: ['us'], domains: ['general'] } }), false);
+assert.strictEqual(isCurrentUsTechOracle({ source: 'workday', tags: { locations: ['us'], domains: ['software'] } }), false);
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'oracle-priority-'));
+const allJobsPath = path.join(tmp, 'all_jobs.json');
+fs.writeFileSync(allJobsPath, JSON.stringify([
+  { id: 'oracle-a', source: 'oracle', tags: { locations: ['us'], domains: ['software'] } },
+  { id: 'oracle-b', source: 'oracle', tags: { locations: ['us'], domains: ['general'] } },
+  { id: 'oracle-c', source: 'oracle', tags: { locations: ['us'], domains: ['ai'] } },
+]));
+
+const cachedIds = new Set(['oracle-c']);
+const existingPriorityIds = new Set(['oracle-short']);
+const out = loadCurrentBoardPriorityIds(cachedIds, existingPriorityIds, allJobsPath);
+assert.deepStrictEqual([...out].sort(), ['oracle-a', 'oracle-short']);
+
+fs.rmSync(tmp, { recursive: true, force: true });
+console.log('PASS oracle board priority');

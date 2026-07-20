@@ -1,22 +1,34 @@
-U2FsdGVkX18FAT0/p+SiK2gjjkTZ9gGFutlPGqGcXM05q1CoTdjsyAB1LxhSpt/Z
-RTbLQ/LflU/KicnqlXzB95+IE1l+8NsB5sKIK5LFEIUUC4AE7T5BO22jPS+wP+2c
-FNxd7ix5mCilHwyDo7lkY5tEkkccSNYoBbNNR7A/uGwUj3T0N7mEhx8jbyF3XFrA
-0z3K/3wUxDzG2QXiTDOjSS5Cc046u5a0Ep/SekQstqS118+6+xX0KVFIbHi7E4dD
-bCSDOGhV665oEBwKbW2abJLipjyaKnZ+4kY8csBc3FaH7gIhIC3l2VS4C4yuwlYB
-s/TGZOWLb9wuBJ6Y9Y+qjqRH6vQRsQ5GbRU1NrTkcUcSFQwpzkI0WdSyWMQBNJp7
-NgA5MOtNc18zjwO07xKW7+QExs63Xbh5wjpEDvSx4DPVrKeboqREWOdPg/MF1gV2
-JzR6JP0hxRxCZj1vRBzvMMx8UjDd89Ayva0N8vAVa6CT99EiP4IpperOf4tA/VrU
-t0Y4wNAZy/qn9C/zHot47JBG3JCtAiXoT4O2wER3KOuqaBXi79Bj2EvBCC82WMmI
-TeAQJFbt3PJ9dtCmbmXRYtIOXYVT75XwhnFRnenkDSjXRmGKsQLYwn4eiSrXiVPZ
-aW+fVTiHsCsTsDF2lg3enUBOMplwSA3A3U3kW01jvf2gqcVwXx11lU5Jb3HB6lsg
-kw6kPxorsq/JlUR69+KXy/SH/Plb0nAEEg0+QUrP5sagunMU+fBFMqlblICR/06C
-6uh9t7jJ4hwY1O6IdZyxwEMiCdCPLpJsyvXUuM0IfsVo82tjZT81tFTS94vQxIUC
-dQEbALVymE9zx8AiC827zjR9cnEwujvcQfb5IZAGlB2QGsMIsVJBm3AzlrA4NFU7
-V3/YEV5dZAurSeiTKTmtahqBWTA5KwSqSQjP51Yng6wLspRb8+b17jj6Qg82cqiW
-T255IyMmigl6ztN8nGykN4Fn94sFLzCO0QgKhbhYCnF8Yjc3/7G+A2dSN3aT0QPl
-pDGsB4vyWBeX8e3f/IFWAikUTEpvbipShgfoJOq5+5EklCqFNMm4yrXmKz1ZQsUk
-JU62nvoNT9fKJ6pFFGwIkmz9m+r9outmnVGgZ4GXaZzlAShhRdRa1oUx4IGPn5A1
-8JMX54XPNcSCpMG6pNIUeebLWtUnE8GE/U9EIYtdoq/B6g9MkTe0vZQZhwgQRjqz
-jA34q1Fp4GBf1nAfnBTEcnCHbrvDg7ozEohRkzs1v5md6MKoGrJcvOKsAzCl6C46
-V6zXx4/MwFBoDZX0rVvF2VGpiuevyh8fncPgpWQwbX7GLys2DKmlZEGIPX5BmImN
-zH27uCCFRikNbIdTlazrd+rD743IdwRZXFxdxRQ7Py61QFjIHW7PfdQt+9VC/VNz
+#!/usr/bin/env node
+'use strict';
+
+const assert = require('assert');
+const { activePublicWindowTs } = require('../index');
+
+const now = new Date('2026-06-18T05:00:00.000Z').getTime();
+const point72 = {
+  id: 'greenhouse-point72-7586061002',
+  source: 'greenhouse',
+  posted_at: '2024-08-15T17:34:49-04:00',
+  source_updated_at: '2026-06-12T13:40:11-04:00',
+  tags: { employment: 'internship', locations: ['us'], domains: ['ai', 'data_science'] },
+};
+
+assert.strictEqual(
+  new Date(activePublicWindowTs(point72, now)).toISOString(),
+  '2026-06-12T17:40:11.000Z',
+  'current-run Point72 internship should anchor to source_updated_at'
+);
+
+assert.strictEqual(
+  activePublicWindowTs({ ...point72, source: 'icims' }, now),
+  new Date(point72.posted_at).getTime(),
+  'exception must stay greenhouse-only'
+);
+
+assert.strictEqual(
+  activePublicWindowTs({ ...point72, tags: { employment: 'entry_level' } }, now),
+  new Date(point72.posted_at).getTime(),
+  'exception must stay internship-only'
+);
+
+console.log('PASS GH TTL current-run anchor');

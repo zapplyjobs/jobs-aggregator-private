@@ -1,98 +1,131 @@
-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
+#!/usr/bin/env node
+'use strict';
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function parsePositiveInt(value, fallback) {
+  const n = Number.parseInt(value, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function truncate(text, max = 1000) {
+  if (!text) return '';
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+function classifyDispatchFailure(status) {
+  if (status === 429) return { retryable: true, className: 'rate_limited' };
+  if (status >= 500 && status <= 599) return { retryable: true, className: 'github_transient' };
+  if (status === 401 || status === 403) return { retryable: false, className: 'auth' };
+  if (status === 404) return { retryable: false, className: 'not_found' };
+  if (status === 422) return { retryable: false, className: 'invalid_dispatch' };
+  if (status >= 400 && status <= 499) return { retryable: false, className: 'client' };
+  return { retryable: false, className: 'unexpected' };
+}
+
+function retryDelayMs(response, baseDelayMs, attempt) {
+  const header = response?.headers?.get?.('retry-after');
+  const seconds = Number.parseInt(header, 10);
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.min(seconds * 1000, 10000);
+  }
+  return Math.min(baseDelayMs * (2 ** (attempt - 1)), 10000);
+}
+
+async function dispatchWorkflow(options) {
+  const {
+    token,
+    owner = 'zapplyjobs',
+    repo,
+    workflow,
+    ref = 'main',
+    maxAttempts = 3,
+    baseDelayMs = 1000,
+    fetchImpl = globalThis.fetch,
+    sleepImpl = sleep,
+    log = console.log,
+    warn = console.warn,
+    error = console.error,
+  } = options;
+
+  if (!token) throw new Error('GH_PAT is required for workflow dispatch');
+  if (!repo) throw new Error('DISPATCH_REPO is required');
+  if (!workflow) throw new Error('DISPATCH_WORKFLOW is required');
+  if (!fetchImpl) throw new Error('fetch is not available in this Node runtime');
+
+  const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow}/dispatches`;
+  let lastFailure = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let response;
+    let body = '';
+    try {
+      response = await fetchImpl(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ref }),
+      });
+      body = response.status === 204 ? '' : await response.text();
+    } catch (err) {
+      lastFailure = `network ${err?.message || err}`;
+      if (attempt === maxAttempts) {
+        error(`Workflow dispatch FAILED: ${owner}/${repo}/${workflow} attempt=${attempt}/${maxAttempts} class=network message=${err?.message || err}`);
+        return false;
+      }
+      warn(`Workflow dispatch retry ${attempt}/${maxAttempts - 1}: ${owner}/${repo}/${workflow} — network ${err?.message || err}`);
+      await sleepImpl(Math.min(baseDelayMs * (2 ** (attempt - 1)), 10000));
+      continue;
+    }
+
+    if (response.status === 204) {
+      log(`Workflow dispatch OK: ${owner}/${repo}/${workflow} ref=${ref} attempt=${attempt}/${maxAttempts}`);
+      return true;
+    }
+
+    const classification = classifyDispatchFailure(response.status);
+    lastFailure = `status=${response.status} class=${classification.className} body=${truncate(body)}`;
+    if (!classification.retryable || attempt === maxAttempts) {
+      error(`Workflow dispatch FAILED: ${owner}/${repo}/${workflow} attempt=${attempt}/${maxAttempts} ${lastFailure}`);
+      return false;
+    }
+
+    warn(`Workflow dispatch retry ${attempt}/${maxAttempts - 1}: ${owner}/${repo}/${workflow} — ${lastFailure}`);
+    await sleepImpl(retryDelayMs(response, baseDelayMs, attempt));
+  }
+
+  error(`Workflow dispatch FAILED: ${owner}/${repo}/${workflow} ${lastFailure || 'unknown failure'}`);
+  return false;
+}
+
+async function main() {
+  const ok = await dispatchWorkflow({
+    token: process.env.GH_PAT,
+    owner: process.env.DISPATCH_OWNER || 'zapplyjobs',
+    repo: process.env.DISPATCH_REPO,
+    workflow: process.env.DISPATCH_WORKFLOW,
+    ref: process.env.DISPATCH_REF || 'main',
+    maxAttempts: parsePositiveInt(process.env.DISPATCH_MAX_ATTEMPTS, 3),
+    baseDelayMs: parsePositiveInt(process.env.DISPATCH_RETRY_DELAY_MS, 1000),
+  });
+  if (!ok) process.exit(1);
+}
+
+if (require.main === module) {
+  main().catch(err => {
+    console.error(`Workflow dispatch fatal: ${err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  classifyDispatchFailure,
+  dispatchWorkflow,
+  retryDelayMs,
+};

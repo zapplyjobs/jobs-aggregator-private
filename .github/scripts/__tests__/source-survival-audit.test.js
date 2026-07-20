@@ -1,51 +1,69 @@
-U2FsdGVkX1+o2HhdSV6oo+zb2AJHx7rTTeOD/11P3GKOYfbAAJ2wo/YwMn3z3VBc
-/FQ0I4ediMM4bTqZNkeL3Ap0EsJ7jjo4d/oBWhMyT+jQg/c2Mns5rF22jqvotVBb
-udgaoRiTnTj1yp9ipXC9al7YgLzjqxl6GxTeyB+HY6RZZRxQCk1gTXOMXgTYlcvk
-SVTxuiki/HyNi1gCMu+HhW7GBYa0pHUpQOziolgTzFey/UXctVLluiSuTx7wOBMx
-rAqGHYi0EXtBfrqcqzgYBhmcPUoXRrUTudJhbbhGrmxjqZhZXLe1mzd53B/iUE0g
-Dw8DA1mq0dShNw+B9FC9MhtkQ0S7kCnF/qwc0ifMxkC6zk4Ps4YTZu/0E2fktodR
-ugSWixPRn6EtTQhiW0Q6/N1y0LB1F9ag/ME7Umkf98qcMZPwYKEEIpp018bAKAhU
-wO3x6ppOIx+IUqKMs3S4zUkcanjJwf1ImY1ZdVhW/dREmCzMvL8pBCGcRVyYoetO
-gXFsQwmO5Id6tSJ2G88npO1gPe70a3jupd0Mb1C/Xw+ctlurB0edgbNVMmiX0Enb
-DzpbsjfFKZ5jIO6ZTyb1UtxjVHRR8cMZtvT9irOccKXi58qVUzl2c0RjNAb5jwSn
-64Og1Xyt/0H3bMcifdZEYbqf7b8i27Mp2Gzb3Pnf0HvVEEjPfzWLmd5oFvzGGOkt
-gX2Jj6KVKz51xaBwZmifGE91HMhQPYRRRwW23GfGgZczy7xoxmyyYlgp4t7TbQ5X
-MCAjiZzA62raTgygYF97iYciOGcg43U55nBBYq6SGgq3r/KR+fQsdnv57Am4UtFz
-4//a8hLikjsBpEhfp3dj37gMR8oHLakp7UWstqiq9QYsNdLXVjUGxkv97/x05vj0
-6E3Ip85uyjFy0syTmNuLyojd4hEd95zYwRJqIIHe77Mx8O2U0f7hEYg/plePeyLy
-tuBPY/KIUbJRVQpM57Fj+iS24R7H7o0bBXnCCS54OZKjukbOmGLbY8zdGqgS6hC3
-pj/dY3p/lPHsk1KzqFuiC10y2Kc9NU/wSxjNjyV2MxzU0S1d1JqjV+5Q9u7XbHPw
-n8EEB9KGrXWGT3Qbv7537Bxtq1Y9yGkBrQZlaGHLL3daPKQUGAB40mXefCZ0Voj4
-udi5NMdedU+P2GkLVJgmcpeB28Eyyzi0EqgTzmqNoDOK72nbtEbInLSmjTk0aty/
-v5JLMMT+THoow2xaRNTDJAhYm/T0CqzEtSzQjP4hB/SSARRSS1100p85ebqRMog9
-MTb/TZgHzH48MO8451FKRVaJm/MB+VqkafH3V6U/Xr8hKUnMem3hQKYnHF9Kjikq
-G8xPRkYYdB9ZtZ1G5teevnEJ7Aly/sTRWFbOxp6XJ7Q07zESfZPTxaw3rolRIHZH
-MxuVyliMA09rRpw7ibKkWghyz5xeUsOfTXW8LBcwTpJVDYVS/z753x7DX+4VCbxQ
-xtns0SC9fCr8zuvVufMBWiJ+OyVz/n6eJy0sA4BliZNZxJhb1DRmLOoJvG/DYMIr
-2sc4AUG+nusp46/B2O7XM/qCD2qETjjzfrVbPqzpgpILYBJ1yhDGuXKC6No8a5vg
-dC0GfnkYEjEsQtfqJhjQawq5I0i0zId0Qiaac35FBd/S8KY6Xve41sO0D0ms3hQv
-FEFz2+Ows28CigYVmof++wPGAf2mlsWuFoRcbzKXo7YBMIqOfUfH/t6QtT+rCsuj
-AYZj567Y3CEqdS8t96uiIUPZ5OjcPsnHDpxX6cUQyoOEwP4V171k3So7iivm6IJg
-2msqW4wNaW24nUdH+p9/c15dsWQfrXHdXrxl2JJdWUHu0c44TV1GQv2k4zyHv5FF
-6kIDlwDqGkVY+riiNoLjUWK7//X9oPWdwKVfXoPtk9TgYTCo0AJP5n3PO6BUGv6V
-31PQ6wxXGNX7GQrcTyBVXRv+ji9av2Wwy6A/QbDnRw89MzlBBovMYj8mDpOLBZGu
-Xhioc3Xb1rb47aIYqoeHoDhV8krD3h93BxG5dmlY+Mji/GMBAHo3k02kNVK55+Ox
-q9OaFzFCELF1PR49WWCEFAG+sijaZVRcATa15CgYFXWx4lZcgMckTzn5ELocokkn
-zPpL3Dv/OEppWxEVVsz70WS5qR8YgAX9h3m5B3XOBJvd5n0cApYdhHPxRuJl+JRa
-HjHdwNoBN5cHdSUoFCK1WD/Kah1A8cpNVcus7ePgwiEm5azFIrAmj6MlEaTuQ/tr
-VC5r8rG4RKw57ildSOQ5aNBmRlwH4qccgV4FSTMSK76BBudSBdWpchnMRCmtieUo
-PwLHXUryqEmxTmzZ2ei355n4htRuYiWmqQdo6cy6EM/jVOmJBtckcuhgVWtY1jvZ
-UPkR1UVxoYt0a1Z70jEwHDM1WZRVqwyllYgMNd1dtMah4B1lbMMYHQgCEWLUQLBw
-JhBG6k+FCt5Hq/DoFy1YKurmiNJ7iZJyoRdVrqxLJyrBoNDhbUrJoS4rgQkQHyc+
-mHZyOITlyTvgpX2E9wpei9AkTxSG5tDwH8hjdVDq2QUnuu6AYS9ZsOjKqJV0fxcx
-e/IeS23tXggKTUIuB9bUFSwHuYSEN2UcCVxDsdaBOZaLEOVr/stFaD+3aR/wGOBY
-K0cCJ2nMuzqXN4njdVUeKXZOZvOH9/cCSvX3Q1hnP1rURBbFACtS1rmwOZpmzm5F
-6vJIPSTghN8UTrN0FwdYErwP41jR56gLvtgrGQltaJfqaCWegDQj4R2PJsQxhhqC
-Wx3bKDJ8LI/KjjFOG//G3s2mzIoN4CNZx4/UDvN8R4xx/BBHDHk5wPHsFpSer1nu
-goprYyGXJOlLGaluSYJQTEas2RD4kwYZhkdmJvfOTAAReKKNoZ8rUkRZlgIufNcP
-kuMYQQ5CO1tQzGcXLqSPgWxuxwnFYKypwQuO5xyvCydXSV/hTon/gN+6ZzIEbOOf
-sVflX+v5/BBqXKT0PU8/4QcyVHMoJDZ7Wky5mopW4qSN4UeOhScqaDdg1M8W5bL3
-VnLpGfspFpwnlmbH631SZJ923ZMVGCumVAIbJTHTrpD8f2QeNnnyfJQc2AdxRYJH
-mvxYReOFnNPFYgyqTWGWMwDEkaeOsL+25uIEQNeuxgjk8jKCRytA/aSV/90QJc7x
-kcpLDoQbpe87TU4MEj3YiqGhMFp5CE8JclRoTBRIkgWiscv7Boc1nNCXE+W0Cj/A
-QaZuu0XpT0RK8qwDdQn7NKp0VWgHDJNxZ5KbN2IXBOU=
+#!/usr/bin/env node
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { buildAudit } = require('../source-survival-audit');
+
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'source-survival-audit-'));
+
+fs.writeFileSync(path.join(dir, 'jobs-metadata.json'), JSON.stringify({
+  fetch_results: { direct: 10 },
+  supplemental_inputs: {
+    custom: { by_source: { direct: 3, weak: 200 } },
+  },
+}));
+
+fs.writeFileSync(path.join(dir, 'all_jobs.json'), JSON.stringify([
+  {
+    id: 'direct-1',
+    source: 'direct',
+    title: 'Software Engineer Intern',
+    posted_at: '2026-06-17T00:00:00.000Z',
+    description: '',
+    tags: { domains: ['software'], locations: ['us'], employment: 'internship' },
+  },
+  {
+    id: 'direct-2',
+    source: 'direct',
+    title: 'Data Intern',
+    posted_at: '2026-06-17T00:00:00.000Z',
+    description: '',
+    tags: { domains: ['data_science'], locations: ['us'], employment: 'internship' },
+  },
+  ...Array.from({ length: 80 }, (_, i) => ({
+    id: `weak-${i}`,
+    source: 'weak',
+    title: `Weak Job ${i}`,
+    posted_at: '2026-06-17T00:00:00.000Z',
+    description: '',
+    tags: { domains: ['software'], locations: ['us'], employment: 'entry_level' },
+  })),
+]));
+
+fs.writeFileSync(path.join(dir, 'enriched_jobs.json'), JSON.stringify([
+  { id: 'direct-1', source: 'direct', required_skills: ['python'] },
+  { id: 'direct-2', source: 'direct', required_skills: [] },
+]));
+
+fs.writeFileSync(path.join(dir, 'descriptions-direct.jsonl'), [
+  JSON.stringify({ id: 'direct-1', description_text: 'Python required' }),
+  JSON.stringify({ id: 'direct-2', description_text: 'SQL required' }),
+].join('\n') + '\n');
+
+const audit = buildAudit(dir);
+const direct = audit.sources.find(row => row.source === 'direct');
+assert.strictEqual(direct.sidecar_rows, 2);
+assert.strictEqual(direct.description_coverage_pct, 100);
+assert.strictEqual(direct.tech_us_internship_rows, 2);
+assert(!direct.flags.some(flag => flag.code === 'low_description_input'));
+
+const weak = audit.sources.find(row => row.source === 'weak');
+assert.strictEqual(weak.final_rows, 80);
+assert(weak.flags.some(flag => flag.code === 'low_supplemental_survival'));
+assert(weak.flags.some(flag => flag.code === 'low_enrichment_survival'));
+
+fs.rmSync(dir, { recursive: true, force: true });
+console.log('PASS source survival audit');

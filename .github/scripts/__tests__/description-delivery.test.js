@@ -1,45 +1,47 @@
-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
-opQfr9CkzraVItRpRFS8gw==
+#!/usr/bin/env node
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { buildDescriptionDeliverySummary } = require('../index');
+
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'desc-delivery-'));
+fs.writeFileSync(path.join(dir, 'descriptions-google.jsonl'), [
+  JSON.stringify({ id: 'google-1', description_text: 'Alpha' }),
+  JSON.stringify({ id: 'google-2', description_text: 'Beta' }),
+].join('\n') + '\n');
+fs.writeFileSync(path.join(dir, 'descriptions-oracle.jsonl'), [
+  JSON.stringify({ id: 'oracle-1', description_text: 'Gamma' }),
+  JSON.stringify({ id: 'oracle-3', description_text: 'Delta' }),
+].join('\n') + '\n');
+
+const summary = buildDescriptionDeliverySummary([
+  { id: 'google-1', source: 'google' },
+  { id: 'google-2', source: 'google' },
+  { id: 'oracle-1', source: 'oracle' },
+  { id: 'oracle-2', source: 'oracle' },
+  { id: 'apple-1', source: 'apple' },
+  { id: 'workday-1', source: 'workday' },
+], dir);
+
+assert.strictEqual(summary.sources.google.mode, 'sidecar_only');
+assert.strictEqual(summary.sources.google.final_rows_with_sidecar_match, 2);
+assert.strictEqual(summary.sources.google.coverage_pct, 100);
+
+assert.strictEqual(summary.sources.oracle.mode, 'partial_sidecar_coverage');
+assert.strictEqual(summary.sources.oracle.final_rows_with_sidecar_match, 1);
+assert.strictEqual(summary.sources.oracle.coverage_pct, 50);
+
+assert.strictEqual(summary.sources.apple.mode, 'none_visible');
+assert.strictEqual(summary.sources.apple.sidecar_rows, 0);
+assert.strictEqual(summary.sources.apple.final_rows, 1);
+
+// AGG-DESCCOVERAGE-METRIC-1: workday is now INCLUDED in the coverage summary (its descriptions
+// are in the hot path via backfill + R2 sidecars). No sidecar provided here → 'none_visible'.
+assert.strictEqual(summary.sources.workday.mode, 'none_visible', 'workday now tracked in coverage summary (AGG-DESCCOVERAGE-METRIC-1)');
+assert.strictEqual(summary.sources.workday.final_rows, 1);
+
+fs.rmSync(dir, { recursive: true, force: true });
+console.log('PASS description delivery summary');
