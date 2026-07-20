@@ -61,6 +61,10 @@ jobs:
         run: |
           echo "Y" | transcrypt --cipher aes-256-cbc --password "$TRANSCRYPT_PASSWORD" --force
           git checkout -- .
+          git submodule foreach --recursive "
+            echo 'Y' | transcrypt --cipher aes-256-cbc --password \"\$TRANSCRYPT_PASSWORD\" --force
+            git checkout -- .
+          " || echo "No encrypted submodules or none configured"
         env:
           TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
 
