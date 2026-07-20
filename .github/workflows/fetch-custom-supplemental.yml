@@ -37,7 +37,7 @@ jobs:
       - name: Unlock encrypted files
         run: |
           echo "Y" | transcrypt --cipher aes-256-cbc --password "$TRANSCRYPT_PASSWORD" --force
-          git checkout HEAD -- .
+          git checkout -f HEAD -- .
           echo "Decrypt verification:" && head -1 .github/scripts/index.js 2>/dev/null || echo "(no index.js)"
         env:
           TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
