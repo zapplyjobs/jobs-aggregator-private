@@ -1,104 +1,55 @@
-{
-  "version": 1,
-  "repoPrefix": "can",
-  "buttonPrefix": "int-can",
-  "headingImageAlt": "Canada Internships 2027",
-  "title": "Canada Internships 2027",
-  "tagline": "",
-  "jobCountBadgeLabel": "Total Internships",
-  "descriptionLine1": "\ud83d\ude80 Internships and co-ops across tech, business, healthcare, and more for students in Canada, sourced live and updated in real time.",
-  "descriptionLine2": "",
-  "noteType": "TIP",
-  "noteText": "\ud83d\udee0 Help us grow! Add new jobs by submitting an issue! View contributing steps [here](CONTRIBUTING-GUIDE.md).",
-  "jobsSectionHeader": "Fresh Canada Internships 2027",
-  "features": {
-    "internships": false,
-    "moreResources": true
-  },
-  "defaultCategory": "other_internships",
-  "feedKey": "canada-tech-internships.jsonl",
-  "r2Prefix": "data/",
-  "filters": {
-    "locations": [
-      "canada"
-    ]
-  },
-  "activeWindowDays": 120,
-  "contributorLocation": "Canada",
-  "repo": "Canada-Internships-2027",
-  "boardName": "canada_internships_2027",
-  "categories": {
-    "software": {
-      "title": "Software Engineering",
-      "emoji": "\ud83d\udcbb",
-      "keywords": [
-        "software engineer",
-        "developer",
-        "backend",
-        "frontend",
-        "full stack",
-        "devops",
-        "sre",
-        "cloud",
-        "security",
-        "embedded",
-        "systems engineer"
-      ]
-    },
-    "hardware": {
-      "title": "Hardware & Systems",
-      "emoji": "\u2699\ufe0f",
-      "keywords": [
-        "hardware engineer",
-        "electrical",
-        "fpga",
-        "asic",
-        "validation",
-        "test engineer",
-        "power systems"
-      ]
-    },
-    "data_science": {
-      "title": "Data Science & Analytics",
-      "emoji": "\ud83d\udd2c",
-      "keywords": [
-        "data scientist",
-        "data analyst",
-        "machine learning",
-        "analytics",
-        "research scientist",
-        "actuarial",
-        "strategy analyst"
-      ]
-    },
-    "ai": {
-      "title": "AI / ML",
-      "emoji": "\ud83e\udd16",
-      "keywords": [
-        "artificial intelligence",
-        "ai",
-        "llm",
-        "ml",
-        "machine learning"
-      ]
-    },
-    "operations": {
-      "title": "Operations & Support",
-      "emoji": "\ud83d\udee0\ufe0f",
-      "keywords": [
-        "operations",
-        "support",
-        "customer success",
-        "field service",
-        "supply chain",
-        "program manager"
-      ]
-    },
-    "other": {
-      "title": "Other Tech Roles",
-      "emoji": "\ud83d\udcc2",
-      "keywords": []
-    }
-  },
-  "companies": {}
-}
+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
+gDivQcwkph7/mePWfW6TXw==

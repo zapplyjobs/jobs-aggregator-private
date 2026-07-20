@@ -1,116 +1,134 @@
-#!/usr/bin/env node
-'use strict';
-
-// AGG-DEADNESS-1 (bounded): coverage for the Simplify age-bypass sampler in check-link-health.js.
-// The BAE class (Simplify-sourced, re-stamped posted_at=today every run) is ALWAYS age<minAgeDays,
-// so it slips through the regular 2–4d age window. The bypass samples Simplify REGARDLESS of age so
-// hard-404/410 dead links surface in the evidence feed. Bot-blocked companies (Tesla/Citadel) are
-// excluded (budget/noise). 404/410 remain the only 'dead' codes in checkUrl (unchanged here).
-
-const assert = require('assert');
-const {
-  parseArgs,
-  buildSamples,
-  isBotBlocked,
-  BOT_BLOCKED_COMPANIES,
-} = require('../check-link-health');
-
-function daysAgo(days) {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-}
-
-function mkJob({ id, source, company_name, postedDaysAgo, url = 'https://boards.greenhouse.io/x/j', domains = ['software'], locations = ['us'] }) {
-  return { id, source, company_name, title: `Job ${id}`, posted_at: daysAgo(postedDaysAgo), url, tags: { domains, locations } };
-}
-
-function groupIds(samples, group) {
-  return samples.filter(s => s.group === group).map(s => s.id).sort();
-}
-
-// --- Case 1: the BAE class — Simplify job re-stamped today (age 0) MUST be sampled ---
-{
-  const jobs = [
-    mkJob({ id: 'gh1', source: 'greenhouse', company_name: 'Acme', postedDaysAgo: 3 }),
-    mkJob({ id: 'BAE1US118005', source: 'simplify', company_name: 'BAE Systems', postedDaysAgo: 0 }),
-  ];
-  const args = parseArgs([]);
-  const { samples } = buildSamples(jobs, args);
-  const simplifyFresh = groupIds(samples, 'simplify-fresh');
-  assert.ok(simplifyFresh.includes('BAE1US118005'),
-    're-stamped-fresh (age 0) Simplify job must be sampled via the age bypass — the whole point of AGG-DEADNESS-1');
-  assert.ok(groupIds(samples, 'greenhouse').includes('gh1'), 'regular in-window greenhouse job still sampled');
-  // And it must NOT leak into a regular group (age 0 < minAgeDays).
-  assert.ok(!samples.some(s => s.id === 'BAE1US118005' && s.group !== 'simplify-fresh'),
-    'age-0 Simplify job must only appear in simplify-fresh, never a regular age-windowed group');
-  console.log('✓ case 1: BAE re-stamped-fresh Simplify job sampled via age bypass');
-}
-
-// --- Case 2: bot-blocked companies excluded from the Simplify pass ---
-{
-  const jobs = [
-    mkJob({ id: 's1', source: 'simplify', company_name: 'BAE Systems', postedDaysAgo: 0 }),
-    mkJob({ id: 's2', source: 'simplify', company_name: 'Tesla', postedDaysAgo: 0 }),
-    mkJob({ id: 's3', source: 'simplify', company_name: 'Citadel Securities', postedDaysAgo: 0 }),
-  ];
-  const args = parseArgs([]);
-  const { samples } = buildSamples(jobs, args);
-  const simplifyFresh = groupIds(samples, 'simplify-fresh');
-  assert.deepStrictEqual(simplifyFresh, ['s1'], 'Tesla + Citadel Securities must be excluded (bot-blocked); only BAE remains');
-  assert.ok(isBotBlocked({ company_name: 'Citadel' }), 'isBotBlocked matches bare Citadel');
-  assert.ok(BOT_BLOCKED_COMPANIES.has('tesla'), 'bot-block set contains tesla');
-  console.log('✓ case 2: bot-blocked companies (Tesla/Citadel) excluded from Simplify pass');
-}
-
-// --- Case 3: non-consumer-visible Simplify jobs excluded (keeps the pool bounded + on-target) ---
-{
-  const jobs = [
-    mkJob({ id: 'vis', source: 'simplify', company_name: 'BAE Systems', postedDaysAgo: 0, domains: ['software'], locations: ['us'] }),
-    mkJob({ id: 'noloc', source: 'simplify', company_name: 'BAE Systems', postedDaysAgo: 0, locations: ['canada'] }),
-    mkJob({ id: 'nodom', source: 'simplify', company_name: 'BAE Systems', postedDaysAgo: 0, domains: [] }),
-    mkJob({ id: 'nourl', source: 'simplify', company_name: 'BAE Systems', postedDaysAgo: 0, url: '' }),
-  ];
-  const args = parseArgs([]);
-  const { samples } = buildSamples(jobs, args);
-  assert.deepStrictEqual(groupIds(samples, 'simplify-fresh'), ['vis'],
-    'only US + tech-domain + has-url Simplify jobs are sampled');
-  console.log('✓ case 3: non-consumer-visible Simplify jobs excluded');
-}
-
-// --- Case 4: dedup — a Simplify job already sampled in a regular group is not re-checked ---
-{
-  const jobs = [
-    mkJob({ id: 'inwin', source: 'simplify', company_name: 'Foo', postedDaysAgo: 3 }), // in 2–4d window → 'custom'
-    mkJob({ id: 'fresh', source: 'simplify', company_name: 'Foo', postedDaysAgo: 0 }),  // bypass only
-  ];
-  const args = parseArgs([]);
-  const { samples } = buildSamples(jobs, args);
-  assert.ok(groupIds(samples, 'custom').includes('inwin'), 'in-window Simplify job sampled via custom group');
-  assert.ok(!groupIds(samples, 'simplify-fresh').includes('inwin'), 'in-window Simplify job deduped from simplify-fresh (no double HEAD)');
-  assert.ok(groupIds(samples, 'simplify-fresh').includes('fresh'), 'fresh Simplify job sampled via bypass');
-  console.log('✓ case 4: dedup prevents double-checking in-window Simplify jobs');
-}
-
-// --- Case 5: --no-simplify-bypass disables the pass entirely (reversibility) ---
-{
-  const jobs = [mkJob({ id: 'bae', source: 'simplify', company_name: 'BAE Systems', postedDaysAgo: 0 })];
-  const args = parseArgs(['--no-simplify-bypass']);
-  assert.strictEqual(args.simplifyBypass, false, '--no-simplify-bypass sets simplifyBypass false');
-  const { samples, simplifyCandidates } = buildSamples(jobs, args);
-  assert.strictEqual(groupIds(samples, 'simplify-fresh').length, 0, 'no simplify-fresh samples when bypass off');
-  assert.strictEqual(simplifyCandidates, 0, 'no simplify candidates when bypass off');
-  console.log('✓ case 5: --no-simplify-bypass fully disables the pass (reversible)');
-}
-
-// --- Case 6: --per-simplify bounds the sample (pool ~hundreds, sample stays small) ---
-{
-  const jobs = [];
-  for (let i = 0; i < 40; i++) jobs.push(mkJob({ id: `s${i}`, source: 'simplify', company_name: 'BAE Systems', postedDaysAgo: 0 }));
-  const args = parseArgs(['--per-simplify', '8']);
-  assert.strictEqual(args.perSimplify, 8, '--per-simplify parsed');
-  const { samples, simplifyCandidates } = buildSamples(jobs, args);
-  assert.strictEqual(simplifyCandidates, 40, 'all 40 visible simplify jobs are candidates');
-  assert.strictEqual(groupIds(samples, 'simplify-fresh').length, 8, 'sample bounded to per-simplify even when pool is larger');
-  console.log('✓ case 6: --per-simplify bounds the Simplify sample');
-}
-
-console.log('\nAll AGG-DEADNESS-1 check-link-health tests passed.');
+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

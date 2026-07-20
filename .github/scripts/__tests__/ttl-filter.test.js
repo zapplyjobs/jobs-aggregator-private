@@ -1,38 +1,45 @@
-#!/usr/bin/env node
-'use strict';
-
-const assert = require('assert');
-const { resolvePostedAt, applicableTtlMs, LIFECYCLE_VERSION } = require('../index');
-
-function daysAgo(days) {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-}
-
-const oldRegular = { id: 'old-regular', posted_at: daysAgo(15), tags: { employment: 'entry_level' } };
-const validInternship = { id: 'valid-internship', posted_at: daysAgo(119), tags: { employment: 'internship' } };
-const oldInternship = { id: 'old-internship', posted_at: daysAgo(121), tags: { employment: 'internship' } };
-const legacyInternship = { id: 'legacy-internship', posted_at: daysAgo(121), employment_type: 'internship', tags: { employment: 'entry_level' } };
-
-assert.ok(applicableTtlMs(validInternship) > applicableTtlMs(oldRegular), 'internship TTL must exceed regular TTL');
-
-const publicJobs = [oldRegular, validInternship, oldInternship, legacyInternship];
-resolvePostedAt(publicJobs, []);
-
-// AGG-LIFECYCLE-1: previously these stale jobs were DROPPED; now they are KEPT + tagged.
-// AGG-STALE-FIX-1: ghost postings beyond TTL+45d are hard-retired (legacy-internship is
-// tagged entry_level → 14d TTL → 121d > 59d → hard-retired, not tagged).
-assert.deepStrictEqual(
-  publicJobs.map(job => job.id).sort(),
-  ['old-internship', 'old-regular', 'valid-internship'],
-  'stale jobs kept + tagged; ghost postings beyond TTL+45d hard-retired (AGG-STALE-FIX-1)'
-);
-
-const byId = Object.fromEntries(publicJobs.map(j => [j.id, j]));
-assert.strictEqual(byId['valid-internship'].tags.lifecycle_state, 'evergreen', 'within-window but >10d internship is evergreen');
-assert.strictEqual(byId['old-regular'].tags.lifecycle_state, 'stale-candidate', 'beyond-TTL regular is stale-candidate');
-assert.strictEqual(byId['old-internship'].tags.lifecycle_state, 'stale-candidate', 'beyond-TTL internship is stale-candidate');
-for (const job of publicJobs) {
-  assert.strictEqual(job.tags.lifecycle_version, LIFECYCLE_VERSION, `${job.id} must carry lifecycle_version`);
-}
-
-console.log('PASS AGG-LIFECYCLE-1 TTL tag-and-keep (no drops; stale jobs tagged stale-candidate)');
+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

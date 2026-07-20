@@ -1,214 +1,228 @@
-#!/usr/bin/env node
-
-const fs = require('fs');
-const path = require('path');
-let SHARED = path.join(__dirname, 'aggregator', 'lib');
-if (!fs.existsSync(SHARED)) {
-  SHARED = path.join(__dirname, '..', 'aggregator', 'lib');
-}
-
-const { fetchAllGoogleJobs, fetchGoogleCanadaJobs } = require(`${SHARED}/fetchers/google`);
-const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
-const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
-const { fetchAllByteDanceJobs } = require(`${SHARED}/fetchers/bytedance`);
-const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
-
-const DATA_DIR = path.join(process.cwd(), '.github', 'data');
-const JOBS_FILE = path.join(DATA_DIR, 'supplemental-custom-jobs.json');
-const META_FILE = path.join(DATA_DIR, 'supplemental-custom-metadata.json');
-
-function countJsonlLines(file) {
-  try { return fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).length; }
-  catch { return 0; }
-}
-
-function hasR2Env() {
-  return Boolean(process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_ENDPOINT && process.env.R2_BUCKET_NAME);
-}
-
-function isGitHubActions() {
-  return process.env.GITHUB_ACTIONS === 'true';
-}
-
-async function uploadRequired(r2, name, file, contentType) {
-  const ok = await r2.uploadRaw(name, fs.readFileSync(file, 'utf8'), contentType);
-  if (!ok) throw new Error(`R2 upload failed: ${name}`);
-  console.log(`  R2 OK: ${name}`);
-}
-
-async function loadIds(prefix) {
-  const file = path.join(DATA_DIR, `${prefix}.jsonl`);
-  const ids = new Set();
-  if (!fs.existsSync(file)) return ids;
-  for (const line of fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean)) {
-    try { const { id } = JSON.parse(line); if (id) ids.add(id); } catch {}
-  }
-  return ids;
-}
-
-function writeSidecar(filePath, jobs) {
-  if (!jobs || jobs.length === 0) return 0;
-  const lines = jobs.filter(j => j.description && j.description.trim()).map(j =>
-    JSON.stringify({ id: j.id, description_text: j.description })
-  ).join('\n') + '\n';
-  fs.writeFileSync(filePath, lines, 'utf8');
-  return countJsonlLines(filePath);
-}
-
-/**
- * AGG-SLOW-LANE-1: Off-cycle supplemental lane for slow fetchers.
- * Google/Microsoft/Apple have 600-1200s timeouts — too slow for the 15-min main pipeline.
- * Runs independently every 2h, writes to R2, main pipeline consumes via loadSupplementalInputs().
- *
- * Fault isolation: allSettled + per-fetcher timeouts. If one fetcher is slow/fails,
- * others still complete and upload independently.
- */
-async function main() {
-  const start = Date.now();
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-
-  const googleSidecarPath = path.join(DATA_DIR, 'descriptions-google.jsonl');
-  const microsoftSidecarPath = path.join(DATA_DIR, 'descriptions-microsoft.jsonl');
-  const appleSidecarPath = path.join(DATA_DIR, 'descriptions-apple.jsonl');
-  const bytedanceSidecarPath = path.join(DATA_DIR, 'descriptions-bytedance.jsonl');
-  const googleCachedIds = await loadIds('descriptions-google');
-  const microsoftCachedIds = await loadIds('descriptions-microsoft');
-  const appleCachedIds = await loadIds('descriptions-apple');
-
-  // AGG-SLOWLANE-SPEED-1: Load previous supplemental jobs for incremental state.
-  // The main pipeline does this (index.js lines 1025-1039) — reads previous all_jobs.json,
-  // extracts source-specific counts and IDs, passes them to fetchers. The fetchers use
-  // this to skip pages where all job IDs are already known (incremental skip).
-  // Without this, every run is a FULL crawl (50 pages + all detail pages).
-  // With this, runs are INCREMENTAL (1-2 pages + only new detail pages).
-  let prevAppleCount = 0, prevAppleIds = new Set();
-  let prevGoogleCount = 0, prevGoogleIds = new Set();
-  let prevMicrosoftCount = 0;
-  try {
-    const prevJobsPath = path.join(DATA_DIR, 'supplemental-custom-jobs.json');
-    if (fs.existsSync(prevJobsPath)) {
-      const prevJobs = JSON.parse(fs.readFileSync(prevJobsPath, 'utf8'));
-      if (Array.isArray(prevJobs)) {
-        const appleJobs = prevJobs.filter(j => j.source === 'apple');
-        prevAppleCount = Math.max(appleJobs.length, 201);
-        prevAppleIds = new Set(appleJobs.map(j => j.id));
-        // AGG-SLOWLANE-FRAGILITY-1: Floor all sources + extract Google IDs for page-1 skip
-        prevGoogleCount = Math.max(prevJobs.filter(j => j.source === 'google').length, 1);
-        prevGoogleIds = new Set(prevJobs.filter(j => j.source === 'google').map(j => j.id));
-        prevMicrosoftCount = Math.max(prevJobs.filter(j => j.source === 'microsoft').length, 1);
-        console.log(`  Incremental state: Apple ${prevAppleCount} (${prevAppleIds.size} IDs), Google ${prevGoogleCount} (${prevGoogleIds.size} IDs), Microsoft ${prevMicrosoftCount}`);
-      }
-    }
-  } catch (e) {
-    console.log(`  ⚠️ Incremental state: not loaded (${e.message}) — full fetch mode`);
-  }
-  // AGG-SLOWLANE-FRAGILITY-1 Point 2: concurrency group queues runs — no overlap. Point 5: sidecar integrity below.
-
-  const withTimeout = (promise, ms, name) => {
-    let timer;
-    return Promise.race([
-      promise,
-      new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${name} timed out after ${ms/1000}s`)), ms);
-      }),
-    ]).finally(() => clearTimeout(timer));
-  };
-
-  const [googleR, googleCaR, microsoftR, appleR, bytedanceR, amazonR] = await Promise.allSettled([
-    withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount, previousJobIds: prevGoogleIds, cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
-    withTimeout(fetchGoogleCanadaJobs({ cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 300_000, 'Google Canada'),
-    withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount, cachedDescriptionIds: microsoftCachedIds, fetchDetailsOnInitial: true }), 300_000, 'Microsoft'),
-    withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds, cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 300_000, 'Apple'),
-    withTimeout(fetchAllByteDanceJobs(), 120_000, 'ByteDance'),
-    withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon'),
-  ]);
-
-  const google = googleR.status === 'fulfilled' ? googleR.value : [];
-  const googleCa = googleCaR.status === 'fulfilled' ? googleCaR.value : [];
-  if (googleCa.length > 0) google.push(...googleCa);
-  const microsoft = microsoftR.status === 'fulfilled' ? microsoftR.value : [];
-  const apple = appleR.status === 'fulfilled' ? appleR.value : [];
-  const bytedance = bytedanceR.status === 'fulfilled' ? bytedanceR.value : [];
-  const amazon = amazonR.status === 'fulfilled' ? amazonR.value : [];
-  if (googleR.status === 'rejected') console.log(`  ⚠️ Google: ${googleR.reason?.message || googleR.reason}`);
-  if (googleCaR.status === 'rejected') console.log(`  ⚠️ Google Canada: ${googleCaR.reason?.message || googleCaR.reason}`);
-  if (microsoftR.status === 'rejected') console.log(`  ⚠️ Microsoft: ${microsoftR.reason?.message || microsoftR.reason}`);
-  if (appleR.status === 'rejected') console.log(`  ⚠️ Apple: ${appleR.reason?.message || appleR.reason}`);
-  if (bytedanceR.status === 'rejected') console.log(`  ⚠️ ByteDance: ${bytedanceR.reason?.message || bytedanceR.reason}`);
-  if (amazonR.status === 'rejected') console.log(`  ⚠️ Amazon: ${amazonR.reason?.message || amazonR.reason}`);
-
-  const groups = { google, microsoft, apple, bytedance, amazon };
-  const payload = Object.entries(groups).flatMap(([source, jobs]) =>
-    jobs.map(job => ({
-      id: job.id,
-      title: job.title,
-      company_name: job.company_name,
-      source,
-      location: job.location,
-      url: job.url,
-      posted_at: job.posted_at,
-      description: job.description || null,
-    }))
-  );
-
-  const bytedanceSidecarRows = writeSidecar(bytedanceSidecarPath, bytedance);
-
-  const durationMs = Date.now() - start;
-  const metadata = {
-    schema: 'supplemental-lane-v1',
-    generated_at: new Date().toISOString(),
-    lane_name: 'custom',
-    publish_contract: {
-      blocks_fast_publish: false,
-      included_in_main_all_jobs: false,
-      merge_mode: 'separate_artifact',
-      visibility: 'snapshot_only',
-      expected_cadence_minutes: 120,
-      max_staleness_minutes: 180,
-    },
-    source: 'custom',
-    sources: Object.fromEntries(
-      Object.entries({ google: google.length, microsoft: microsoft.length, apple: apple.length, bytedance: bytedance.length, amazon: amazon.length })
-        .filter(([, count]) => count > 0)
-    ),
-    jobs_fetched: payload.length,
-    duration_ms: durationMs,
-  };
-
-  fs.writeFileSync(JOBS_FILE, JSON.stringify(payload, null, 2), 'utf8');
-  fs.writeFileSync(META_FILE, JSON.stringify(metadata, null, 2), 'utf8');
-  console.log(`Custom supplemental lane wrote ${payload.length} jobs in ${Math.round(durationMs/1000)}s`);
-  console.log(`  Sources: google=${google.length}, microsoft=${microsoft.length}, apple=${apple.length}, bytedance=${bytedance.length}, amazon=${amazon.length}`);
-
-  if (hasR2Env()) {
-    try {
-      const { createR2Client } = require(`${SHARED}/storage/r2-client`);
-      const r2 = createR2Client({ prefix: 'data/' });
-      await uploadRequired(r2, 'supplemental-custom-jobs.json', JOBS_FILE, 'application/json');
-      await uploadRequired(r2, 'supplemental-custom-metadata.json', META_FILE, 'application/json');
-      if (fs.existsSync(googleSidecarPath)) await uploadRequired(r2, 'descriptions-google.jsonl', googleSidecarPath, 'application/x-jsonlines');
-      if (fs.existsSync(appleSidecarPath)) await uploadRequired(r2, 'descriptions-apple.jsonl', appleSidecarPath, 'application/x-jsonlines');
-      if (fs.existsSync(microsoftSidecarPath)) await uploadRequired(r2, 'descriptions-microsoft.jsonl', microsoftSidecarPath, 'application/x-jsonlines');
-      if (fs.existsSync(bytedanceSidecarPath)) await uploadRequired(r2, 'descriptions-bytedance.jsonl', bytedanceSidecarPath, 'application/x-jsonlines');
-      console.log('Uploaded custom supplemental artifacts to R2');
-    } catch (err) {
-      if (isGitHubActions()) throw new Error(`R2 publish failed: ${err.message}`);
-      console.log(`R2 upload unavailable locally — skipped (${err.message})`);
-    }
-  } else if (isGitHubActions()) {
-    throw new Error('R2 env missing in GitHub Actions');
-  }
-}
-
-if (require.main === module) {
-  // AGG-SLOW-LANE-1: process.exit(0) is REQUIRED — HTTP keep-alive connections
-  // and pending setTimeout timers from the fetchers keep the Node.js event loop
-  // alive long after the work is done. Without this, the script hangs until the
-  // longest timer fires (10+ min), causing every slow-lane workflow timeout.
-  main().then(() => process.exit(0)).catch(err => {
-    console.error('Supplemental custom lane failed:', err.message);
-    process.exit(1);
-  });
-}
-
-module.exports = { writeSidecar };
+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
+uivVtONA9AVhGkZVq0cesA==

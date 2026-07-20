@@ -1,243 +1,200 @@
-#!/usr/bin/env node
-/**
- * generate-and-push-readmes.js — Centralized README generation + push.
- *
- * Runs at the END of the pipeline (after all data is processed + uploaded to R2).
- * For each board config in configs/, generates the README + pushes it directly
- * to the consumer repo. Consumer repos become pure display (no logic needed).
- *
- * Phase 2 of the consumer architecture improvement.
- */
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-const { createReadmeGenerator } = require(path.join(__dirname, 'consumer/lib/readme-generator'));
-
-const CONFIGS_DIR = path.join(process.cwd(), 'configs');
-const DATA_DIR = path.join(process.cwd(), '.github', 'data');
-const TEMP_DIR = path.join(process.cwd(), '.github', 'data', 'readme-temp');
-
-// --- Helpers ---
-
-function loadConfigs() {
-  return fs.readdirSync(CONFIGS_DIR)
-    .filter(f => f.endsWith('.json') && f !== '_index.json')
-    .map(f => ({ ...JSON.parse(fs.readFileSync(path.join(CONFIGS_DIR, f), 'utf8')), _file: f }))
-    .sort((a, b) => (a.repo || '').localeCompare(b.repo || ''));
-}
-
-function parseNdjson(text) {
-  return text.trim().split(/\n+/).filter(Boolean).map(line => JSON.parse(line));
-}
-
-function loadJobsForBoard(config) {
-  if (config.feedKey) {
-    // Canada pattern: read the specific R2 feed file
-    const feedPath = path.join(DATA_DIR, config.feedKey);
-    if (fs.existsSync(feedPath)) {
-      const raw = fs.readFileSync(feedPath, 'utf8');
-      return parseNdjson(raw);
-    }
-    console.warn(`  ⚠️ Feed not found locally: ${config.feedKey}`);
-    return [];
-  }
-
-  // US pattern: filter all_jobs using config.filters
-  const allJobsPath = path.join(DATA_DIR, 'all_jobs.json');
-  if (!fs.existsSync(allJobsPath)) {
-    console.warn('  ⚠️ all_jobs.json not found');
-    return [];
-  }
-  const allJobsRaw = fs.readFileSync(allJobsPath, 'utf8').trim();
-  let allJobs;
-  try { allJobs = JSON.parse(allJobsRaw); }
-  catch { allJobs = allJobsRaw.split(/\n+/).filter(Boolean).map(l => JSON.parse(l)); }
-  return filterJobs(allJobs, config.filters || {});
-}
-
-function filterJobs(jobs, filters) {
-  return jobs.filter(job => {
-    // Location filter
-    if (filters.locations && filters.locations.length > 0) {
-      const jobLocations = job.tags?.locations || [];
-      const hasLocation = filters.locations.some(loc => jobLocations.includes(loc));
-      if (!hasLocation) return false;
-    }
-    // Employment filter
-    if (filters.employment) {
-      if (job.tags?.employment !== filters.employment) return false;
-    }
-    // Domain filter
-    if (filters.domains && filters.domains.length > 0) {
-      const jobDomains = job.tags?.domains || [];
-      const hasDomain = filters.domains.some(d => jobDomains.includes(d));
-      if (!hasDomain) return false;
-    }
-    return true;
-  });
-}
-
-function normalizeJob(row) {
-  return {
-    ...row,
-    employer_name: row.company_name || row.employer_name || 'Unknown',
-    job_title: row.title || row.job_title || '',
-    job_location: row.location || row.job_location || '',
-    job_posted_at: row.posted_at || row.job_posted_at_datetime_utc || row.job_posted_at || null,
-    job_apply_link: row.apply_url || row.job_apply_link || row.url || '#',
-  };
-}
-
-function pushReadme(repo, readmeContent) {
-  const content = Buffer.from(readmeContent).toString('base64');
-  // Get current file SHA (needed for update)
-  let sha;
-  try {
-    sha = execSync(`gh api repos/zapplyjobs/${repo}/contents/README.md --jq '.sha'`, { encoding: 'utf8' }).trim();
-  } catch (e) {
-    throw new Error(`Failed to get README SHA for ${repo}: ${e.message}`);
-  }
-  // Write request body to file (avoids command-line argument length limits for large READMEs)
-  const body = JSON.stringify({
-    message: 'auto: regenerate README from pipeline (centralized)',
-    content: content,
-    sha: sha,
-    branch: 'main'
-  });
-  const bodyFile = path.join(TEMP_DIR, 'push-body.json');
-  fs.writeFileSync(bodyFile, body);
-  // Push via --input (reads body from file, not command-line args)
-  execSync(
-    `gh api repos/zapplyjobs/${repo}/contents/README.md -X PUT --input ${bodyFile}`,
-    { encoding: 'utf8', stdio: 'pipe' }
-  );
-}
-
-// --- Main ---
-
-
-function sendDiscordAlert(repo, reason) {
-  const token = process.env.DISCORD_TEAM_TOKEN;
-  const channel = process.env.DISCORD_PIPELINE_ALERT_CHANNEL_ID;
-  if (!token || !channel) { console.log('  (Discord alert skipped — secrets not set)'); return; }
-  const https = require('https');
-  const body = JSON.stringify({
-    embeds: [{ title: '⚠️ Consumer Board Alert', color: 0xe74c3c,
-      description: '**' + repo + '**: ' + reason, footer: { text: new Date().toISOString() } }]
-  });
-  const req = https.request({
-    hostname: 'discord.com', path: '/api/channels/' + channel + '/messages', method: 'POST',
-    headers: { 'Authorization': 'Bot ' + token, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-  }, res => { console.log('  Discord alert: ' + res.statusCode); });
-  req.on('error', e => console.error('  Discord alert failed: ' + e.message));
-  req.setTimeout(5000, () => { req.destroy(); });
-  req.write(body); req.end();
-}
-
-async function main() {
-  console.log('═══════════════════════════════════════════');
-  console.log('  Generate + Push Consumer Board READMEs');
-  console.log('═══════════════════════════════════════════\n');
-
-  fs.mkdirSync(TEMP_DIR, { recursive: true });
-
-  const configs = loadConfigs();
-  console.log(`Found ${configs.length} board configs\n`);
-
-  let ok = 0, fail = 0;
-  const boardCounts = [];
-  const failedRepos = [];
-
-  // Load previous counts for drop detection
-  const prevCountsPath = path.join(DATA_DIR, 'board-counts.json');
-  let prevCounts = {};
-  if (fs.existsSync(prevCountsPath)) {
-    try {
-      const prev = JSON.parse(fs.readFileSync(prevCountsPath, 'utf8'));
-      prevCounts = Object.fromEntries(prev.map(p => [p.repo, p.count]));
-      console.log(`Loaded ${Object.keys(prevCounts).length} previous counts for drop detection\n`);
-    } catch { console.log('Could not parse previous counts — starting fresh\n'); }
-  }
-
-  for (const config of configs) {
-    const repo = config.repo || config._file;
-    console.log(`▶ ${repo}:`);
-
-    try {
-      // 1. Load jobs for this board
-      const rawJobs = loadJobsForBoard(config);
-      const jobs = rawJobs.map(normalizeJob);
-      console.log(`  Jobs: ${jobs.length}`);
-
-      if (jobs.length === 0) {
-        console.log(`  ⚠️ No jobs — skipping (board would be empty)`);
-        continue;
-      }
-
-      // 2. Build stats
-      const stats = { totalByCompany: {} };
-      jobs.forEach(job => {
-        const name = job.employer_name || 'Unknown';
-        stats.totalByCompany[name] = (stats.totalByCompany[name] || 0) + 1;
-      });
-
-      // 3. Generate README using the shared library
-      const boardTempDir = path.join(TEMP_DIR, config._file.replace('.json', ''));
-      fs.mkdirSync(boardTempDir, { recursive: true });
-
-      const categories = config.categories || {};
-      const generator = createReadmeGenerator(config, categories, boardTempDir);
-      await generator.updateReadme(jobs, [], null, stats);
-
-      // 4. Read the generated README
-      const readmePath = path.join(boardTempDir, 'README.md');
-      if (!fs.existsSync(readmePath)) {
-        throw new Error('readme-generator did not produce README.md');
-      }
-      const readmeContent = fs.readFileSync(readmePath, 'utf8');
-
-      // 5. Push to consumer repo
-      pushReadme(repo, readmeContent);
-      console.log(`  ✅ Pushed README (${jobs.length} jobs, ${Object.keys(stats.totalByCompany).length} companies)`);
-      ok++;
-      boardCounts.push({ repo, count: jobs.length, companies: Object.keys(stats.totalByCompany).length, timestamp: new Date().toISOString() });
-      // Count-drop detection (replaces per-repo alerts)
-      const prev = prevCounts[repo];
-      if (prev !== undefined) {
-        if (jobs.length === 0) {
-          console.warn(`  🚨 COUNT ZERO: ${repo} has 0 jobs (was ${prev})`);
-          sendDiscordAlert(repo, `Job count hit 0 (was ${prev})`);
-        } else if (jobs.length < prev * 0.5) {
-          const dropPct = Math.round((1 - jobs.length / prev) * 100);
-          console.warn(`  🚨 COUNT DROP: ${repo} dropped ${dropPct}% (${prev} → ${jobs.length})`);
-          sendDiscordAlert(repo, `Job count dropped ${dropPct}% (${prev} → ${jobs.length})`);
-        }
-      }
-
-    } catch (error) {
-      console.error(`  ❌ ${error.message}`);
-      fail++;
-      failedRepos.push(repo);
-    }
-  }
-
-  console.log(`\n${'═'.repeat(43)}`);
-  console.log(`  Done: ${ok} succeeded, ${fail} failed`);
-  if (fail > 0) {
-    console.warn(`  ⚠️ Failed boards: ${failedRepos.join(', ')}`);
-    sendDiscordAlert('pipeline-push', `${fail}/${ok + fail} boards failed to push: ${failedRepos.join(', ')}`);
-  }
-
-  // Write board counts for monitoring (consumer_count_zero_health will read from R2)
-  const countsPath = path.join(DATA_DIR, 'board-counts.json');
-  fs.writeFileSync(countsPath, JSON.stringify(boardCounts, null, 2));
-  console.log(`\n📊 Board counts written to ${path.relative(process.cwd(), countsPath)}`);
-
-  // Clean up temp
-  fs.rmSync(TEMP_DIR, { recursive: true, force: true });
-
-  if (fail > 0) process.exitCode = 1;
-}
-
-main().catch(e => { console.error('Fatal:', e); process.exit(1); });
+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
