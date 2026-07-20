@@ -1,2730 +1,2841 @@
-#!/usr/bin/env node
-
-/**
- * Main Orchestrator - Jobs Data Fetcher
- *
- * Coordinates all fetchers, normalizes jobs, deduplicates,
- * and writes the shared output file.
- *
- * Usage:
- *   node index.js                    # Normal run
- *   node index.js --dry-run          # Dry run (no git commit)
- *   node index.js --verbose          # Verbose logging
- */
-
-const fs = require('fs');
-const path = require('path');
-const assert = require('assert');
-
-// Import from aggregator submodule (job-board-aggregator/lib/)
-const SHARED = path.join(__dirname, 'aggregator', 'lib');
-
-// Import fetchers
-const { fetchFromAllATS, getUsageStats: getATSUsageStats } = require(`${SHARED}/fetchers/ats-fetcher`);
-const { fetchAllAmazonJobs } = require(`${SHARED}/fetchers/amazon`);
-const { fetchAllNetflixJobs } = require(`${SHARED}/fetchers/netflix`);
-// AGG-HOTPATH-1: WD descriptions are no longer fetched in the hot publish path.
-const { fetchAllAppleJobs } = require(`${SHARED}/fetchers/apple`);
-const { fetchAllTwoSigmaJobs } = require(`${SHARED}/fetchers/twosigma`);
-const { fetchAllUberJobs } = require(`${SHARED}/fetchers/uber`);
-const { fetchAllGoogleJobs } = require(`${SHARED}/fetchers/google`);
-// AGG-SIMPLIFY-EXIT-1 (2026-07-06): simplify fetcher REMOVED. Source retired.
-// Fetcher files kept in submodule for reference but no longer called.
-const { fetchAllIcimsJobs } = require(`${SHARED}/fetchers/icims`);
-const { fetchAllMicrosoftJobs } = require(`${SHARED}/fetchers/microsoft`);
-const { fetchAllOracleJobs } = require(`${SHARED}/fetchers/oracle`);
-const { fetchAllAmdJobs } = require(`${SHARED}/fetchers/amd`);
-const { fetchAllTiktokJobs } = require(`${SHARED}/fetchers/tiktok`);
-const { fetchAllDeshawJobs } = require(`${SHARED}/fetchers/deshaw`);
-const { applyFamilyCache, buildFamilyCache } = require(`${SHARED}/fetchers/workday`);
-const { fetchSRDescriptions } = require(`${SHARED}/fetchers/smartrecruiters-descriptions`);
-const { fetchWorkdayDescriptions } = require(`${SHARED}/fetchers/workday-descriptions`);
-const { fromDescription } = require(`${SHARED}/fetchers/salary`);
-
-
-// Import processors
-const { validateAndNormalizeJobs, printValidationSummary, normalizeJob } = require(`${SHARED}/processors/validator`);
-const { filterSeniorJobs, printSeniorFilterSummary, isSeniorJob, buildCompanyOverrideMap } = require(`${SHARED}/processors/senior-filter`);
-const { deduplicateJobs, DEDUPE_TTL_MS, DEDUPE_TTL_DAYS, INTERNSHIP_TTL_MS } = require(`${SHARED}/processors/deduplicator`);
-const { tagJobs, generateTagStats, tagEmployment, tagDomains, tagLocations, setCompanyOverrideMap, TAG_ENGINE_VERSION, getKeywordMap } = require(`${SHARED}/processors/tag-engine`);
-const { printTagDistribution, checkTagDrift, printDriftReport, checkDomainPrecision, printPrecisionReport, checkKeywordHealth, checkKeywordOverlap } = require(`${SHARED}/processors/tag-monitor`);
-
-const SKIP_WD_FAMILY_CACHE_BUILD = process.env.SKIP_WD_FAMILY_CACHE_BUILD === '1';
-// Import utils
-const { writeJobsJSONL, writeMetadata } = require(`${SHARED}/utils/file-writer`);
-const { EMPLOYMENT_NORMALIZE_MAP } = require(`${SHARED}/utils/helpers`);
-const { writeSidecars } = require(`${SHARED}/utils/sidecar-writer`);
-const { runTagMonitoring } = require(`${SHARED}/utils/monitoring`);
-
-// AGG-36: Company override map (populated by loadCompanyOverrides)
-const COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');
-let companyOverrideMap = new Map();
-
-function loadCompanyOverrides() {
-  try {
-    const companyList = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));
-    companyOverrideMap = buildCompanyOverrideMap(companyList);
-    if (companyOverrideMap.size > 0) {
-      console.log(`📋 AGG-36: Loaded ${companyOverrideMap.size} company title overrides`);
-      setCompanyOverrideMap(companyOverrideMap);
-    }
-  } catch (e) {
-    console.warn(`⚠️ AGG-36: Could not load company overrides: ${e.message}`);
-  }
-}
-loadCompanyOverrides();
-
-// Paths
-const DATA_DIR = path.join(process.cwd(), '.github', 'data');
-const JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'all_jobs.json');
-const US_JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'us_jobs.json');
-const MID_LEVEL_TECH_FILE = path.join(DATA_DIR, 'mid-level-tech-jobs.jsonl');
-const MID_LEVEL_TECH_SUMMARY_FILE = path.join(DATA_DIR, 'mid-level-tech-summary.json');
-const SENIOR_TECH_FILE = path.join(DATA_DIR, 'senior-tech-jobs.jsonl');
-const SENIOR_TECH_SUMMARY_FILE = path.join(DATA_DIR, 'senior-tech-summary.json');
-const METADATA_OUTPUT_FILE = path.join(DATA_DIR, 'jobs-metadata.json');
-
-// Command line args
-const args = process.argv.slice(2);
-const isDryRun = args.includes('--dry-run');
-const isVerbose = args.includes('--verbose');
-
-// --- Extracted invariants (AGG-PIPE-6) ---
-// Each function wraps a pipeline invariant that was previously inline in main().
-// Named functions make accidental removal structurally harder.
-
-function appendAll(target, items) {
-  if (!Array.isArray(items) || items.length === 0) return;
-  for (const item of items) target.push(item);
-}
-
-function isUsSnapshotJob(job) {
-  return job?.tags?.locations?.includes('us') === true;
-}
-function injectDescriptions(jobs, descriptionMap, source) {
-  let injected = 0;
-  for (const job of jobs) {
-    if (job.description) continue;
-    const text = descriptionMap.get(job.id);
-    if (!text) continue;
-    job.description = text;
-    injected++;
-  }
-  if (injected > 0) {
-    console.log(`📄 ${source} descriptions: injected ${injected} descriptions into current jobs`);
-  }
-  return injected;
-}
-
-
-function buildUsSnapshotJobs(jobs) {
-  return jobs.filter(isUsSnapshotJob);
-}
-
-// INF-FEED-1: mid-level tech shadow feed (additive lane artifact; no source mutation, no consumer yet).
-// Spec: research/INF_FEED_1_MID_LEVEL_TECH_FEED_SPEC_2026_06_07.md. Consumer adoption blocked until
-// TAG/AGG reviews quality-flagged rows; this artifact only measures/publishes supply.
-const MID_LEVEL_TECH_DOMAINS = ['software', 'data_science', 'hardware', 'ai'];
-function isMidLevelTechJob(job) {
-  const emp = job?.tags?.employment;
-  const doms = Array.isArray(job?.tags?.domains) ? job.tags.domains : [];
-  return emp === 'mid_level' && doms.some(d => MID_LEVEL_TECH_DOMAINS.includes(d));
-}
-function buildMidLevelTechFeed(jobs) {
-  return jobs.filter(isMidLevelTechJob);
-}
-function buildMidLevelTechSummary(feed, sourceTotal) {
-  const countsByDomain = {};
-  for (const d of MID_LEVEL_TECH_DOMAINS) countsByDomain[d] = 0;
-  const locCounts = { US: 0, non_US: 0, missing: 0 };
-  const q = { missing_location: 0, title_contains_senior: 0, title_contains_manager: 0,
-              title_contains_facilities: 0, title_contains_sales: 0, title_contains_principal_or_staff: 0 };
-  for (const j of feed) {
-    for (const d of (j.tags?.domains || [])) if (d in countsByDomain) countsByDomain[d]++;
-    const locs = Array.isArray(j.tags?.locations) ? j.tags.locations : [];
-    if (locs.length === 0) { locCounts.missing++; q.missing_location++; }
-    else if (locs.includes('us')) locCounts.US++;
-    else locCounts.non_US++;
-    const t = String(j.title || '').toLowerCase();
-    if (t.includes('senior')) q.title_contains_senior++;
-    if (t.includes('manager')) q.title_contains_manager++;
-    if (t.includes('facilities')) q.title_contains_facilities++;
-    if (t.includes('sales')) q.title_contains_sales++;
-    if (t.includes('principal') || t.includes('staff')) q.title_contains_principal_or_staff++;
-  }
-  return {
-    contract_version: 1, generated_at: new Date().toISOString(),
-    source_artifact: 'data/all_jobs.json', source_total: sourceTotal,
-    feed_total: feed.length, employment_required: 'mid_level',
-    tech_domains: MID_LEVEL_TECH_DOMAINS, counts_by_domain: countsByDomain,
-    counts_by_location: locCounts, quality_flags: q, shadow: true,
-    consumer_adoption_blocked_reason: 'TAG/AGG classification review pending for quality-flagged rows',
-  };
-}
-
-// AGG-SEN-FILTERKNOB-1: senior-tech shadow feed (additive; mirrors INF-FEED-1).
-// Sources from the Step-4 seniorJobs partition (the jobs senior-filter drops before pooling),
-// NOT from publicJobs — senior jobs are absent from the final pool by design. This surfaces the
-// dropped senior tech supply as a queryable feed so INF/OUT can build a senior surface later.
-// No source mutation: the main pool (all_jobs) is untouched; senior jobs remain filtered from
-// the entry-level/new-grad pool. Shadow artifact — measures/publishes supply only (no consumer yet).
-const SENIOR_TECH_DOMAINS = ['software', 'data_science', 'hardware', 'ai'];
-function isSeniorTechJob(job) {
-  // Seniority is defined by membership in the senior-filter partition (Step 4), not by the
-  // employment tag — so we filter by tech domain only (the tag-engine and the senior filter
-  // are independent classifiers; employment is reported in the summary, not required here).
-  const doms = Array.isArray(job?.tags?.domains) ? job.tags.domains : [];
-  return doms.some(d => SENIOR_TECH_DOMAINS.includes(d));
-}
-function buildSeniorTechFeed(taggedSeniorJobs) {
-  // AGG-SEN-RAWTRIM: match all_jobs's STRIP_FIELDS (defined ~line 1127) so this feed is as lean
-  // as the main pool. The dominant bloat is `description` (~5 KB/job, ~150 MB total) — it lives
-  // in sidecars (descriptions-*.jsonl) fetched on-demand by detail views; this feed is a
-  // list/index pool for OUT's paginated senior board (id/title/company/location/tags/posted_at/url).
-  return taggedSeniorJobs.filter(isSeniorTechJob).map(stripFeedInternal);
-}
-// Same fields all_jobs strips (STRIP_FIELDS ~line 1127) + any internal underscore-prefixed field.
-// NOTE: an earlier revision only stripped `_*` fields (wrongly assumed _raw was the bloat) — the
-// feed stayed ~151 MB. Verified the real bloat is `description`; now matches all_jobs leanness.
-const SENIOR_FEED_STRIP = ['source_url', '_raw', 'description', 'enriched', 'enriched_at', 'is_internship', 'is_new_grad', 'is_us_only', 'remote'];
-function stripFeedInternal(job) {
-  if (!job) return job;
-  const out = {};
-  for (const [k, v] of Object.entries(job)) {
-    if (k.startsWith('_')) continue;             // _filter_reason, future internal fields
-    if (SENIOR_FEED_STRIP.includes(k)) continue; // match all_jobs STRIP_FIELDS (incl. description)
-    out[k] = v;
-  }
-  return out;
-}
-function buildSeniorTechSummary(feed, seniorTotal) {
-  const countsByDomain = {};
-  for (const d of SENIOR_TECH_DOMAINS) countsByDomain[d] = 0;
-  const locCounts = { US: 0, non_US: 0, missing: 0 };
-  const empCounts = { senior: 0, mid_level: 0, entry_level: 0, other: 0, missing: 0 };
-  for (const j of feed) {
-    for (const d of (j.tags?.domains || [])) if (d in countsByDomain) countsByDomain[d]++;
-    const locs = Array.isArray(j.tags?.locations) ? j.tags.locations : [];
-    if (locs.length === 0) locCounts.missing++;
-    else if (locs.includes('us')) locCounts.US++;
-    else locCounts.non_US++;
-    const emp = j.tags?.employment;
-    if (emp === 'senior') empCounts.senior++;
-    else if (emp === 'mid_level') empCounts.mid_level++;
-    else if (emp === 'entry_level') empCounts.entry_level++;
-    else if (emp) empCounts.other++;
-    else empCounts.missing++;
-  }
-  return {
-    contract_version: 1, generated_at: new Date().toISOString(),
-    source_artifact: 'step4_senior_partition', source_total: seniorTotal,
-    feed_total: feed.length, seniority_source: 'senior-filter partition (Step 4, pre-pooling)',
-    tech_domains: SENIOR_TECH_DOMAINS, counts_by_domain: countsByDomain,
-    counts_by_location: locCounts, counts_by_employment: empCounts, shadow: true,
-    consumer_adoption_blocked_reason: 'INF/OUT senior surface not yet built; artifact measures supply only',
-  };
-}
-
-// CANADA-LANE: tag-driven additive partition over the post-merge pool (locations:'canada').
-// Re-added 2026-06-25 (operator reactivation of the Canada lane). Recovered from commit 81f6347~1
-// and hardened with an empty-file fallback (A196 lesson): a shadow feed must never block the
-// pipeline. This is NOT a new fetcher — it partitions the SAME publicJobs pool the US feed uses,
-// via the tag-engine's `locations:'canada'` tag (the scope knob). Zero US-path impact by
-// construction: the US snapshot and all_jobs are computed upstream and untouched here.
-// Dual-tag policy (AGG-8): a "Canada; United States" job carries BOTH tags and intentionally
-// appears in BOTH the us_jobs and canada feeds — preserved verbatim from the original partition.
-const CANADA_TECH_DOMAINS = new Set(['software', 'hardware', 'data_science', 'ai']);
-const CANADA_TECH_JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-jobs.jsonl');
-const CANADA_TECH_INTERNSHIPS_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-internships.jsonl');
-const CANADA_TECH_SUMMARY_OUTPUT_FILE = path.join(DATA_DIR, 'canada-tech-summary.json');
-const CANADA_ALL_JOBS_OUTPUT_FILE = path.join(DATA_DIR, 'canada-jobs.jsonl');
-const CANADA_ALL_SUMMARY_OUTPUT_FILE = path.join(DATA_DIR, 'canada-all-summary.json');
-const CANADA_ALL_INTERNSHIPS_OUTPUT_FILE = path.join(DATA_DIR, 'canada-internships.jsonl');
-
-// Sentinel cue regexes — used ONLY by buildCanadaSentinelChecks (the FP guard), NEVER for tagging
-// (the tag-engine owns canada detection via hasCanadaLocation). The US cue flags a canada-tagged
-// job whose raw location text reads US-only (a mis-tag / leak); the canada cue whitelists genuine
-// Canadian text so dual-country rows do not false-alarm.
-const CANADA_LOCATION_CUE_RE = /\b(canada|canadian|ontario|toronto|ottawa|waterloo|kitchener|markham|mississauga|burlington|brampton|windsor|london|hamilton|quebec|montr[eé]al|montreal|laval|gatineau|british columbia|vancouver|burnaby|victoria|richmond|surrey|alberta|calgary|edmonton|manitoba|winnipeg|saskatchewan|regina|saskatoon|nova scotia|halifax|new brunswick|fredericton|moncton|newfoundland|st john'?s|prince edward island|charlottetown|yukon|whitehorse|northwest territories|yellowknife|nunavut|iqaluit|\bON\b|\bQC\b|\bBC\b|\bAB\b|\bMB\b|\bSK\b|\bNS\b|\bNB\b|\bNL\b|\bPE\b|\bYT\b|\bNT\b|\bNU\b)\b/i;
-const US_LOCATION_CUE_RE = /\b(united states|\busa\b|california|new york|texas|florida|washington|illinois|massachusetts|georgia|north carolina|virginia|colorado|arizona|pennsylvania|ohio|michigan|new jersey|maryland|oregon|utah|seattle|san francisco|los angeles|new york city|austin|dallas|boston|chicago|atlanta|denver|phoenix|philadelphia|detroit|portland|\bCA\b|\bNY\b|\bTX\b|\bFL\b|\bWA\b|\bIL\b|\bMA\b|\bGA\b|\bNC\b|\bVA\b|\bCO\b|\bAZ\b|\bPA\b|\bOH\b|\bMI\b|\bNJ\b|\bMD\b|\bOR\b|\bUT\b)\b/i;
-
-// Shared partition helpers (restored with the canada feed; pure, no side effects, no collisions).
-function hasTag(job, field, value) {
-  const values = job?.tags?.[field];
-  return Array.isArray(values) && values.includes(value);
-}
-function isInternshipJob(job) {
-  return job.tags?.employment === 'internship'
-    || job.employment_type === 'internship'
-    || (Array.isArray(job.employment_types) && job.employment_types.includes('internship'));
-}
-function isCanadaJob(job) {
-  return hasTag(job, 'locations', 'canada');
-}
-function isCanadaTechJob(job) {
-  const domains = job?.tags?.domains;
-  return isCanadaJob(job) && Array.isArray(domains) && domains.some(domain => CANADA_TECH_DOMAINS.has(domain));
-}
-function incrementCount(map, key, amount = 1) {
-  const safeKey = key || 'unknown';
-  map[safeKey] = (map[safeKey] || 0) + amount;
-}
-function sortCountObject(map) {
-  return Object.fromEntries(Object.entries(map).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
-}
-function locationText(job) {
-  return [job.location, job.job_city, job.job_state, job.city, job.state, job.country, job.url].filter(Boolean).join(' ');
-}
-
-function buildCanadaSentinelChecks(canadaTechJobs) {
-  let missingCanadaTag = 0;
-  let nonTechDomain = 0;
-  const suspiciousUsOnly = [];
-  for (const job of canadaTechJobs) {
-    if (!isCanadaJob(job)) missingCanadaTag++;
-    if (!Array.isArray(job.tags?.domains) || !job.tags.domains.some(domain => CANADA_TECH_DOMAINS.has(domain))) nonTechDomain++;
-    const text = locationText(job);
-    const locations = Array.isArray(job.tags?.locations) ? job.tags.locations : [];
-    const canadaOnly = locations.includes('canada') && !locations.includes('us') && !locations.includes('remote');
-    if (canadaOnly && US_LOCATION_CUE_RE.test(text) && !CANADA_LOCATION_CUE_RE.test(text)) {
-      suspiciousUsOnly.push({
-        id: job.id, company_name: job.company_name, title: job.title, source: job.source,
-        job_city: job.job_city || '', job_state: job.job_state || '', url: job.url || '',
-      });
-    }
-  }
-  return {
-    contract_version: 'canada-tech-feed-v1',
-    passed: missingCanadaTag === 0 && nonTechDomain === 0 && suspiciousUsOnly.length === 0,
-    checks: {
-      missing_canada_tag: missingCanadaTag,
-      non_tech_domain: nonTechDomain,
-      suspicious_us_only_location: suspiciousUsOnly.length,
-    },
-    suspicious_us_only_samples: suspiciousUsOnly.slice(0, 10),
-  };
-}
-
-function buildCanadaTechFeed(jobs) {
-  const canadaJobs = [];
-  const canadaTechJobs = [];
-  const byDomain = {};
-  const bySource = {};
-  const companyCounts = {};
-  let canadaInternships = 0;
-  let canadaTechInternships = 0;
-  for (const job of jobs) {
-    if (!isCanadaJob(job)) continue;
-    canadaJobs.push(job);
-    if (isInternshipJob(job)) canadaInternships++;
-    if (!isCanadaTechJob(job)) continue;
-    canadaTechJobs.push(job);
-    if (isInternshipJob(job)) canadaTechInternships++;
-    incrementCount(bySource, job.source);
-    incrementCount(companyCounts, job.company_name);
-    for (const domain of job.tags.domains || []) {
-      if (CANADA_TECH_DOMAINS.has(domain)) incrementCount(byDomain, domain);
-    }
-  }
-  const topCompanies = Object.entries(companyCounts)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 20)
-    .map(([company_name, count]) => ({ company_name, count }));
-  return {
-    jobs: canadaTechJobs,
-    summary: {
-      contract_version: 'canada-tech-feed-v1',
-      generated_at: new Date().toISOString(),
-      source: 'jobs-aggregator-private normalized post-merge all_jobs pipeline output',
-      tag_engine_version: TAG_ENGINE_VERSION,
-      total_jobs: jobs.length,
-      canada_jobs: canadaJobs.length,
-      canada_tech_jobs: canadaTechJobs.length,
-      canada_internships: canadaInternships,
-      canada_tech_internships: canadaTechInternships,
-      included_domains: [...CANADA_TECH_DOMAINS],
-      by_domain: sortCountObject(byDomain),
-      by_source: sortCountObject(bySource),
-      top_companies: topCompanies,
-      sentinel_false_positive_checks: buildCanadaSentinelChecks(canadaTechJobs),
-    },
-  };
-}
-
-// Canada tech internships lane: subset of canada-tech-jobs filtered to entry_level + internship
-// (A164 recommended highest-signal first slice for the OUT canada-internships consumer).
-function buildCanadaInternshipsFeed(canadaTechJobs) {
-  return canadaTechJobs.filter(job => ['entry_level', 'internship'].includes(job?.tags?.employment));
-}
-
-async function writeCanadaTechFeed(jobs) {
-  const { jobs: canadaTechJobs, summary } = buildCanadaTechFeed(jobs);
-  await writeJobsJSONL(canadaTechJobs, CANADA_TECH_JOBS_OUTPUT_FILE);
-  await writeMetadata(summary, CANADA_TECH_SUMMARY_OUTPUT_FILE);
-  console.log(`🇨🇦 CANADA-LANE: tech feed ${canadaTechJobs.length} jobs (${summary.canada_jobs} Canada total, ${summary.canada_tech_internships} tech internships) → canada-tech-jobs.jsonl`);
-  if (!summary.sentinel_false_positive_checks.passed) {
-    throw new Error(`Canada tech feed sentinel checks failed: ${JSON.stringify(summary.sentinel_false_positive_checks.checks)}`);
-  }
-  return summary;
-}
-
-async function writeCanadaInternshipsFeed(jobs) {
-  const { jobs: canadaTechJobs } = buildCanadaTechFeed(jobs);
-  const internshipsJobs = buildCanadaInternshipsFeed(canadaTechJobs);
-  await writeJobsJSONL(internshipsJobs, CANADA_TECH_INTERNSHIPS_OUTPUT_FILE);
-  const internshipCount = internshipsJobs.filter(job => job?.tags?.employment === 'internship').length;
-  const entryLevelCount = internshipsJobs.filter(job => job?.tags?.employment === 'entry_level').length;
-  console.log(`🇨🇦 CANADA-LANE: internships feed ${internshipsJobs.length} jobs (${entryLevelCount} entry-level, ${internshipCount} internships) → canada-tech-internships.jsonl`);
-  return { total: internshipsJobs.length, entry_level: entryLevelCount, internships: internshipCount };
-}
-// Canada ALL internships lane: broad internship feed from ALL Canada jobs (not just tech).
-// INF-CANADA-INTERNSHIP-FEED-1: matches the US Internships-2027 pattern (all categories).
-async function writeCanadaAllInternshipsFeed(jobs) {
-  const canadaAllJobs = jobs.filter(isCanadaJob);
-  const internshipsJobs = canadaAllJobs.filter(job => isInternshipJob(job));
-  await writeJobsJSONL(internshipsJobs, CANADA_ALL_INTERNSHIPS_OUTPUT_FILE);
-  console.log(`🇨🇦 CANADA-LANE: ALL internships feed ${internshipsJobs.length} jobs → canada-internships.jsonl`);
-  return { total: internshipsJobs.length };
-}
-// AGG-CANADAFEED-1: ALL-Canada feed (broadens canada-tech → all domains, tech-prioritized).
-// Additive shadow feed alongside canada-tech-* (unchanged, back-compat). Independent of tech feeds.
-function buildCanadaAllSentinelChecks(canadaAllJobs) {
-  let missingCanadaTag = 0;
-  const suspiciousUsOnly = [];
-  for (const job of canadaAllJobs) {
-    if (!isCanadaJob(job)) missingCanadaTag++;
-    const text = locationText(job);
-    const locations = Array.isArray(job.tags?.locations) ? job.tags.locations : [];
-    const canadaOnly = locations.includes('canada') && !locations.includes('us') && !locations.includes('remote');
-    if (canadaOnly && US_LOCATION_CUE_RE.test(text) && !CANADA_LOCATION_CUE_RE.test(text)) {
-      suspiciousUsOnly.push({ id: job.id, company_name: job.company_name, title: job.title, source: job.source, job_city: job.job_city || '', job_state: job.job_state || '', url: job.url || '' });
-    }
-  }
-  return {
-    contract_version: 'canada-all-feed-v1',
-    passed: missingCanadaTag === 0 && suspiciousUsOnly.length === 0,
-    checks: { missing_canada_tag: missingCanadaTag, suspicious_us_only_location: suspiciousUsOnly.length },
-    suspicious_us_only_samples: suspiciousUsOnly.slice(0, 10),
-  };
-}
-function buildCanadaAllFeed(jobs) {
-  const canadaJobs = [];
-  const byDomain = {}; const bySource = {}; const companyCounts = {};
-  let techCount = 0; let nonTechCount = 0;
-  for (const job of jobs) {
-    if (!isCanadaJob(job)) continue;
-    canadaJobs.push(job);
-    const doms = job?.tags?.domains || [];
-    const isTech = doms.some(d => CANADA_TECH_DOMAINS.has(d));
-    if (isTech) techCount++; else nonTechCount++;
-    incrementCount(bySource, job.source);
-    incrementCount(companyCounts, job.company_name);
-    for (const d of doms) incrementCount(byDomain, d);
-  }
-  // tech-prioritized: tech-domain jobs first, then non-tech; each by posted_at desc.
-  const sorted = canadaJobs
-    .map(j => ({ job: j, _tech: (j?.tags?.domains || []).some(d => CANADA_TECH_DOMAINS.has(d)) }))
-    .sort((a, b) => (b._tech - a._tech) || (new Date(b.job.posted_at || 0).getTime() - new Date(a.job.posted_at || 0).getTime()))
-    .map(x => x.job);
-  const topCompanies = Object.entries(companyCounts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 20).map(([company_name, count]) => ({ company_name, count }));
-  return {
-    jobs: sorted,
-    summary: {
-      contract_version: 'canada-all-feed-v1',
-      generated_at: new Date().toISOString(),
-      source: 'jobs-aggregator-private normalized post-merge all_jobs pipeline output',
-      tag_engine_version: TAG_ENGINE_VERSION,
-      total_jobs: jobs.length,
-      canada_jobs: canadaJobs.length,
-      canada_tech_jobs: techCount,
-      canada_non_tech_jobs: nonTechCount,
-      tech_prioritized: true,
-      by_domain: sortCountObject(byDomain),
-      by_source: sortCountObject(bySource),
-      top_companies: topCompanies,
-      sentinel_false_positive_checks: buildCanadaAllSentinelChecks(sorted),
-    },
-  };
-}
-async function writeCanadaAllFeed(jobs) {
-  const { jobs: canadaAllJobs, summary } = buildCanadaAllFeed(jobs);
-  await writeJobsJSONL(canadaAllJobs, CANADA_ALL_JOBS_OUTPUT_FILE);
-  await writeMetadata(summary, CANADA_ALL_SUMMARY_OUTPUT_FILE);
-  console.log(`🇨🇦 CANADA-LANE (all): all-canada feed ${canadaAllJobs.length} jobs (${summary.canada_tech_jobs} tech + ${summary.canada_non_tech_jobs} non-tech, tech-prioritized) → canada-jobs.jsonl`);
-  if (!summary.sentinel_false_positive_checks.passed) {
-    throw new Error(`Canada all feed sentinel checks failed: ${JSON.stringify(summary.sentinel_false_positive_checks.checks)}`);
-  }
-  return summary;
-}
-
-
-function activePublicWindowTs(job, now = Date.now()) {
-  const rawPostedAt = job?.posted_at ? new Date(job.posted_at).getTime() : now;
-  const postedTs = Number.isNaN(rawPostedAt) ? now : Math.min(rawPostedAt, now);
-  if (job?.source === 'greenhouse' && job?.tags?.employment === 'internship' && job?.source_updated_at) {
-    const rawUpdatedAt = new Date(job.source_updated_at).getTime();
-    if (!Number.isNaN(rawUpdatedAt)) {
-      const updatedTs = Math.min(rawUpdatedAt, now);
-      if (updatedTs > postedTs) return updatedTs;
-    }
-  }
-  return postedTs;
-}
-
-function applicableTtlMs(job) {
-  return job?.tags?.employment === 'internship' ? INTERNSHIP_TTL_MS : DEDUPE_TTL_MS;
-}
-
-// AGG-LIFECYCLE-1: TAG-AND-KEEP for evergreen / ghost / TTL-expired jobs.
-// Previously these were DROPPED from the pool; now they are KEPT and tagged with a
-// lifecycle_state so they stay visible + filterable instead of vanishing. The 5 states:
-//   fresh            — current-run job, within the active window (recent posted_at)
-//   carry-forward    — prior-run job merged via rolling window (source absent this run, still alive)
-//   evergreen        — old-but-alive (always-open repost); posted_at in the 10d–TTL evergreen band
-//   stale-candidate  — posted_at beyond TTL (or null/unverifiable); previously TTL-dropped
-//   dead             — confirmed closed/ghost (absent from a successful fetch) or retired source
-// Precedence (most actionable first): dead > stale-candidate > evergreen > carry-forward > fresh.
-// Consumers replicate the pre-LIFECYCLE "dropped" set by excluding {dead, stale-candidate}.
-const LIFECYCLE_VERSION = 1;
-const LIFECYCLE_EVERGREEN_THRESHOLD_DAYS = 10; // matches evergreen-detector.js EVERGREEN_THRESHOLD_DAYS
-const LIFECYCLE_EVERGREEN_THRESHOLD_MS = LIFECYCLE_EVERGREEN_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
-// Anti-flood guardrail (verify-no-flood): dead / stale-candidate jobs are KEPT for visibility but
-// truly retired (dropped) once posted_at outlives its TTL + this window, so the rolling store
-// cannot accumulate closed/expired jobs forever. Generous vs both 14d regular and 120d internship TTL.
-const LIFECYCLE_VISIBILITY_DAYS = 45;
-const LIFECYCLE_VISIBILITY_MS = LIFECYCLE_VISIBILITY_DAYS * 24 * 60 * 60 * 1000;
-
-/**
- * AGG-LIFECYCLE-1: classify a job's age-based lifecycle_state.
- * Returns 'stale-candidate' | 'evergreen' | null (null = within the fresh window; caller resolves
- * carry-forward vs fresh). Caller must assign 'dead' for confirmed-closed jobs separately, since
- * closure (not age) is the strongest lifecycle signal and takes precedence over age.
- */
-function classifyAgeLifecycle(job, now = Date.now()) {
-  const jobTtlMs = applicableTtlMs(job);
-  const windowTs = activePublicWindowTs(job, now);
-  if (!job.posted_at || Number.isNaN(windowTs) || windowTs < now - jobTtlMs) {
-    return 'stale-candidate';
-  }
-  if (windowTs < now - LIFECYCLE_EVERGREEN_THRESHOLD_MS) {
-    return 'evergreen';
-  }
-  return null;
-}
-
-/**
- * AGG-LIFECYCLE-1: hard-retire check (anti-flood). A dead/stale-candidate job kept for visibility
- * is truly dropped once it outlives its TTL + visibility window, bounding rolling-pool growth.
- */
-function isLifecycleHardRetired(job, now = Date.now()) {
-  if (!job.posted_at) return false; // null-date jobs are rare; retained, bounded by their scarcity
-  const windowTs = activePublicWindowTs(job, now);
-  if (Number.isNaN(windowTs)) return false;
-  return windowTs < now - (applicableTtlMs(job) + LIFECYCLE_VISIBILITY_MS);
-}
-
-/**
- * AGG-32 / AGG-LIFECYCLE-1: classify current-run jobs by posted_at age (TAG-AND-KEEP).
- * Previously DROPPED stale (TTL-expired) and null-date jobs from the pool. Now KEPT and tagged
- * with lifecycle_state (stale-candidate / evergreen / fresh) so they stay visible + filterable.
- * Hard-retires jobs beyond TTL + visibility window (anti-flood; see isLifecycleHardRetired).
- * AGG-6 date overwrite disabled A86 — jobs keep their source-reported posted_at.
- */
-function resolvePostedAt(publicJobs, prevLines) {
-  // AGG-LIFECYCLE-1: single pass — tag instead of drop.
-  // SUP-TTL-1: Internships get wider TTL window (120d vs 14d).
-  // AGG-STALE-FIX-1 (2026-07-06): hard-retire now also applies to current-run jobs.
-  // Previously only carry-forward (mergeCarryForward) had the check. But ATS sources
-  // (oracle, greenhouse) keep returning ancient ghost postings indefinitely — 155 jobs
-  // >59d accumulated because resolvePostedAt blindly trusted "source returns it = active."
-  // Same isLifecycleHardRetired function, applied uniformly.
-  let staleTagged = 0;
-  let evergreenTagged = 0;
-  let freshTagged = 0;
-  let hardRetired = 0;
-  for (let i = publicJobs.length - 1; i >= 0; i--) {
-    const job = publicJobs[i];
-    if (!job.tags) job.tags = {};
-    const ageState = classifyAgeLifecycle(job);
-    if (ageState === 'stale-candidate') {
-      if (isLifecycleHardRetired(job)) {
-        publicJobs.splice(i, 1);
-        hardRetired++;
-        continue;
-      }
-      job.tags.lifecycle_state = 'stale-candidate';
-      staleTagged++;
-    } else if (ageState === 'evergreen') {
-      job.tags.lifecycle_state = 'evergreen';
-      evergreenTagged++;
-    } else {
-      job.tags.lifecycle_state = 'fresh';
-      freshTagged++;
-    }
-    job.tags.lifecycle_version = LIFECYCLE_VERSION;
-  }
-
-  if (hardRetired > 0) {
-    console.log(`🧹 AGG-STALE-FIX-1: hard-retired ${hardRetired} current-run jobs beyond TTL+${LIFECYCLE_VISIBILITY_DAYS}d (ATS ghost postings — source still returns them but posted_at expired)`);
-  }
-  if (staleTagged > 0 || evergreenTagged > 0) {
-    console.log(`🏷️  AGG-LIFECYCLE-1: kept+tagged ${staleTagged} stale-candidate + ${evergreenTagged} evergreen current-run jobs (>${DEDUPE_TTL_DAYS}d regular / 120d internship)`);
-  }
-}
-
-// AGG-PIPE-4: Sources excluded from closed-job detection.
-// Workday: per-tenant failures inside an otherwise-successful aggregate fetch
-// would falsely close hundreds of jobs (33K+ WD jobs, ~138 tenants).
-// SmartRecruiters: owned by enrichment workflow (DESC-MIGRATE-1), not main pipeline.
-const PIPE4_EXCLUDED_SOURCES = new Set(['workday', 'smartrecruiters']);
-
-// Sources that are no longer fetched by any active lane must not survive through
-// the internship 120-day rolling window. If a retired source is absent from the
-// current run, carry-forward would otherwise preserve stale skeleton listings.
-const RETIRED_CARRY_FORWARD_SOURCES = new Set(['jsearch', 'simplify', 'icims']);
-
-// AGG-PIPE-4: Map Phase B fetcher display names to job source field values.
-const FETCHER_NAME_TO_SOURCE = {
-  'Amazon': 'amazon',
-  'Netflix': 'eightfold',
-  'Apple': 'apple',
-  'Two Sigma': 'twosigma',
-  'Uber': 'uber',
-  'Google': 'google',
-  'SimplifyJobs': 'simplify',
-  'Microsoft': 'microsoft',
-  'Oracle': 'oracle',
-  'AMD': 'amd',
-  'TikTok': 'tiktok',
-  'D.E. Shaw': 'deshaw',
-};
-
-// AGG-HOTPATH-1: fetchers explicitly removed from the fast publish path.
-// They may return via separate workflowing or slower lanes later, but they must not
-// consume Tier A runtime budget inside the main 15-minute-capped workflow.
-const HOTPATH_DEMOTED_FETCHERS = new Set(['Apple', 'Google', 'Microsoft', 'Oracle']);
-const HOTPATH_DEMOTED_SOURCES = new Set(
-  [...HOTPATH_DEMOTED_FETCHERS].map(name => FETCHER_NAME_TO_SOURCE[name] || name.toLowerCase())
-);
-
-const SUPPLEMENTAL_LANE_FILES = [
-  {
-    lane: 'oracle',
-    jobsFile: path.join(DATA_DIR, 'supplemental-oracle-jobs.json'),
-    metaFile: path.join(DATA_DIR, 'supplemental-oracle-metadata.json'),
-  },
-  {
-    lane: 'custom',
-    jobsFile: path.join(DATA_DIR, 'supplemental-custom-jobs.json'),
-    metaFile: path.join(DATA_DIR, 'supplemental-custom-metadata.json'),
-  },
-];
-
-function normalizeSupplementalJobForMerge(job, laneMeta) {
-  if (!job || typeof job !== 'object') return null;
-  const source = typeof job.source === 'string' ? job.source.toLowerCase() : null;
-  if (!source) return null;
-
-  const normalized = { ...job, source };
-  if (!normalized.posted_at && laneMeta?.generated_at) {
-    const generatedTs = new Date(laneMeta.generated_at).getTime();
-    if (!Number.isNaN(generatedTs)) {
-      normalized.posted_at = laneMeta.generated_at;
-      normalized.posted_at_basis = 'supplemental_generated_at';
-    }
-  }
-  return normalized;
-}
-
-function summarizeSupplementalLaneForMerge(laneName, laneJobs, laneMeta, nowMs = Date.now()) {
-  const info = {
-    status: 'missing',
-    skip_reason: null,
-    generated_at: laneMeta?.generated_at || null,
-    age_minutes: null,
-    jobs_loaded: Array.isArray(laneJobs) ? laneJobs.length : 0,
-    by_source: {},
-    publish_contract: laneMeta?.publish_contract || null,
-  };
-  if (!Array.isArray(laneJobs)) {
-    info.status = 'skipped_invalid';
-    info.skip_reason = 'jobs_not_array';
-    return { info, jobs: [], sourcesUsed: new Set() };
-  }
-  if (!laneMeta || typeof laneMeta !== 'object') {
-    info.status = 'skipped_invalid';
-    info.skip_reason = 'metadata_not_object';
-    return { info, jobs: [], sourcesUsed: new Set() };
-  }
-  if (laneMeta.lane_name && laneMeta.lane_name !== laneName) {
-    info.status = 'skipped_invalid';
-    info.skip_reason = 'lane_name_mismatch';
-    return { info, jobs: [], sourcesUsed: new Set() };
-  }
-
-  const normalizedJobs = [];
-  const sourcesUsed = new Set();
-  for (const job of laneJobs) {
-    const normalized = normalizeSupplementalJobForMerge(job, laneMeta);
-    if (!normalized) continue;
-    const source = normalized.source;
-    sourcesUsed.add(source);
-    info.by_source[source] = (info.by_source[source] || 0) + 1;
-    normalizedJobs.push(normalized);
-  }
-
-  const generatedTs = info.generated_at ? new Date(info.generated_at).getTime() : Number.NaN;
-  if (info.generated_at) {
-    if (Number.isNaN(generatedTs)) {
-      info.status = 'skipped_invalid';
-      info.skip_reason = 'invalid_generated_at';
-      return { info, jobs: [], sourcesUsed: new Set() };
-    }
-    info.age_minutes = Math.max(0, Math.floor((nowMs - generatedTs) / 60000));
-  }
-
-  const maxStalenessMinutes = Number(info.publish_contract?.max_staleness_minutes);
-  if (Number.isFinite(maxStalenessMinutes) && maxStalenessMinutes > 0 && Number.isFinite(generatedTs)) {
-    if (nowMs - generatedTs > maxStalenessMinutes * 60 * 1000) {
-      info.status = 'skipped_stale';
-      info.skip_reason = 'stale_artifact';
-      return { info, jobs: [], sourcesUsed: new Set() };
-    }
-  }
-
-  if (Number.isFinite(laneMeta.jobs_fetched) && laneMeta.jobs_fetched !== laneJobs.length) {
-    info.status = 'skipped_invalid';
-    info.skip_reason = 'jobs_fetched_mismatch';
-    return { info, jobs: [], sourcesUsed: new Set() };
-  }
-
-  if (laneName === 'custom') {
-    // AGG-SLOW-LANE-1: validate that actual sources are a SUBSET of declared sources.
-    // A fetcher legitimately returning 0 (e.g. API down) shouldn't invalidate the entire lane.
-    // We still reject UNDECLARED sources (corruption/tampering detection).
-    const declaredSet = laneMeta.sources && typeof laneMeta.sources === 'object'
-      ? new Set(Object.keys(laneMeta.sources))
-      : new Set();
-    const actualSources = Object.keys(info.by_source);
-    for (const src of actualSources) {
-      if (!declaredSet.has(src)) {
-        info.status = 'skipped_invalid';
-        info.skip_reason = `undeclared_source:${src}`;
-        return { info, jobs: [], sourcesUsed: new Set() };
-      }
-    }
-  } else if (laneName === 'oracle') {
-    const actualSources = Object.keys(info.by_source);
-    if (actualSources.some(source => source !== 'oracle')) {
-      info.status = 'skipped_invalid';
-      info.skip_reason = 'unexpected_source';
-      return { info, jobs: [], sourcesUsed: new Set() };
-    }
-  }
-
-  info.status = 'merged';
-  return { info, jobs: normalizedJobs, sourcesUsed };
-}
-
-
-function loadSupplementalInputs(nowMs = Date.now()) {
-  const jobs = [];
-  const inputs = {};
-  const sourcesUsed = new Set();
-  for (const lane of SUPPLEMENTAL_LANE_FILES) {
-    if (!fs.existsSync(lane.jobsFile) || !fs.existsSync(lane.metaFile)) {
-      inputs[lane.lane] = {
-        status: 'missing',
-        skip_reason: 'artifact_missing',
-        generated_at: null,
-        age_minutes: null,
-        jobs_loaded: 0,
-        by_source: {},
-        publish_contract: null,
-      };
-      continue;
-    }
-    try {
-      const laneJobs = JSON.parse(fs.readFileSync(lane.jobsFile, 'utf8'));
-      const laneMeta = JSON.parse(fs.readFileSync(lane.metaFile, 'utf8'));
-      const summary = summarizeSupplementalLaneForMerge(lane.lane, laneJobs, laneMeta, nowMs);
-      inputs[lane.lane] = summary.info;
-      if (summary.info.status !== 'merged') {
-        console.warn(`⚠️ Supplemental lane ${lane.lane}: skipped (${summary.info.skip_reason})`);
-        continue;
-      }
-      for (const source of summary.sourcesUsed) sourcesUsed.add(source);
-      appendAll(jobs, summary.jobs);
-    } catch (e) {
-      inputs[lane.lane] = {
-        status: 'skipped_invalid',
-        skip_reason: 'load_error',
-        generated_at: null,
-        age_minutes: null,
-        jobs_loaded: 0,
-        by_source: {},
-        publish_contract: null,
-      };
-      console.warn(`⚠️ Supplemental lane ${lane.lane}: could not load artifact (${e.message})`);
-    }
-  }
-  return { jobs, inputs, sourcesUsed };
-}
-
-
-
-
-/**
- * Carry-forward merge: re-adds prior-run jobs not in current run (rolling window).
- * Re-tags employment, re-tags domains on version change, refreshes empty locations.
- *
- * AGG-PIPE-4: Jobs from sources that had a successful fetch this run are NOT carried
- * forward — if the source fetched successfully and the job isn't in the results,
- * the job is genuinely closed. Excludes WD and SR (multi-tenant false-positive risk).
- */
-function shouldTreatCompanyScopedSourceJobClosed(job, fetcherHealth) {
-  const source = (job.source || '').toLowerCase();
-  if (source !== 'workday' && source !== 'smartrecruiters') return false;
-  if (!fetcherHealth || typeof fetcherHealth !== 'object') return false;
-  const companyKey = job.company_name;
-  if (!companyKey) return false;
-  const health = fetcherHealth[companyKey];
-  return health?.source === source && health?.status === 'alive';
-}
-
-// AGG-STALEUPSTREAM-1 (2026-07-04): drop orphan jobs — carry-forward jobs whose company is no longer
-// in the active multi-tenant config (workday/smartrecruiters) AND not fetched in >14d. These are
-// defunct-tenant leftovers (e.g. Sanofi, Veolia) that never get re-fetched -> never dead-checked ->
-// linger indefinitely. High precision: company-list name match is exact (0 near-misses measured), and
-// the >14d fetched_at floor avoids dropping jobs from very-recently-removed companies. Exported for testing.
-function dropOrphanJobs(publicJobs, activeWdNames, activeSRNames, graceMs = 14 * 86400000, now = Date.now()) {
-  let dropped = 0;
-  // AGG-SIMPLIFY-EXIT-1 (2026-07-06): extended to cover ALL multi-tenant sources (workday, SR, icims)
-  // + the hardcoded iCIMS tenant list (orphan check was workday/SR-only — zombie iCIMS jobs survived).
-  const ACTIVE_ICIMS_COMPANIES = new Set(['Peraton', 'General Dynamics Mission Systems', 'Cotiviti']);
-  for (let i = publicJobs.length - 1; i >= 0; i--) {
-    const j = publicJobs[i];
-    const src = (j.source || '').toLowerCase();
-    let set = null;
-    if (src === 'workday') set = activeWdNames;
-    else if (src === 'smartrecruiters') set = activeSRNames;
-    else if (src === 'icims') set = ACTIVE_ICIMS_COMPANIES;
-    if (set && set.size > 0 && !set.has(j.company_name) && j.fetched_at && (now - new Date(j.fetched_at).getTime()) > graceMs) {
-      publicJobs.splice(i, 1);
-      dropped++;
-    }
-  }
-  return dropped;
-}
-
-function mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, stripFields, successfulSources, companyFetchHealth) {
-
-  let mergedCount = 0;
-  let staleKept = 0;          // AGG-LIFECYCLE-1: TTL-expired / null-date prior-run (was dropped)
-  let deadDropped = 0;       // OPERATOR 2026-07-03: dead dropped UPSTREAM (reverses AGG-LIFECYCLE-1 tag-and-keep). dead = source fetched OK this run but job absent (or retired source) — high-precision, no re-flood (source no longer lists it). Restores pre-LIFECYCLE drop behavior.
-  let evergreenTagged = 0;
-  let carryForwardTagged = 0;
-  let hardRetired = 0;        // AGG-LIFECYCLE-1: anti-flood true-drop
-  let seniorDropped = 0;      // OUT OF SCOPE (senior filter) — still dropped, not lifecycle-tagged
-  let fpSkipCount = 0;
-  for (const line of prevLines) {
-    try {
-      const job = JSON.parse(line);
-      if (currentIds.has(job.id)) continue;                                       // dedup (unchanged)
-      if (job.fingerprint && currentFingerprints.has(job.fingerprint)) { fpSkipCount++; continue; } // dedup
-
-      // AGG-LIFECYCLE-1: build the carried-forward job once, then TAG-AND-KEEP.
-      // (Previously the cases below each `continue`-DROPPED the job; now they keep + tag it.)
-      const strippedJob = { ...job };
-      for (const field of stripFields) delete strippedJob[field];
-      // AGG-DATA-13: normalize employment types on carry-forward jobs (AGG-PIPE-13: shared constant)
-      if (Array.isArray(strippedJob.employment_types)) {
-        strippedJob.employment_types = strippedJob.employment_types.map(t => EMPLOYMENT_NORMALIZE_MAP[t] || t);
-      }
-      // A86: Restore posted_at from first_published for carry-forward jobs.
-      // Pre-A86 runs used FRESHNESS-2 which inflated posted_at to Date.now() when source date >7d.
-      // This one-time correction restores the real source date where first_published is available.
-      if (strippedJob.first_published && strippedJob.posted_at) {
-        const fpTs = new Date(strippedJob.first_published).getTime();
-        const paTs = new Date(strippedJob.posted_at).getTime();
-        if (!isNaN(fpTs) && !isNaN(paTs) && paTs > fpTs) {
-          strippedJob.posted_at = strippedJob.first_published;
-        }
-      }
-      if (!strippedJob.tags) strippedJob.tags = {};
-
-      // Classify lifecycle_state. OPERATOR-2026-07-04: DEAD takes precedence over age.
-      // A confirmed-dead prior-run job (retired source / source fetched OK but absent / company-scoped
-      // closed) is DROPPED upstream regardless of posted_at age — age must not "rescue" a dead job.
-      // Previously the stale-candidate age check fired first, so old dead jobs leaked into the pool
-      // tagged stale-candidate. This extends the 2026-07-03 dead-drop to stale-candidate-age jobs
-      // using the SAME source-absence signal (high-precision; non-dead stale-candidate still tag-and-keep).
-      // Consumers replicate the pre-LIFECYCLE "dropped" set by excluding {dead, stale-candidate}.
-      let state;
-      const ageState = classifyAgeLifecycle(strippedJob);
-      if (RETIRED_CARRY_FORWARD_SOURCES.has((strippedJob.source || '').toLowerCase())) {
-        deadDropped++; continue;  // DROP dead upstream. Retired source.
-      } else if (successfulSources.has(strippedJob.source) && !PIPE4_EXCLUDED_SOURCES.has(strippedJob.source)) {
-        deadDropped++; continue;  // DROP dead upstream. Source fetched OK this run but job absent -> gone from its own career site.
-      } else if (shouldTreatCompanyScopedSourceJobClosed(strippedJob, companyFetchHealth)) {
-        deadDropped++; continue;  // DROP dead upstream. Company-scoped source confirmed closed.
-      } else if (ageState === 'stale-candidate') {
-        if (isLifecycleHardRetired(strippedJob)) { hardRetired++; continue; }      // anti-flood: truly drop (non-dead, extremely old)
-        state = 'stale-candidate';
-        staleKept++;
-      } else if (ageState === 'evergreen') {
-        state = 'evergreen'; evergreenTagged++;
-      } else {
-        state = 'carry-forward'; carryForwardTagged++;
-      }
-      strippedJob.tags.lifecycle_state = state;
-      strippedJob.tags.lifecycle_version = LIFECYCLE_VERSION;
-      publicJobs.push(strippedJob);
-      mergedCount++;
-    } catch { /* skip malformed lines */ }
-  }
-
-  if (staleKept > 0) {
-    console.log(`🏷️  AGG-LIFECYCLE-1: kept+tagged ${staleKept} stale-candidate prior-run jobs (TTL-expired/null-date; previously dropped)`);
-  }
-  if (deadDropped > 0) {
-    console.log(`🧹 OPERATOR 2026-07-03+07-04: dropped ${deadDropped} dead prior-run jobs UPSTREAM (closed/ghost/retired; dead takes precedence over posted_at age since 2026-07-04) — they no longer reach all_jobs/R2/consumers. [non-dead stale-candidate still tag-and-keep until a first_seen-based TTL]`);
-  }
-  if (hardRetired > 0) {
-    console.log(`🧹 AGG-LIFECYCLE-1: hard-retired ${hardRetired} prior-run jobs beyond TTL+${LIFECYCLE_VISIBILITY_DAYS}d visibility window (anti-flood)`);
-  }
-  if (fpSkipCount > 0) {
-    console.log(`🔄 Rolling window: skipped ${fpSkipCount} prior-run jobs with matching fingerprint (ID changed, current version wins)`);
-  }
-  if (seniorDropped > 0) {
-    console.log(`🛡️  Rolling window: dropped ${seniorDropped} senior prior-run jobs (senior filter; out of lifecycle scope)`);
-  }
-  if (mergedCount > 0) {
-    publicJobs.sort((a, b) => new Date(b.posted_at || 0) - new Date(a.posted_at || 0));
-    let empRetagged = 0;
-    let domainRetagged = 0;
-    let locRefreshed = 0;
-    let locRetagged = 0;
-    for (const job of publicJobs) {
-      if (currentIds.has(job.id)) continue;
-      if (!job.tags) job.tags = {};
-      const newEmp = tagEmployment(job);
-      if (job.tags.employment !== newEmp) {
-        job.tags.employment = newEmp;
-        empRetagged++;
-      }
-      // AGG-PIPE-12: Always re-tag domains (not just on version change).
-      // Between version bumps, keyword/guard changes silently miss carry-forward jobs.
-      const freshDomains = tagDomains(job);
-      const oldDomains = (job.tags.domains || []).slice().sort().join(',');
-      const newDomains = (freshDomains || []).slice().sort().join(',');
-      if (oldDomains !== newDomains) {
-        job.tags.domains = freshDomains;
-        domainRetagged++;
-      }
-      if ((!job.job_state || job.job_state === '') || (!job.job_city || job.job_city === '')) {
-        const hadState = job.job_state && job.job_state !== '';
-        const hadCity = job.job_city && job.job_city !== '';
-        normalizeJob(job);
-        if ((!hadState && job.job_state) || (!hadCity && job.job_city)) locRefreshed++;
-      }
-      const freshLocations = tagLocations(job);
-      const oldLocations = (job.tags.locations || []).slice().sort().join(',');
-      const newLocations = (freshLocations || []).slice().sort().join(',');
-      if (oldLocations !== newLocations) {
-        job.tags.locations = freshLocations;
-        locRetagged++;
-      }
-      job.tags.tag_engine_version = TAG_ENGINE_VERSION;
-      // AGG-LIFECYCLE-1: re-stamp lifecycle version on every carry-forward job each run.
-      if (job.tags.lifecycle_state) job.tags.lifecycle_version = LIFECYCLE_VERSION;
-    }
-    console.log(`🔄 Merged ${mergedCount} prior-run jobs into rolling window (total: ${publicJobs.length}${deadDropped > 0 ? `, ${deadDropped} dead dropped upstream` : ''}${staleKept > 0 ? `, ${staleKept} stale-candidate kept+tagged` : ''}${evergreenTagged > 0 ? `, ${evergreenTagged} evergreen` : ''}${carryForwardTagged > 0 ? `, ${carryForwardTagged} carry-forward` : ''}${empRetagged > 0 ? `, ${empRetagged} employment re-tagged` : ''}${domainRetagged > 0 ? `, ${domainRetagged} domains re-tagged (version ${TAG_ENGINE_VERSION})` : ''}${locRefreshed > 0 ? `, ${locRefreshed} location fields refreshed` : ''}${locRetagged > 0 ? `, ${locRetagged} locations re-tagged` : ''})`);
-  } else {
-    console.log(`🔄 No prior-run jobs to merge${(deadDropped + staleKept) > 0 ? ` (${deadDropped} dead dropped, ${staleKept} stale-candidate tagged)` : ''}`);
-  }
-}
-
-/**
- * Generate tag stats from full pool (post-merge + post-AGG-32).
- * Must run after both carry-forward merge and AGG-32 filter for accurate counts.
- */
-function computeFullPoolTagStats(publicJobs) {
-  const stats = generateTagStats(publicJobs);
-  console.log(`📊 Tag stats: ${stats.total} jobs (full pool)`);
-  return stats;
-}
-
-/**
- * Main execution function
- */
-async function main() {
-  const startTime = Date.now();
-  const stageTimings = {};
-  const pipelineTimestamps = { started_at: new Date(startTime).toISOString() };
-
-  // AGG-PREVIOUS-CYCLE-TIMESTAMP-1 v3: read prior run's completion timestamp.
-  // Seeded from R2 by fetch-jobs.yml "Seed pipeline-cycle-state.json" step.
-  // First run (file absent) → null → field publishes as null; self-bootstraps next cycle.
-  // v3 lesson: declared in main() and PASSED explicitly to generateMetadata (v2 used a
-  // closure reference across function boundaries → ReferenceError at runtime, not at parse).
-  let prevRunCompletedAt = null;
-  try {
-    const _cycleStatePath = path.join(DATA_DIR, 'pipeline-cycle-state.json');
-    if (fs.existsSync(_cycleStatePath)) {
-      prevRunCompletedAt = JSON.parse(fs.readFileSync(_cycleStatePath, 'utf8')).last_completed_at || null;
-    }
-  } catch (_cycleErr) { /* non-fatal: first run or corrupt marker */ }
-
-  console.log('🚀 Jobs Data Fetcher - Starting...');
-  console.log('═'.repeat(60));
-  console.log(`Mode: ${isDryRun ? 'DRY RUN (no commits)' : 'NORMAL'}`);
-  console.log('');
-
-  // AGG-PIPE-7: Startup assertions — fail fast when critical files are missing.
-  // Origin: d06bb81 deleted tag-engine.js, pipeline ran 25+ failing runs over 7h.
-  try {
-    // (a) Submodule directory exists and isn't empty
-    const sharedFiles = fs.readdirSync(SHARED);
-    assert(sharedFiles.length > 0, `Submodule directory ${SHARED} is empty`);
-
-    // (b) tag-engine.js exports expected functions
-    assert(typeof tagJobs === 'function', 'tag-engine.js does not export tagJobs');
-    assert(typeof tagEmployment === 'function', 'tag-engine.js does not export tagEmployment');
-    assert(typeof tagDomains === 'function', 'tag-engine.js does not export tagDomains');
-    assert(typeof generateTagStats === 'function', 'tag-engine.js does not export generateTagStats');
-
-    // (c) Senior filter exports expected functions
-    assert(typeof filterSeniorJobs === 'function', 'senior-filter.js does not export filterSeniorJobs');
-    assert(typeof isSeniorJob === 'function', 'senior-filter.js does not export isSeniorJob');
-    assert(typeof buildCompanyOverrideMap === 'function', 'senior-filter.js does not export buildCompanyOverrideMap');
-
-    // (d) Deduplicator exports TTL constants
-    assert(typeof DEDUPE_TTL_MS === 'number' && DEDUPE_TTL_MS > 0, 'deduplicator.js does not export valid DEDUPE_TTL_MS');
-    assert(typeof DEDUPE_TTL_DAYS === 'number' && DEDUPE_TTL_DAYS > 0, 'deduplicator.js does not export valid DEDUPE_TTL_DAYS');
-
-    // (e) company-list.json is parseable with expected platforms
-    const companyList = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));
-    const platforms = Object.keys(companyList);
-    const requiredPlatforms = ['greenhouse', 'lever', 'ashby', 'workday', 'smartrecruiters'];
-    for (const p of requiredPlatforms) {
-      assert(platforms.includes(p), `company-list.json missing required platform: ${p}`);
-    }
-
-    console.log('✅ Startup assertions passed (AGG-PIPE-7)');
-  } catch (assertionErr) {
-    console.error(`❌ STARTUP ASSERTION FAILED: ${assertionErr.message}`);
-    console.error('Pipeline cannot proceed — critical file/module missing or corrupt.');
-    process.exit(1);
-  }
-
-  try {
-    // Ensure data directory exists
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-
-    // Step 1: Fetch from all sources
-    console.log('📡 Step 1: Fetching jobs from all sources...');
-    let _stepStart = Date.now();
-    console.log('━'.repeat(60));
-
-    // AGG-5 (S229): Overall timeout per fetcher. Prevents one hung API from blocking
-    // the entire pipeline (Amazon API hung for 23 min on 2026-03-26T00:15 run).
-    // Rolling window merge preserves prior-run jobs — skipping a source is safe.
-    function withTimeout(promise, ms, label) {
-      return Promise.race([
-        promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms/1000}s`)), ms))
-      ]).catch(err => {
-        console.error(`⚠️ ${label}: ${err.message} — continuing with 0 jobs`);
-        return label.includes('ATS') ? { jobs: [], stats: { by_source: {}, by_company: {} } } : [];
-      });
-    }
-
-    let allJobs = [];
-
-    // Read previous counts (needed for initial-population detection) before fetch
-    let prevAppleCount = 0, prevGoogleCount = 0, prevMicrosoftCount = 0;
-    let prevAppleIds = new Set();
-    let wdPreviousTotals = null;
-    try {
-      if (fs.existsSync(JOBS_OUTPUT_FILE)) {
-        const content = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8');
-        prevAppleCount = (content.match(/"source":"apple"/g) || []).length;
-        prevGoogleCount = (content.match(/"source":"google"/g) || []).length;
-        prevMicrosoftCount = (content.match(/"source":"microsoft"/g) || []).length;
-        if (prevAppleCount > 0) {
-          prevAppleIds = new Set((content.match(/"id":"apple-[^"]+"/g) || []).map(m => m.slice(6, -1)));
-          console.log(`  Previous Apple count: ${prevAppleCount} (${prevAppleIds.size} IDs)`);
-        }
-        if (prevGoogleCount > 0) console.log(`  Previous Google count: ${prevGoogleCount}`);
-        if (prevMicrosoftCount > 0) console.log(`  Previous Microsoft count: ${prevMicrosoftCount}`);
-      }
-    } catch (e) { /* first run */ }
-
-    // AGG-SPEED-4: Load Microsoft description cache from seeded sidecar
-    // IDs are extracted from descriptions-microsoft*.jsonl files in DATA_DIR
-    let microsoftCachedIds = new Set();
-    try {
-      const msSidecarFiles = fs.readdirSync(DATA_DIR)
-        .filter(f => f.startsWith('descriptions-microsoft') && f.endsWith('.jsonl'));
-      for (const fname of msSidecarFiles) {
-        const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
-        for (const line of lines) {
-          try { const { id } = JSON.parse(line); if (id) microsoftCachedIds.add(id); } catch {}
-        }
-      }
-      if (microsoftCachedIds.size > 0) console.log(`  Microsoft description cache: ${microsoftCachedIds.size} IDs`);
-    } catch (e) { /* no cache yet */ }
-
-    // AGG-FETCH-10: Load description caches from sidecar files.
-    // Same pattern as Microsoft — avoids re-fetching detail pages every run.
-    // Oracle only treats rich sidecars as cached; short listing snippets must
-    // stay fetchable so responsibilities/qualifications can progressively land.
-    function loadDescriptionCacheState(prefix, { minChars = 1, marker = null, trackShort = false } = {}) {
-      const cachedIds = new Set();
-      const priorityIds = new Set();
-      try {
-        const sidecarFiles = fs.readdirSync(DATA_DIR)
-          .filter(f => f.startsWith(prefix) && f.endsWith('.jsonl'));
-        for (const fname of sidecarFiles) {
-          const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
-          for (const line of lines) {
-            try {
-              const { id, description_text } = JSON.parse(line);
-              const text = description_text || '';
-              const rich = text.length >= minChars || (marker && marker.test(text));
-              if (id && rich) cachedIds.add(id);
-              else if (id && trackShort && text) priorityIds.add(id);
-            } catch {}
-          }
-        }
-        if (cachedIds.size > 0 || priorityIds.size > 0) {
-          const source = prefix.replace('descriptions-', '');
-          const cacheLabel = minChars > 1 ? `rich IDs (>=${minChars} chars or marker)` : 'IDs';
-          const priorityLabel = priorityIds.size > 0 ? `, ${priorityIds.size} short sidecar IDs prioritized` : '';
-          console.log(`  ${source} description cache: ${cachedIds.size} ${cacheLabel}${priorityLabel}`);
-        }
-      } catch (e) { /* no cache yet */ }
-      return { cachedIds, priorityIds };
-    }
-
-    const googleCachedIds = loadDescriptionCacheState('descriptions-google').cachedIds;
-    const appleCachedIds = loadDescriptionCacheState('descriptions-apple').cachedIds;
-    const oracleCache = loadDescriptionCacheState('descriptions-oracle', { minChars: 2000, marker: /^(Responsibilities|Qualifications):/m, trackShort: true });
-    // AGG-ORACLE-DEPT: also treat Oracle jobs whose department is already captured in the sidecar
-    // as cached, so the detail-fetch budget (MAX_DETAIL_FETCHES) targets jobs still missing a
-    // department. This drains the large short-sidecar pool progressively — tech-titled jobs get
-    // captured first and drop out, letting US Oracle generals (low title score) rise into the
-    // budget over successive runs instead of being permanently starved. Without this, generals
-    // (the G1 target) are never reached because the pool is tech-front-loaded.
-    try {
-      const oracleSidecarFiles = fs.readdirSync(DATA_DIR)
-        .filter(f => f.startsWith('descriptions-oracle') && f.endsWith('.jsonl'));
-      const deptHavingIds = new Set();
-      for (const fname of oracleSidecarFiles) {
-        const lines = fs.readFileSync(path.join(DATA_DIR, fname), 'utf8').trim().split('\n').filter(Boolean);
-        for (const line of lines) {
-          try {
-            const { id, departments } = JSON.parse(line);
-            if (id && Array.isArray(departments) && departments.length > 0) deptHavingIds.add(id);
-          } catch (_) {}
-        }
-      }
-      // AGG-ORACLE-DEPT FIX: loadDescriptionCacheState (line 977) caches ALL described Oracle
-      // jobs — including generals that never captured a Category. Remove dept-less jobs from
-      // the skip-list so they remain eligible for detail-fetch (the only source of Category).
-      // Only keep jobs WITH departments cached (skip re-fetch, preserve the captured dept).
-      // Without this, generals (the G1 target) are skipped forever → 0% department capture.
-      let removed = 0;
-      for (const id of oracleCache.cachedIds) {
-        if (!deptHavingIds.has(id)) { oracleCache.cachedIds.delete(id); removed++; }
-      }
-      if (removed > 0) console.log(`  oracle dept cache: ${deptHavingIds.size} with dept (cached/skip), ${removed} dept-less → eligible for detail-fetch`);
-    } catch (_) { /* no sidecar yet */ }
-
-
-    // AGG-SPEED-2: Load WD totals cache from prior run
-    const WD_TOTALS_CACHE = path.join(DATA_DIR, 'wd-totals-cache.json');
-    try {
-      if (fs.existsSync(WD_TOTALS_CACHE)) {
-        wdPreviousTotals = JSON.parse(fs.readFileSync(WD_TOTALS_CACHE, 'utf8'));
-        const cachedCount = Object.keys(wdPreviousTotals).length;
-        if (cachedCount > 0) console.log(`  WD incremental cache: ${cachedCount} tenants`);
-      }
-    } catch (e) { /* first run or corrupt cache */ }
-    // AGG-MAXJOBS-ROTATE-1: Load WD segment rotation cache
-    const WD_SEGMENT_CACHE = path.join(DATA_DIR, 'wd-segment-cache.json');
-    let wdSegmentCache = {};
-    try {
-      if (fs.existsSync(WD_SEGMENT_CACHE)) {
-        wdSegmentCache = JSON.parse(fs.readFileSync(WD_SEGMENT_CACHE, 'utf8'));
-        const rotated = Object.keys(wdSegmentCache).filter(k => wdSegmentCache[k] > 0).length;
-        if (rotated > 0) console.log(`  WD segment cache: ${rotated} tenants with active rotation`);
-      }
-    } catch (e) { /* first run or corrupt cache */ }
-
-    // Phase A+B: Run ATS and custom fetchers in parallel (AGG-SPEED-5)
-    // ~5.5 min savings: max(PhaseA, PhaseB) instead of PhaseA + PhaseB
-    console.log('  Phase A+B: ATS + custom fetchers (parallel)...');
-    const [phaseAResult, ...phaseBSettled] = await Promise.allSettled([
-      withTimeout(fetchFromAllATS({ wdPreviousTotals, wdSegmentCache }), 720_000, 'ATS'),
-      withTimeout(fetchAllAmazonJobs(), 120_000, 'Amazon'),
-      withTimeout(fetchAllNetflixJobs(), 60_000, 'Netflix'),
-      HOTPATH_DEMOTED_FETCHERS.has('Apple')
-        ? Promise.resolve([])
-        : withTimeout(fetchAllAppleJobs({ previousJobCount: prevAppleCount, previousJobIds: prevAppleIds, cachedDescriptionIds: appleCachedIds, dataDir: DATA_DIR }), 1200_000, 'Apple'),
-      withTimeout(fetchAllTwoSigmaJobs(), 120_000, 'Two Sigma'),
-      withTimeout(fetchAllUberJobs(), 60_000, 'Uber'),
-      HOTPATH_DEMOTED_FETCHERS.has('Google')
-        ? Promise.resolve([])
-        : withTimeout(fetchAllGoogleJobs({ previousJobCount: prevGoogleCount, cachedDescriptionIds: googleCachedIds, dataDir: DATA_DIR }), 600_000, 'Google'),
-      // AGG-SIMPLIFY-EXIT-1: simplify fetcher REMOVED (source retired).
-      HOTPATH_DEMOTED_FETCHERS.has('Microsoft')
-        ? Promise.resolve([])
-        : withTimeout(fetchAllMicrosoftJobs({ previousJobCount: prevMicrosoftCount, cachedDescriptionIds: microsoftCachedIds }), 600_000, 'Microsoft'),
-      HOTPATH_DEMOTED_FETCHERS.has('Oracle')
-        ? Promise.resolve([])
-        : withTimeout(fetchAllOracleJobs(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).oracle || undefined, { cachedDescriptionIds: oracleCache.cachedIds, priorityDescriptionIds: oracleCache.priorityIds }), 600_000, 'Oracle'),
-      withTimeout(fetchAllAmdJobs(), 120_000, 'AMD'),
-      HOTPATH_DEMOTED_FETCHERS.has('TikTok')
-        ? Promise.resolve([])
-        : withTimeout(fetchAllTiktokJobs(), 120_000, 'TikTok'),
-      withTimeout(fetchAllDeshawJobs(), 30_000, 'D.E. Shaw'),
-      // AGG-SIMPLIFY-EXIT-1: iCIMS fetcher DISABLED (returns 0 jobs from CI — HTML parsing
-      // fails in GitHub Actions environment). PoC needs debugging before re-enabling.
-      // withTimeout(fetchAllIcimsJobs([...tenants...]), 120_000, 'iCIMS'),
-    ]);
-
-    if (HOTPATH_DEMOTED_FETCHERS.size > 0) {
-      console.log(`  AGG-HOTPATH-1: demoted from hot path -> ${[...HOTPATH_DEMOTED_FETCHERS].join(', ')}`);
-    }
-
-    // Collect ATS results
-    const atsResult = phaseAResult.status === 'fulfilled' ? phaseAResult.value : { jobs: [] };
-    appendAll(allJobs, atsResult.jobs);
-    console.log(`  ATS: ${atsResult.jobs.length} jobs`);
-
-    // AGG-SPEED-2: Save WD totals cache for next run
-    if (atsResult.wdCurrentTotals && Object.keys(atsResult.wdCurrentTotals).length > 0) {
-      fs.writeFileSync(WD_TOTALS_CACHE, JSON.stringify(atsResult.wdCurrentTotals, null, 2));
-      console.log(`  WD totals cache saved: ${Object.keys(atsResult.wdCurrentTotals).length} tenants`);
-    }
-    // AGG-MAXJOBS-ROTATE-1: Save WD segment rotation cache
-    if (atsResult.wdSegmentCache) {
-      try { fs.writeFileSync(WD_SEGMENT_CACHE, JSON.stringify(atsResult.wdSegmentCache, null, 2)); } catch (e) {}
-    }
-    // AGG-WD-429MONITOR-1: Track WD rate-limit responses
-    const wdRateLimited = atsResult.wdRateLimited || 0;
-    if (wdRateLimited > 0) console.log(`   ⚠️  WD rate-limited (429): ${wdRateLimited} responses — investigate Cloudflare rules`);
-
-    // Collect custom fetcher results
-    const fetcherNames = ['Amazon', 'Netflix', 'Apple', 'Two Sigma', 'Uber', 'Google', 'Microsoft', 'Oracle', 'AMD', 'TikTok', 'D.E. Shaw'];
-    const fetcherResults = {};
-    phaseBSettled.forEach((result, i) => {
-      const name = fetcherNames[i];
-      const jobs = result.status === 'fulfilled' ? result.value : [];
-      fetcherResults[name] = Array.isArray(jobs) ? jobs : [];
-      appendAll(allJobs, fetcherResults[name]);
-    });
-
-
-    const supplementalInputs = loadSupplementalInputs();
-    if (supplementalInputs.jobs.length > 0) {
-      appendAll(allJobs, supplementalInputs.jobs);
-      console.log(`  Supplemental lanes merged: ${supplementalInputs.jobs.length} jobs`);
-      for (const [lane, info] of Object.entries(supplementalInputs.inputs)) {
-        console.log(`   - ${lane}: ${info.jobs_loaded} jobs from supplemental artifact`);
-      }
-    }
-
-    // Step 1a-post: apply cached Workday family/department mapping before tagging.
-    const familyCacheReport = await applyFamilyCache(allJobs, JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR);
-    stageTimings.step1a_family_cache_ms = familyCacheReport.durationMs;
-
-    console.log('');
-    console.log(`📊 Step 1 complete: ${allJobs.length} jobs fetched`);
-    stageTimings.step1_fetch_ms = Date.now() - _stepStart;
-    pipelineTimestamps.fetch_completed_at = new Date().toISOString();
-    console.log(`   - ATS: ${atsResult.jobs.length} jobs`);
-    for (const name of fetcherNames) {
-      console.log(`   - ${name}: ${fetcherResults[name].length} jobs`);
-    }
-
-    // GAP-6: Compute zero-yield companies from raw fetch results (pre-filter).
-    // Compares companies configured in company-list.json against companies that
-    // produced jobs this run. A company returning 0 raw jobs may have a broken
-    // slug, API change, or auth issue (LLNL incident class).
-    const zeroYieldCompanies = computeZeroYield(atsResult, fetcherResults, COMPANY_LIST_PATH, atsResult.wdCurrentTotals);
-    if (zeroYieldCompanies.length > 0) {
-      console.log(`   ⚠️  GAP-6: ${zeroYieldCompanies.length} companies returned 0 raw jobs`);
-    }
-
-    // AGG-PIPE-4: Build set of sources that fetched successfully this run.
-    // Used by mergeCarryForward to detect closed jobs (source fetched OK, job absent = closed).
-    const successfulSources = new Set();
-    for (const [source, count] of Object.entries((atsResult.stats || {}).by_source || {})) {
-      if (count > 0) successfulSources.add(source);
-    }
-    for (const [fetcherName, jobs] of Object.entries(fetcherResults)) {
-      const sourceKey = FETCHER_NAME_TO_SOURCE[fetcherName] || fetcherName.toLowerCase();
-      if (Array.isArray(jobs) && jobs.length > 0) successfulSources.add(sourceKey);
-    }
-    for (const source of supplementalInputs.sourcesUsed) {
-      successfulSources.add(source);
-    }
-    if (successfulSources.size > 0) {
-      console.log(`   🔍 AGG-PIPE-4: ${successfulSources.size} sources fetched successfully: ${[...successfulSources].join(', ')}`);
-    }
-
-    console.log('');
-
-    // AGG-DESCCOVERAGE-1 (2026-07-05): Workday description fetch RE-ENABLED in the main run.
-    // It was removed (AGG-HOTPATH-1) under runtime pressure, but runtime has since recovered
-    // (~5-6 min wall, under the 8-min alert), and ~1,227 in-scope workday jobs were being dropped
-    // by the bridge for lack of a description (the workday shard sat near-empty at 25 entries).
-    // The fetcher self-caps at MAX_PER_RUN=200 (~80s), prioritizes US jobs, and caches via
-    // descriptions-workday.jsonl (seeded from R2 + uploaded each run) -> backfills over ~2 days.
-    // GUARD: monitor first runs' wall-time; revert to skipping if it breaches 8 min.
-    const _skipDesc = process.env.SKIP_DESC_BACKFILL === '1';
-    const _skipWdDesc = process.env.SKIP_WD_DESC_BACKFILL === '1';  // AGG-DESC-ASYNC-1: WD-only skip (separate workflow backfills)
-    const _skipSrDesc = process.env.SKIP_SR_DESC_BACKFILL === '1';  // AGG-DESC-ASYNC-1: SR desc also decoupled
-    let _wdDescBacklog = 0, _wdDescCached = 0;
-    const _step1bStart = Date.now();
-    const wdJobs = allJobs.filter(j => j.source === 'workday');
-    if (wdJobs.length > 0) {
-      const wdDescriptions = await fetchWorkdayDescriptions(wdJobs, DATA_DIR, { skipFetch: _skipWdDesc });
-      injectDescriptions(wdJobs, wdDescriptions, 'WD');
-      _wdDescBacklog = wdJobs.filter(j => !wdDescriptions.has(j.id)).length;
-      _wdDescCached = wdDescriptions.size;
-      // AGG-DESC-ASYNC-1: when WD desc backfill is skipped, write pending jobs (with _raw,
-      // pre-strip) to a queue file for the separate desc-backfill workflow to consume.
-      if (_skipWdDesc) {
-        const _wdPending = wdJobs.filter(j => !wdDescriptions.has(j.id) && j._raw && j._raw.externalPath && j._raw.baseUrl && j._raw.site);
-        if (_wdPending.length > 0) {
-          const _qLines = _wdPending.map(j => JSON.stringify({ id: j.id, externalPath: j._raw.externalPath, baseUrl: j._raw.baseUrl, site: j._raw.site, location: j.location || '' }));
-          fs.writeFileSync(path.join(DATA_DIR, 'wd-desc-queue.jsonl'), _qLines.join('\n') + '\n', 'utf8');
-          console.log(`📄 Wrote ${_wdPending.length} pending WD jobs → wd-desc-queue.jsonl (separate desc-backfill workflow will fetch)`);
-        }
-      }
-    } else {
-      console.log('📄 Step 1b: No WD jobs this run — skipping description fetch');
-    }
-    const srJobs = allJobs.filter(j => j.source === 'smartrecruiters');
-    if (srJobs.length > 0) {
-      const srDescriptions = await fetchSRDescriptions(srJobs, DATA_DIR, { skipFetch: _skipSrDesc });
-      injectDescriptions(srJobs, srDescriptions, 'SR');
-    } else {
-      console.log('📄 SR descriptions: No SmartRecruiters jobs this run — skipping description fetch');
-    }
-    stageTimings.step1b_desc_backfill_ms = Date.now() - _step1bStart;
-    console.log(`⏱️  Step 1b (desc backfill WD+SR): ${stageTimings.step1b_desc_backfill_ms}ms`);
-    console.log('');
-
-
-    // Step 2: Enhance jobs (add fingerprints, employment_types arrays, etc.)
-    console.log('🔄 Step 2: Enhancing jobs with required fields...');
-    _stepStart = Date.now();
-    console.log('━'.repeat(60));
-
-    // Add missing fields (fingerprints, normalize employment_types to arrays)
-    const helpers = require(`${SHARED}/utils/helpers`);
-    const enhancedJobs = allJobs.map(job => {
-      // Add fingerprint if missing
-      if (!job.fingerprint) {
-        job.fingerprint = helpers.generateFingerprint(job);
-      }
-
-      // AGG-DATA-13: Normalize employment_type/employment_types to canonical array (AGG-PIPE-13: shared constant)
-      if (!job.employment_types) {
-        const types = job.employment_type || [];
-        if (Array.isArray(types)) {
-          job.employment_types = types.map(t => EMPLOYMENT_NORMALIZE_MAP[String(t).toUpperCase()] || String(t).toUpperCase());
-        } else if (typeof types === 'string') {
-          job.employment_types = types.split(',').map(t => EMPLOYMENT_NORMALIZE_MAP[t.trim().toUpperCase()] || t.trim().toUpperCase());
-        } else {
-          job.employment_types = [];
-        }
-      } else {
-        // Carry-forward: re-normalize existing array
-        job.employment_types = job.employment_types.map(t => EMPLOYMENT_NORMALIZE_MAP[t] || t);
-      }
-
-      return job;
-    });
-
-    console.log('');
-    console.log(`✅ Step 2 complete: ${enhancedJobs.length} jobs enhanced`);
-    stageTimings.step2_enhance_ms = Date.now() - _stepStart;
-    console.log('');
-
-    // Step 3: Validate and fix malformed fields
-    console.log('📝 Step 3: Validating and fixing malformed fields...');
-    _stepStart = Date.now();
-    console.log('━'.repeat(60));
-
-    const { validJobs, invalidJobs, metrics: validationMetrics } = validateAndNormalizeJobs(enhancedJobs);
-
-    console.log('');
-    printValidationSummary(validationMetrics);
-    console.log('');
-    console.log(`✅ Step 3 complete: ${validJobs.length} valid jobs (${invalidJobs.length} filtered)`);
-    stageTimings.step3_validate_ms = Date.now() - _stepStart;
-    console.log('');
-
-    // Step 4: Filter senior jobs
-    console.log('🎓 Step 4: Filtering senior-level jobs...');
-    _stepStart = Date.now();
-    console.log('━'.repeat(60));
-
-    // INF-EXPAND-1 Phase 2 (Option D, 2026-07-09): pipeline senior filter BYPASSED. All jobs enter
-    // the main pool; each consumer filters by tags.employment itself (6 GitHub boards + Discord =
-    // Phase 1 filters LIVE; zapply.jobs = isEarlyCareerJob; softwarejobs.dev = all-levels by design).
-    // filterSeniorJobs + senior-filter.js are KEPT for reference/rollback + observability: we still
-    // call it to MEASURE what would be filtered, but validJobs is the pool and seniorJobs is empty
-    // (so the shadow feed + seniorUsFold become no-ops — no double-count into us_jobs).
-    const _filterResult = filterSeniorJobs(validJobs, companyOverrideMap);
-    const entryLevelJobs = validJobs;
-    const seniorJobs = [];
-    const seniorFilterMetrics = _filterResult.metrics;
-    const _wouldBeSenior = _filterResult.seniorJobs.length;
-
-    console.log('');
-    printSeniorFilterSummary(seniorFilterMetrics);
-    console.log('');
-    const overrideCount = seniorFilterMetrics.override_applied || 0;
-    console.log(`✅ Step 4 complete (Phase 2: senior filter BYPASSED): ${entryLevelJobs.length} jobs enter pool (all levels; ${_wouldBeSenior} would-have-been-senior → flow to consumers that filter)`);
-    stageTimings.step4_filter_ms = Date.now() - _stepStart;
-    console.log('');
-
-    // Step 4b: Write senior-filter analytics summary (PIPELINE-1)
-    // Summary counts only — full job objects are ~180 MB and exceed GitHub's 100 MB limit.
-    // Tags not yet available (Step 5), so breakdown is by source only.
-    const FILTERED_OUTPUT_FILE = path.join(DATA_DIR, 'filtered_jobs.json');
-    const seniorBySource = {};
-    for (const job of seniorJobs) {
-      seniorBySource[job.source || 'unknown'] = (seniorBySource[job.source || 'unknown'] || 0) + 1;
-    }
-
-    // AGG-SELF-4 Check C: FP rate tracking for trend alerting
-    let fpStats = { sample_size: 0, potential_fp_count: 0, fp_rate_pct: '0.0' };
-    // AGG-DATA-8 / AGG-PIPE-11: Sample 500 filtered jobs for false-positive measurement.
-    // 500 jobs gives ±4.3pp CI (vs ±14pp with 50). File rotated weekly (7-day TTL).
-    {
-      const SAMPLE_SIZE = 500;
-      const SAMPLES_FILE = path.join(DATA_DIR, 'filtered-samples.jsonl');
-      const now = new Date();
-
-      // Rotate: remove entries older than 7 days
-      let existingLines = [];
-      if (fs.existsSync(SAMPLES_FILE)) {
-        const cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        existingLines = fs.readFileSync(SAMPLES_FILE, 'utf8').trim().split('\n')
-          .filter(line => { try { return JSON.parse(line).sampled_at >= cutoff; } catch { return false; } });
-      }
-
-      // Random sample without bias (Fisher-Yates partial shuffle)
-      const sampleIndices = [];
-      if (seniorJobs.length <= SAMPLE_SIZE) {
-        sampleIndices.push(...Array.from({ length: seniorJobs.length }, (_, i) => i));
-      } else {
-        const pool = Array.from({ length: seniorJobs.length }, (_, i) => i);
-        for (let i = 0; i < SAMPLE_SIZE; i++) {
-          const j = i + Math.floor(Math.random() * (pool.length - i));
-          [pool[i], pool[j]] = [pool[j], pool[i]];
-          sampleIndices.push(pool[i]);
-        }
-      }
-
-      // AGG-PIPE-11: Flag potential FPs — jobs where title has no senior keyword.
-      // Not definitive (could be filtered by experience in description), but surfaces
-      // likely FPs for review. A high potential_fp rate warrants investigation.
-      const SENIOR_TITLE_RE = /\b(senior|sr\.?|lead|principal|staff|director|vp|vice president|head of|chief|manager|mgr\.?)\b/i;
-
-      const newSamples = sampleIndices.map(idx => {
-        const job = seniorJobs[idx];
-        const hasSeniorKeyword = SENIOR_TITLE_RE.test(job.title || '');
-        return {
-          sampled_at: now.toISOString(),
-          id: job.id,
-          title: job.title,
-          company_name: job.company_name,
-          source: job.source,
-          location: job.location || null,
-          filter_reason: job._filter_reason || 'unknown',
-          potential_fp: !hasSeniorKeyword,
-        };
-      });
-
-      const fpCount = newSamples.filter(s => s.potential_fp).length;
-      const fpRate = newSamples.length > 0 ? (fpCount / newSamples.length * 100).toFixed(1) : '0.0';
-      console.log(`📋 FP estimate: ${fpCount}/${newSamples.length} (${fpRate}%) potential false positives in sample`);
-      fpStats = { sample_size: newSamples.length, potential_fp_count: fpCount, fp_rate_pct: fpRate };
-
-      const allLines = [...existingLines, ...newSamples.map(s => JSON.stringify(s))];
-      fs.writeFileSync(SAMPLES_FILE, allLines.join('\n') + '\n', 'utf8');
-      console.log(`📋 Step 4b-2: Filtered samples → filtered-samples.jsonl (${newSamples.length} sampled, ${allLines.length} total)`);
-    }
-
-    // Write summary AFTER fpStats is computed
-    const filteredSummary = {
-      generated: new Date().toISOString(),
-      total_senior_filtered: seniorJobs.length,
-      by_source: seniorBySource,
-      ...fpStats,
-    };
-    fs.writeFileSync(FILTERED_OUTPUT_FILE, JSON.stringify(filteredSummary, null, 2), 'utf8');
-    console.log(`📋 Step 4b: Senior-filter summary → filtered_jobs.json (${seniorJobs.length} total)`);
-
-    console.log('');
-
-    // Step 4c: Inject descriptions from ALL sidecar files for tag engine's description fallback.
-    // Carried-forward jobs lose their inline descriptions in Step 9 (stripped from all_jobs.json).
-    // This re-injects them from per-source sidecar files so the description-fallback layer can classify.
-    // Guard: !job.description prevents double-injection for freshly-fetched jobs with inline descriptions.
-    // TAG-9 S237: expanded from enriched-only to ALL sidecars — 1,317 additional jobs gain descriptions.
-    const _step4cStart = Date.now();
-    const descSidecarFiles = fs.readdirSync(DATA_DIR)
-      .filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
-    if (descSidecarFiles.length > 0) {
-      const descMap = new Map();
-      const deptMap = new Map();   // AGG-ORACLE-DEPT: id -> departments[] (persisted capture)
-      for (const fname of descSidecarFiles) {
-        const fpath = path.join(DATA_DIR, fname);
-        const descLines = fs.readFileSync(fpath, 'utf8').trim().split('\n').filter(Boolean);
-        for (const line of descLines) {
-          try {
-            const { id, description_text, departments } = JSON.parse(line);
-            if (id && description_text) descMap.set(id, description_text);
-            if (id && Array.isArray(departments) && departments.length > 0) deptMap.set(id, departments);
-          } catch { /* skip malformed */ }
-        }
-      }
-      let injected = 0;
-      for (const job of entryLevelJobs) {
-        if (!job.description && descMap.has(job.id)) {
-          job.description = descMap.get(job.id);
-          injected++;
-        }
-      }
-      // AGG-ORACLE-DEPT: re-inject persisted departments for jobs not detail-fetched this run
-      // (description-cache-skipped or carry-forward). normalizeOracleJob only sees detailJob on
-      // the single run a job is fetched, so without this the captured department is lost and the
-      // job reverts to "general" on every later run.
-      let deptInjected = 0;
-      for (const job of entryLevelJobs) {
-        if ((!job.departments || job.departments.length === 0) && deptMap.has(job.id)) {
-          job.departments = deptMap.get(job.id);
-          deptInjected++;
-        }
-      }
-      console.log(`📄 Step 4c: Injected ${injected} descriptions from ${descSidecarFiles.length} sidecar files (${descMap.size} available)${deptInjected > 0 ? `; re-injected ${deptInjected} persisted Oracle departments` : ''}`);
-    } else {
-      console.log('📄 Step 4c: No description sidecar files found — description fallback inactive');
-    }
-    stageTimings.step4c_desc_inject_ms = Date.now() - _step4cStart;
-    console.log(`⏱️  Step 4c (desc sidecar inject): ${stageTimings.step4c_desc_inject_ms}ms`);
-    console.log('');
-
-    // Step 5: Apply tags
-    console.log('🏷️  Step 5: Applying tags...');
-    _stepStart = Date.now();
-    console.log('━'.repeat(60));
-
-    const taggedJobs = tagJobs(entryLevelJobs);
-
-    console.log(`✅ Step 5 complete: ${taggedJobs.length} jobs tagged`);
-    stageTimings.step5_tag_ms = Date.now() - _stepStart;
-    console.log('');
-
-    // Step 6: Deduplicate
-    console.log('🔍 Step 6: Deduplicating jobs...');
-    _stepStart = Date.now();
-    console.log('━'.repeat(60));
-
-    const { unique: dedupedJobs, duplicates, stats: dedupeStats } = deduplicateJobs(taggedJobs);
-
-    console.log('');
-    console.log(`✅ Step 6 complete: ${dedupedJobs.length} unique jobs (${duplicates} duplicates removed)`);
-    stageTimings.step6_dedup_ms = Date.now() - _stepStart;
-    console.log('');
-
-    // Step 7: Tag statistics deferred to post-merge (after Step 9).
-    // Previously computed from dedupedJobs (current-run only), missing ~4K carry-forward jobs.
-    // Now computed after carry-forward merge + AGG-32 stale filter for full-pool accuracy.
-    console.log('📊 Step 7: Tag statistics deferred to post-merge');
-
-    let tagStats = null;
-    console.log('');
-
-    // Step 8: Sort by date (newest first)
-    console.log('📊 Step 8: Sorting jobs by date...');
-    _stepStart = Date.now();
-    console.log('━'.repeat(60));
-
-    const sortedJobs = dedupedJobs.sort((a, b) => {
-      const dateA = new Date(a.posted_at || 0);
-      const dateB = new Date(b.posted_at || 0);
-      return dateB - dateA; // Newest first
-    });
-
-    console.log(`✅ Step 8 complete: Jobs sorted`);
-    stageTimings.step8_sort_ms = Date.now() - _stepStart;
-    console.log('');
-
-    // Step 8b: Write per-source description sidecars (AGG-PIPE-13: extracted to sidecar-writer.js)
-    console.log('📄 Step 8b: Writing description sidecars...');
-    _stepStart = Date.now();
-    const { writtenFiles: sidecarFiles, stats: sidecarStats, removedFiles: sidecarRemoved } = writeSidecars(sortedJobs, DATA_DIR);
-    // R2-prune manifest (AGG-R2-SINGLEFILE-1): list sidecar files removed locally as stale
-    // so the publish step can delete the superseded R2 copies. Always (re)write or clear it
-    // so a prior run's manifest never causes spurious deletes on a clean run.
-    const _removedManifest = path.join(DATA_DIR, '.sidecar-removed.json');
-    if (sidecarRemoved && sidecarRemoved.size > 0) {
-      fs.writeFileSync(_removedManifest, JSON.stringify([...sidecarRemoved]));
-      console.log(`🗑️  R2-prune manifest: ${sidecarRemoved.size} stale sidecar file(s) queued for R2 deletion`);
-    } else {
-      try { fs.unlinkSync(_removedManifest); } catch (_) {}
-    }
-    stageTimings.step8b_sidecars_ms = Date.now() - _stepStart;
-    pipelineTimestamps.sidecars_written_at = new Date().toISOString();
-    console.log('');
-    // AGG-SALARY-TEXT-INTEGRATION-1: Extract salary from description text for jobs
-    // without structured salary (ashby/lever already have it from the fetcher).
-    // ENR built + tested fromDescription() (30 tests, <0.3% false-positive).
-    // Runs before STRIP_FIELDS so descriptions are still on the job objects.
-    const _salaryStart = Date.now();
-    let _descSalaryCount = 0;
-    for (const job of sortedJobs) {
-      if (job.salaryMin == null && job.description) {
-        const plainText = typeof job.description === 'string'
-          ? job.description.replace(/<[^>]*>/g, ' ').replace(/&[a-z]+;/gi, ' ')
-          : '';
-        const extracted = fromDescription(plainText);
-        if (extracted.salaryMin != null) {
-          job.salaryMin = extracted.salaryMin;
-          job.salaryMax = extracted.salaryMax;
-          job.salaryCurrency = extracted.salaryCurrency;
-          _descSalaryCount++;
-        }
-      }
-    }
-    console.log(`💰 Step 8c: Salary from description text — ${_descSalaryCount} jobs extracted (${((Date.now() - _salaryStart) / 1000).toFixed(1)}s)`);
-
-    // Step 9: Write output files
-    console.log('💾 Step 9: Writing output files...');
-    _stepStart = Date.now();
-    console.log('━'.repeat(60));
-
-    // Strip pipeline internals before writing public output file
-    // (source_url, source_id, _raw are internal — not needed downstream)
-    // Note: 'source' is kept for downstream observability (which ATS produced each job)
-    const STRIP_FIELDS = ['source_url', '_raw', 'description', 'enriched', 'enriched_at', 'is_internship', 'is_new_grad', 'is_us_only', 'remote'];
-    let publicJobs = sortedJobs.map(job => {
-      const stripped = { ...job };
-      for (const field of STRIP_FIELDS) {
-        delete stripped[field];
-      }
-      return stripped;
-    });
-
-    // Merge previous all_jobs.json into current run (rolling window — TTL from deduplicator)
-    // Jobs from prior runs that weren't re-fetched this run are preserved until their TTL expires.
-    const _step9MergeStart = Date.now();
-    if (fs.existsSync(JOBS_OUTPUT_FILE)) {
-      const currentIds = new Set(publicJobs.map(j => j.id));
-      // Fingerprint guard: prevents re-injection of jobs that changed ID (e.g. WD-ID-BUG fix)
-      const currentFingerprints = new Set(publicJobs.map(j => j.fingerprint).filter(Boolean));
-      const prevLines = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8').trim().split('\n').filter(Boolean);
-
-      // AGG-32: Filter stale jobs by posted_at TTL
-      resolvePostedAt(publicJobs, prevLines);
-
-      mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, STRIP_FIELDS, successfulSources, atsResult.health || {});
-    }
-
-    for (const job of publicJobs) {
-      delete job.source_updated_at;
-    }
-
-    // AGG-STALEUPSTREAM-1 (2026-07-04): orphan cleanup pass — drop defunct-tenant jobs (company no longer
-    // in active workday/smartrecruiters config + not fetched >14d). Runs BEFORE the freshness metric so
-    // the metric reflects post-cleanup state.
-    {
-      const _cl = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));
-      const _activeWd = new Set((_cl.workday || []).map(e => e.name));
-      const _activeSR = new Set((_cl.smartrecruiters || []).map(e => e.name));
-      const _orphanDropped = dropOrphanJobs(publicJobs, _activeWd, _activeSR);
-      if (_orphanDropped > 0) console.log(`🧹 AGG-STALEUPSTREAM-1: dropped ${_orphanDropped} ORPHAN jobs upstream (company no longer in active workday/smartrecruiters config + not fetched >14d) — no longer reach all_jobs/R2/consumers.`);
-    }
-    stageTimings.step9_carryforward_ms = Date.now() - _step9MergeStart;
-    console.log(`⏱️  Step 9 (carry-forward merge + orphan-drop): ${stageTimings.step9_carryforward_ms}ms`);
-
-    // AGG-STALEUPSTREAM-1 (2026-07-04): Freshness SLA metric — make the stale-candidate residue's age
-    // VISIBLE every run. The 4.6-day silent rot recurred because nothing measured this; if p50/max climb,
-    // the rotate sweep is losing coverage and closed jobs are lingering again — investigate.
-    const _staleResidue = publicJobs.filter(j => j?.tags?.lifecycle_state === 'stale-candidate');
-    if (_staleResidue.length > 0) {
-      const _agesH = _staleResidue.map(j => j.fetched_at ? (Date.now() - new Date(j.fetched_at).getTime()) / 3600000 : null)
-                                  .filter(a => a != null && !isNaN(a)).sort((a, b) => a - b);
-      if (_agesH.length > 0) {
-        const _pct = p => _agesH[Math.min(_agesH.length - 1, Math.floor(p * _agesH.length))];
-        const _p50 = _pct(0.5), _p90 = _pct(0.9), _max = _agesH[_agesH.length - 1];
-        console.log(`📊 FRESHNESS SLA: ${_staleResidue.length} stale-candidate in pool | age(h) p50=${_p50.toFixed(1)} p90=${_p90.toFixed(1)} max=${_max.toFixed(1)} — investigate if p50/max climb (rotate-coverage-gap signal)`);
-        // AGG-STALEUPSTREAM-1: breach check -> write freshness-status.json for the workflow alert step.
-        // THRESHOLD RATIONALE (AGG-FRESHNESS-12H-1, reviewed 2026-07-17):
-        //   12h = ~6-10x the A208-calibrated normal p50 (1.2-1.9h). Diagnostic threshold, not a user-protection SLA.
-        //   Fires when carry-forward stale-candidates with old fetched_at accumulate (typically after
-        //   incremental cache engages following a full-fetch period — carry-forward jobs age naturally at 1h/hour).
-        //   stale-candidate = posted_at > TTL (age-based via classifyAgeLifecycle, NOT URL-health-based).
-        //   The metric CANNOT: distinguish cache-engagement from rotate degradation, tell if URLs are dead,
-        //   or cross-reference link-health data. stale-candidate jobs in all_jobs.json are filtered by ALL consumers (discord-poster.js, aggregator-consumer.js, sjd API).
-        //   For real degradation detection, track lifecycle.distribution.stale-candidate COUNT trend (count
-        //   growing = problem; count stable + age fluctuating = normal). Full system review: AGG-METRICS-REVIEW-1.
-        //   Also alert at max>15d/360h (orphan/carry-forward past the bound).
-        // THRESHOLD FIX (AGG-FRESHNESS-12H-1 + AGG-METRICS-REVIEW-1, 2026-07-18):
-        //   p50 >12h alone is NOT a breach signal — carry-forward stale-candidates age naturally
-        //   past 12h after every full-fetch period. This fired every run, creating Discord noise.
-        //   Now require BOTH: p50 >12h AND stale-candidate ratio >25% of pool.
-        //   Normal: ~13% stale-candidate, p50 climbs with aging — no alert.
-        //   Problem: >25% stale-candidate + high p50 = rotate/cleanup degraded — alert.
-        //   max>360h (orphan past 15-day bound) remains a standalone breach signal.
-        const _ALERT_P50_H = 12, _ALERT_MAX_H = 360, _ALERT_STALE_RATIO = 0.25;
-        const _staleRatio = _staleResidue.length / publicJobs.length;
-        let _breached = false, _reason = '';
-        if (_p50 > _ALERT_P50_H && _staleRatio > _ALERT_STALE_RATIO) { _breached = true; _reason = `p50 ${_p50.toFixed(1)}h > ${_ALERT_P50_H}h AND stale-candidate ${(_staleRatio * 100).toFixed(1)}% > ${_ALERT_STALE_RATIO * 100}% (rotate/cleanup degraded — count accumulating + aging)`; }
-        else if (_max > _ALERT_MAX_H) { _breached = true; _reason = `max ${_max.toFixed(1)}h > ${_ALERT_MAX_H}h/15d (orphan/carry-forward past the bound — cleanup broken?)`; }
-        try { fs.writeFileSync(path.join(DATA_DIR, 'freshness-status.json'), JSON.stringify({ breached: _breached, reason: _reason, p50: +_p50.toFixed(1), p90: +_p90.toFixed(1), max: +_max.toFixed(1), staleCount: _staleResidue.length, staleRatio: +(_staleRatio * 100).toFixed(1), checkedAt: new Date().toISOString() }, null, 2)); } catch (e) { console.log(`   (freshness-status.json write skipped: ${e.message})`); }
-        if (_breached) console.log(`⚠️  FRESHNESS ALERT (AGG-STALEUPSTREAM-1): ${_reason} — staleness bound breached; investigate rotate coverage + orphan cleanup.`);
-        else if (_p50 > _ALERT_P50_H) console.log(`📊 FRESHNESS DIAGNOSTIC (non-breaching): p50 ${_p50.toFixed(1)}h > ${_ALERT_P50_H}h but stale-candidate ratio ${(_staleRatio * 100).toFixed(1)}% ≤ ${_ALERT_STALE_RATIO * 100}% — normal carry-forward aging, not degradation.`);
-      }
-    }
-
-    // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
-    tagStats = computeFullPoolTagStats(publicJobs);
-
-    // Tag monitoring diagnostics (AGG-PIPE-13: extracted to monitoring.js)
-    const monitoringReports = runTagMonitoring(publicJobs, tagStats, {
-      dataDir: DATA_DIR,
-      checkTagDrift, printDriftReport,
-      tagDomainsFn: tagDomains,
-      checkDomainPrecision, printPrecisionReport,
-      checkKeywordHealth, checkKeywordOverlap,
-      getKeywordMap, tagEngineVersion: TAG_ENGINE_VERSION,
-      seniorJobs, companyOverrideMap,
-    });
-    ({ tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport } = monitoringReports);
-
-    // Archive expiring jobs BEFORE overwriting all_jobs.json
-    const { getExpiringJobs, appendToWeeklyArchive, appendToDailyArchive } = require(`${SHARED}/utils/archiver`);
-    const ARCHIVE_DIR = path.join(DATA_DIR, 'archive');
-    const expiringJobs = getExpiringJobs(JOBS_OUTPUT_FILE, publicJobs);
-    if (expiringJobs.length > 0) {
-      const weeklyFile = appendToWeeklyArchive(expiringJobs, ARCHIVE_DIR);
-      const dailyFile = appendToDailyArchive(expiringJobs, ARCHIVE_DIR);
-      console.log(`📦 Archived ${expiringJobs.length} expiring jobs → weekly: ${path.basename(weeklyFile)}, daily: ${path.basename(dailyFile)}`);
-    } else {
-      console.log('📦 No expiring jobs this run');
-    }
-
-    // AGG-PIPE-10: RETIRED for EXPAND-1 Phase 2 (2026-07-09). Was a write-step safety filter that
-    // removed senior-TAGGED jobs (catching seniors Step 4's title/experience filter missed).
-    // Post-Phase-2 the pipeline senior filter is removed ENTIRELY — all jobs enter the pool;
-    // CONSUMERS filter by tags.employment (6 GitHub boards + Discord Phase 1; zapply.jobs
-    // isEarlyCareerJob; softwarejobs.dev all-levels by design — WANTS seniors). Keeping this
-    // filter would starve softwarejobs.dev's all-levels board + duplicate the consumer filters.
-    // Count for observability only (no removal):
-    const seniorTaggedInPool = publicJobs.filter(job => job.tags?.employment === 'senior').length;
-    if (seniorTaggedInPool > 0) {
-      console.log(`📊 AGG-PIPE-10 (Phase 2: filter RETIRED): ${seniorTaggedInPool} senior-tagged jobs remain in pool → consumers filter`);
-    }
-
-    // Write jobs (JSONL format)
-    await writeJobsJSONL(publicJobs, JOBS_OUTPUT_FILE);
-
-    const usJobs = buildUsSnapshotJobs(publicJobs);
-
-    // AGG-SEN-DATAFOLD (board 2026-06-23): fold a ≤14-day US senior-tech subset into us_jobs so
-    // softwarejobs.dev's Senior filter has data (OUT verified the Senior UI/filter is correct; the
-    // gap was data-only — us_jobs had 0 senior rows). Sourced from the Step-4 seniorJobs partition
-    // (same as the senior-tech feed); windowed to ≤14d + US + tech domains to bound size/freshness.
-    // Schema matches us_jobs (lean via stripFeedInternal — same STRIP_FIELDS as all_jobs). Best-effort.
-    let seniorUsFold = [];
-    try {
-      const foldWindowMs = 14 * 24 * 3600 * 1000;
-      const foldNow = Date.now();
-      seniorUsFold = tagJobs(seniorJobs)
-        .filter(j => {
-          const doms = j.tags?.domains || [], locs = j.tags?.locations || [];
-          return doms.some(d => SENIOR_TECH_DOMAINS.includes(d))
-              && locs.includes('us')
-              && j.posted_at && (foldNow - Date.parse(j.posted_at)) <= foldWindowMs;
-        })
-        .map(stripFeedInternal);
-    } catch (e) {
-      console.warn(`⚠️ AGG-SEN-DATAFOLD: senior fold failed (non-blocking): ${e.message}`);
-    }
-    const usJobsWithSenior = usJobs.concat(seniorUsFold);
-    await writeJobsJSONL(usJobsWithSenior, US_JOBS_OUTPUT_FILE);
-    console.log(`🇺🇸 AGG-US-SNAPSHOT-1 + SEN-DATAFOLD: Wrote ${usJobsWithSenior.length} US jobs to us_jobs.json (entry-level ${usJobs.length} + ≤14d senior-tech ${seniorUsFold.length})`);
-
-    // INF-FEED-1: mid-level tech shadow feed (additive; no consumer depends on it yet)
-    const midLevelTechFeed = buildMidLevelTechFeed(publicJobs);
-    await writeJobsJSONL(midLevelTechFeed, MID_LEVEL_TECH_FILE);
-    fs.writeFileSync(MID_LEVEL_TECH_SUMMARY_FILE, JSON.stringify(buildMidLevelTechSummary(midLevelTechFeed, publicJobs.length), null, 2) + '\n', 'utf8');
-    console.log(`💼 INF-FEED-1: Wrote ${midLevelTechFeed.length} mid-level tech jobs (shadow feed) → mid-level-tech-jobs.jsonl`);
-
-    // AGG-SEN-FILTERKNOB-1: senior-tech shadow feed (additive; mirrors INF-FEED-1).
-    // seniorJobs are untagged at Step 4 (tag-engine runs at Step 5 on entryLevelJobs only), so
-    // tag the partition here to make the feed queryable. Best-effort: a shadow feed must never
-    // block the main pipeline. Main pool (all_jobs) is untouched — parity by construction.
-    try {
-      const taggedSeniorJobs = tagJobs(seniorJobs);
-      const seniorTechFeed = buildSeniorTechFeed(taggedSeniorJobs);
-      await writeJobsJSONL(seniorTechFeed, SENIOR_TECH_FILE);
-      fs.writeFileSync(SENIOR_TECH_SUMMARY_FILE, JSON.stringify(buildSeniorTechSummary(seniorTechFeed, seniorJobs.length), null, 2) + '\n', 'utf8');
-      console.log(`👔 AGG-SEN-FILTERKNOB-1: Wrote ${seniorTechFeed.length} senior tech jobs (shadow feed) → senior-tech-jobs.jsonl (of ${seniorJobs.length} senior-filtered)`);
-    } catch (e) {
-      // Empty-file fallback: these two files are in the workflow's REQUIRED R2 upload list, so
-      // they must ALWAYS exist (empty is acceptable on failure) — a shadow feed must never block
-      // the main pipeline or fail the required R2 upload. source_total stays accurate via
-      // seniorJobs.length. (tagJobs is proven at Step 5, so reaching here is defense-in-depth.)
-      await writeJobsJSONL([], SENIOR_TECH_FILE);
-      fs.writeFileSync(SENIOR_TECH_SUMMARY_FILE, JSON.stringify(buildSeniorTechSummary([], seniorJobs.length), null, 2) + '\n', 'utf8');
-      console.warn(`⚠️ AGG-SEN-FILTERKNOB-1: senior-tech feed failed, wrote EMPTY (non-blocking): ${e.message}`);
-    }
-
-    // CANADA-LANE: tag-driven additive shadow feed (additive; zero US-path impact — the US snapshot
-    // and all_jobs are already written above, untouched). Empty-file fallback: these three files
-    // are in the workflow's REQUIRED R2 upload list, so they must ALWAYS exist (empty is acceptable
-    // on failure) — a shadow feed must never block the pipeline or fail the required R2 upload
-    // (A196 lesson). A sentinel FP failure degrades to empty feeds + a warning, NOT a pipeline crash.
-    try {
-      await writeCanadaTechFeed(publicJobs);
-      await writeCanadaInternshipsFeed(publicJobs);
-    } catch (e) {
-      await writeJobsJSONL([], CANADA_TECH_JOBS_OUTPUT_FILE);
-      await writeJobsJSONL([], CANADA_TECH_INTERNSHIPS_OUTPUT_FILE);
-      const degraded = {
-        contract_version: 'canada-tech-feed-v1',
-        generated_at: new Date().toISOString(),
-        degraded: true,
-        error: e.message,
-        total_jobs: publicJobs.length,
-        canada_jobs: 0, canada_tech_jobs: 0, canada_internships: 0, canada_tech_internships: 0,
-        included_domains: [...CANADA_TECH_DOMAINS],
-        by_domain: {}, by_source: {}, top_companies: [],
-        sentinel_false_positive_checks: { contract_version: 'canada-tech-feed-v1', passed: false, checks: { degraded: true }, suspicious_us_only_samples: [] },
-      };
-      await writeMetadata(degraded, CANADA_TECH_SUMMARY_OUTPUT_FILE);
-      console.warn(`⚠️ CANADA-LANE: feed build failed, wrote EMPTY fallbacks (non-blocking): ${e.message}`);
-    }
-    // CANADA-LANE (all-Canada, AGG-CANADAFEED-1): additive shadow feed — all canada jobs (tech-prioritized).
-    // Independent try/catch so an all-feed failure cannot affect the tech feeds (or vice versa).
-    try {
-      await writeCanadaAllFeed(publicJobs);
-    } catch (e) {
-      await writeJobsJSONL([], CANADA_ALL_JOBS_OUTPUT_FILE);
-      const degradedAll = {
-        contract_version: 'canada-all-feed-v1', generated_at: new Date().toISOString(), degraded: true,
-        error: e.message, total_jobs: publicJobs.length, canada_jobs: 0, canada_tech_jobs: 0, canada_non_tech_jobs: 0,
-        by_domain: {}, by_source: {}, top_companies: [],
-        sentinel_false_positive_checks: { contract_version: 'canada-all-feed-v1', passed: false, checks: { degraded: true }, suspicious_us_only_samples: [] },
-      };
-      await writeMetadata(degradedAll, CANADA_ALL_SUMMARY_OUTPUT_FILE);
-      console.warn(`⚠️ CANADA-LANE (all): all-canada feed failed, wrote EMPTY fallback (non-blocking): ${e.message}`);
-    }
-    // INF-CANADA-INTERNSHIP-FEED-1: broad Canada internships (all domains, not just tech)
-    try {
-      await writeCanadaAllInternshipsFeed(publicJobs);
-    } catch (e) {
-      await writeJobsJSONL([], CANADA_ALL_INTERNSHIPS_OUTPUT_FILE);
-      console.warn(`⚠️ CANADA-LANE: all-internships feed failed, wrote EMPTY fallback (non-blocking): ${e.message}`);
-    }
-
-    // Write metadata
-    // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
-    // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
-    const duration = Date.now() - startTime;
-    stageTimings.step9_write_ms = Date.now() - _stepStart;
-    pipelineTimestamps.output_ready_at = new Date().toISOString();
-    // Build fetch_results: per-source counts from current fetch attempts (before carry-forward).
-    // Demoted hot-path sources are intentionally absent: they were not attempted in this
-    // workflow, so reporting 0 would create a false "source fetch failure" alert.
-    const fetchResults = {};
-    for (const [source, count] of Object.entries((atsResult.stats || {}).by_source || {})) {
-      if (count > 0) fetchResults[source] = (fetchResults[source] || 0) + count;
-    }
-    for (const [fetcherName, jobs] of Object.entries(fetcherResults)) {
-      if (HOTPATH_DEMOTED_FETCHERS.has(fetcherName)) continue;
-      const sourceKey = FETCHER_NAME_TO_SOURCE[fetcherName] || fetcherName.toLowerCase();
-      fetchResults[sourceKey] = Array.isArray(jobs) ? jobs.length : 0;
-    }
-
-    // AGG-FETCH-14: Build fetcher_health from ATS + custom fetcher results.
-    // Enables check-19 to classify zero-yield companies without HTTP probing.
-    const fetcherHealth = {};
-    const healthNow = new Date().toISOString();
-    // ATS health (from ats-fetcher.js)
-    if (atsResult.health) {
-      Object.assign(fetcherHealth, atsResult.health);
-    }
-    // Custom fetcher health. Demoted sources are marked as skipped, not zero:
-    // "zero" means attempted successfully and returned no jobs.
-    for (let i = 0; i < fetcherNames.length; i++) {
-      const name = fetcherNames[i];
-      const source = FETCHER_NAME_TO_SOURCE[name] || name.toLowerCase();
-      if (HOTPATH_DEMOTED_FETCHERS.has(name)) {
-        fetcherHealth[name] = {
-          status: 'skipped',
-          source,
-          jobs: null,
-          reason: 'hot_path_demoted',
-          timestamp: healthNow,
-        };
-        continue;
-      }
-      const result = phaseBSettled[i];
-      if (!result) continue;
-      const jobs = result.status === 'fulfilled' ? result.value : [];
-      const count = Array.isArray(jobs) ? jobs.length : 0;
-      fetcherHealth[name] = {
-        status: result.status === 'rejected' ? 'error' : count > 0 ? 'alive' : 'zero',
-        source,
-        jobs: count,
-        timestamp: healthNow,
-        ...(result.status === 'rejected' ? { detail: result.reason?.message } : {}),
-      };
-    }
-
-    const metadata = generateMetadata({
-      startTime,
-      jobs: publicJobs,
-      uniqueCount: dedupedJobs.length,
-      duplicateCount: duplicates,
-      duration,
-      tagStats,
-      validationMetrics,
-      seniorFilterMetrics,
-      seniorJobs,
-      zeroYieldCompanies,
-      stageTimings,
-      pipelineTimestamps,
-      tagDriftReport,
-      tagPrecisionReport,
-      keywordHealthReport,
-      keywordOverlapReport,
-      fpStats,
-      fetchResults,
-      fetcherHealth,
-      supplementalInputs: supplementalInputs.inputs,
-      prevRunCompletedAt,
-    });
-    metadata.desc_backlog = { wd_pending: _wdDescBacklog, wd_cached: _wdDescCached };
-    metadata.wd_rate_limited_count = wdRateLimited;  // AGG-WD-429MONITOR-1
-    await writeMetadata(metadata, METADATA_OUTPUT_FILE);
-
-    // Step 9c: build / refresh Workday family cache for future runs. Output is already written, so
-    // cache refresh cannot block user-visible publish correctness.
-    if (!isDryRun && !SKIP_WD_FAMILY_CACHE_BUILD) {
-      const familyCacheBuildReport = await buildFamilyCache(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR);
-      stageTimings.step9c_family_cache_build_ms = familyCacheBuildReport.durationMs;
-    } else {
-      stageTimings.step9c_family_cache_build_ms = 0;
-      const reason = isDryRun ? 'dry run' : 'SKIP_WD_FAMILY_CACHE_BUILD=1';
-      console.log(`⏭️  Step 9c: Skipping Workday family cache build (${reason})`);
-    }
-
-    console.log('');
-    console.log(`✅ Step 9 complete: Output files written`);
-    console.log('');
-    // Step 9d: Unified cache pruning (AGG-CACHE-PRUNE-1).
-    // Bounds ALL description sidecars to the current pool — evicts entries for retired/dropped jobs.
-    // One mechanism covers every descriptions-*.jsonl file, present and future.
-    if (!isDryRun) {
-      _stepStart = Date.now();
-      const validIds = new Set(sortedJobs.map(j => j.id));
-      let totalPruned = 0;
-      let filesPruned = 0;
-      for (const fname of fs.readdirSync(DATA_DIR)) {
-        if (!/^descriptions-.+\.jsonl$/.test(fname)) continue;
-        // AGG-DESC-SPEED-1: workday descriptions are NOT pruned by Step 9d. The workday
-        // pool has ~35K jobs; the cache is naturally bounded at that size (~20MB). Both
-        // Step 9d (uses post-filter sortedJobs) and the fetcher's own pruning (uses
-        // current-run-only pool) are too narrow — they prune valid descriptions for
-        // carry-forward and filtered-out jobs, causing oscillation. No pruning = stable growth.
-        if (fname === 'descriptions-workday.jsonl') continue;
-        const fp = path.join(DATA_DIR, fname);
-        try {
-          const lines = fs.readFileSync(fp, 'utf8').trim().split('\n').filter(Boolean);
-          if (lines.length === 0) continue;
-          const kept = [];
-          let pruned = 0;
-          for (const line of lines) {
-            try {
-              const { id } = JSON.parse(line);
-              if (id && validIds.has(id)) kept.push(line);
-              else pruned++;
-            } catch { pruned++; } // malformed line → drop
-          }
-          // Only rewrite if we actually pruned something (avoid unnecessary I/O)
-          if (pruned > 0) {
-            const beforeKB = Math.round(lines.length * 200 / 1024); // rough estimate
-            fs.writeFileSync(fp, kept.join('\n') + '\n', 'utf8');
-            totalPruned += pruned;
-            filesPruned++;
-            console.log(`  🧹 ${fname}: pruned ${pruned} stale entries (${lines.length}→${kept.length})`);
-          }
-        } catch (e) { /* skip unreadable file */ }
-      }
-      if (totalPruned > 0) {
-        console.log(`✅ Step 9d: Cache pruned ${totalPruned} stale entries across ${filesPruned} sidecar file(s)`);
-      } else {
-        console.log(`✅ Step 9d: Cache pruning — all sidecars clean (0 stale entries)`);
-      }
-      stageTimings.step9d_cache_prune_ms = Date.now() - _stepStart;
-    } else {
-      console.log('⏭️  Step 9d: Skipping cache pruning (dry run)');
-    }
-
-
-    // Step 10: Print summary
-    printSummary(sortedJobs, dedupedJobs.length, duplicates, duration);
-
-    // Step 11: Print tag distribution
-    printTagDistribution(sortedJobs);
-
-    // Step 12 REMOVED (AGG-R2-CANONICAL-1, 2026-07-06): git commit was dead code —
-    // committed locally to the Actions runner but was NEVER pushed (no git push step
-    // for the main repo in the workflow). R2 upload (Step 10) is the sole persistence.
-    // Removed per operator directive: "no git fallback — crutch that does more harm than good."
-
-    // AGG-PREVIOUS-CYCLE-TIMESTAMP-1 v3: persist this run's completion for next cycle's seed.
-    // Written BEFORE success banner/exit. Optional upload in fetch-jobs.yml pushes to R2.
-    // Non-fatal on write failure (next run just won't see this cycle's end time).
-    try {
-      fs.writeFileSync(
-        path.join(DATA_DIR, 'pipeline-cycle-state.json'),
-        JSON.stringify({ last_completed_at: pipelineTimestamps.output_ready_at || new Date().toISOString() })
-      );
-    } catch (_writeErr) { /* non-fatal */ }
-
-    console.log('');
-    console.log('═'.repeat(60));
-    console.log('🎉 Jobs Data Fetcher - Complete!');
-    console.log('═'.repeat(60));
-
-    process.exit(0);
-
-  } catch (error) {
-    console.error('');
-    console.error('❌ Fatal error:');
-    console.error(error.message);
-    console.error('');
-    console.error('Stack trace:');
-    console.error(error.stack);
-    process.exit(1);
-  }
-}
-
-/**
- * GAP-6: Compute companies configured in company-list.json that returned 0 raw jobs.
- * Uses company_name from ATS stats (not slug) to match against configured company names.
- * Excludes custom-fetcher companies (Apple, Amazon, etc.) — only ATS companies are checked.
- * @param {Object} atsResult - ATS fetch result with stats.by_company
- * @param {Object} fetcherResults - Custom fetcher results by name
- * @param {string} companyListPath - Path to company-list.json
- * @returns {Array<string>} Company names that returned 0 raw jobs
- */
-function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
-  try {
-    const companyList = JSON.parse(fs.readFileSync(companyListPath, 'utf8'));
-
-    // Build set of company names that produced jobs this run (ATS only)
-    const companiesWithJobs = new Set(Object.keys((atsResult.stats || {}).by_company || {}));
-
-    // AGG-ZEROYIELD-1: Include WD tenants from incremental cache.
-    // When the cache skips a tenant, it doesn't appear in atsResult.by_company,
-    // but it still has jobs (verified by wd-totals-cache.json).
-    if (wdCache && typeof wdCache === 'object') {
-      for (const [name, count] of Object.entries(wdCache)) {
-        if (count > 0) companiesWithJobs.add(name);
-      }
-    }
-
-    // AGG-SR-NAME-1: Build slug set for SR name mismatch.
-    // SR API returns legal names (e.g. "RE/SPEC Inc.") that differ from config names (e.g. "RESPEC").
-    // Matching by slug resolves 6 false positives per run.
-    const slugsWithJobs = new Set();
-    if (Array.isArray(atsResult.jobs)) {
-      for (const job of atsResult.jobs) {
-        if (job.company_slug) slugsWithJobs.add(job.company_slug);
-      }
-    }
-
-    // Build set of configured company names per ATS source
-    const zeroYield = [];
-    const sources = [
-      { key: 'greenhouse', entries: companyList.greenhouse },
-      { key: 'lever', entries: companyList.lever },
-      { key: 'ashby', entries: companyList.ashby },
-      { key: 'workday', entries: companyList.workday },
-      { key: 'smartrecruiters', entries: companyList.smartrecruiters },
-    ];
-
-    for (const { key, entries } of sources) {
-      if (!Array.isArray(entries)) continue;
-      for (const entry of entries) {
-        const name = entry.name;
-        const slug = entry.slug;
-        const hasName = name && companiesWithJobs.has(name);
-        const hasSlug = slug && slugsWithJobs.has(slug);
-        if (!hasName && !hasSlug) {
-          zeroYield.push(`${name} (${key})`);
-        }
-      }
-    }
-
-    return zeroYield;
-  } catch (e) {
-    console.warn(`⚠️ GAP-6: Could not compute zero-yield companies: ${e.message}`);
-    return [];
-  }
-}
-
-/**
- * Generate metadata object
- * @param {Array} jobs - All jobs
- * @param {number} uniqueCount - Unique job count
- * @param {number} duplicateCount - Duplicate count
- * @param {number} duration - Duration in ms
- * @param {Object} tagStats - Tag statistics from tag engine
- * @param {Object} validationMetrics - Validation metrics
- * @param {Object} seniorFilterMetrics - Senior filter metrics
- * @returns {Object} - Metadata object
- */
-
-
-const SOURCE_TIER_POLICY = {
-  workday: 'tier_a_core',
-  greenhouse: 'tier_a_core',
-  ashby: 'tier_a_core',
-  lever: 'tier_a_optional',
-  smartrecruiters: 'tier_b_async_material',
-  oracle: 'tier_b_c_scrutiny',
-  apple: 'tier_b_c_scrutiny',
-  google: 'tier_b_c_scrutiny',
-  microsoft: 'tier_b_c_scrutiny',
-  amd: 'tier_b_c_scrutiny',
-  amazon: 'tier_b_c_scrutiny',
-  tiktok: 'tier_b_c_scrutiny',
-  icims: 'tier_b_c_scrutiny',
-  simplify: 'tier_c_fallback',
-  jsearch: 'tier_c_fallback',
-  eightfold: 'tier_c_fallback',
-  uber: 'tier_c_fallback',
-  twosigma: 'tier_c_fallback',
-};
-
-const TECH_US_DOMAINS = new Set(['software', 'data_science', 'hardware', 'ai', 'finance']);
-
-function buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps, prevRunCompletedAt = null }) {
-  return {
-    pipeline_started_at: new Date(startTime).toISOString(),
-    fetch_completed_at: pipelineTimestamps.fetch_completed_at || null,
-    sidecars_written_at: pipelineTimestamps.sidecars_written_at || null,
-    output_ready_at: pipelineTimestamps.output_ready_at || null,
-    previous_run_completed_at: prevRunCompletedAt || null,  // AGG-PREVIOUS-CYCLE-TIMESTAMP-1
-    total_runtime_ms: duration,
-    step_timings_ms: {
-      step1_fetch_ms: stageTimings.step1_fetch_ms || 0,
-      step2_enhance_ms: stageTimings.step2_enhance_ms || 0,
-      step3_validate_ms: stageTimings.step3_validate_ms || 0,
-      step4_filter_ms: stageTimings.step4_filter_ms || 0,
-      step5_tag_ms: stageTimings.step5_tag_ms || 0,
-      step6_dedup_ms: stageTimings.step6_dedup_ms || 0,
-      step8_sort_ms: stageTimings.step8_sort_ms || 0,
-      step8b_sidecars_ms: stageTimings.step8b_sidecars_ms || 0,
-      step9_write_ms: stageTimings.step9_write_ms || 0,
-      step1b_desc_backfill_ms: stageTimings.step1b_desc_backfill_ms || 0,
-      step4c_desc_inject_ms: stageTimings.step4c_desc_inject_ms || 0,
-      step9_carryforward_ms: stageTimings.step9_carryforward_ms || 0,
-      // step12_commit_ms removed (AGG-R2-CANONICAL-1): git commit step deleted
-    },
-  };
-}
-
-function buildSourceVisibilitySummary(jobs) {
-  const now = Date.now();
-  const sources = {};
-
-  for (const job of jobs || []) {
-    const source = job.source || 'unknown';
-    const row = sources[source] || (sources[source] = {
-      tier: SOURCE_TIER_POLICY[source] || 'unclassified',
-      total_jobs: 0,
-      tech_us_jobs: 0,
-      freshness: {
-        last_24h: 0,
-        last_72h: 0,
-      },
-      newest_posted_at: null,
-      oldest_posted_at: null,
-    });
-
-    row.total_jobs++;
-
-    const domains = job.tags?.domains || [];
-    const locations = job.tags?.locations || [];
-    if (locations.includes('us') && domains.some(domain => TECH_US_DOMAINS.has(domain))) {
-      row.tech_us_jobs++;
-    }
-
-    if (!job.posted_at) continue;
-    const postedMs = new Date(job.posted_at).getTime();
-    if (!Number.isFinite(postedMs)) continue;
-
-    const ageMs = now - postedMs;
-    if (ageMs <= 24 * 60 * 60 * 1000) row.freshness.last_24h++;
-    if (ageMs <= 72 * 60 * 60 * 1000) row.freshness.last_72h++;
-
-    if (!row.newest_posted_at || postedMs > new Date(row.newest_posted_at).getTime()) {
-      row.newest_posted_at = new Date(postedMs).toISOString();
-    }
-    if (!row.oldest_posted_at || postedMs < new Date(row.oldest_posted_at).getTime()) {
-      row.oldest_posted_at = new Date(postedMs).toISOString();
-    }
-  }
-
-  return {
-    generated_at: new Date().toISOString(),
-    policy_version: 'source-tier-a141',
-    metric_basis: 'final_public_pool',
-    tech_us_definition: ['software', 'data_science', 'hardware', 'ai', 'finance'].join('+') + ' with us location tag',
-    tiers: {
-      tier_a_core: ['workday', 'greenhouse', 'ashby'],
-      tier_a_optional: ['lever'],
-      tier_b_async_material: ['smartrecruiters'],
-      tier_b_c_scrutiny: ['oracle', 'apple', 'google', 'microsoft', 'amd', 'amazon', 'tiktok', 'icims'],
-      tier_c_fallback: ['simplify', 'jsearch', 'eightfold', 'uber', 'twosigma'],
-    },
-    sources,
-  };
-}
-
-function buildDescriptionDeliverySummary(jobs, dataDir) {
-  // AGG-DESCCOVERAGE-METRIC-1: removed stale 'workday' + 'smartrecruiters' exclusions.
-  // These were excluded when workday descriptions were not in the hot path (AGG-HOTPATH-1).
-  // Now that the backfill is running (Step 1b) and sidecars are uploaded to R2,
-  // the exclusion hides real coverage data from monitoring.
-  const excludedSources = new Set(['enriched']);
-  const sidecarRows = {};
-  const sidecarNonempty = {};
-  const sidecarIds = new Map();
-
-  try {
-    const files = fs.readdirSync(dataDir)
-      .filter(f => /^descriptions-.+\.jsonl$/.test(f))
-      .filter(f => !f.startsWith('descriptions-enriched'));
-    for (const fname of files) {
-      const source = fname.replace(/^descriptions-/, '').replace(/-\d+\.jsonl$/, '').replace(/\.jsonl$/, '').toLowerCase();
-      sidecarRows[source] = sidecarRows[source] || 0;
-      sidecarNonempty[source] = sidecarNonempty[source] || 0;
-      if (!sidecarIds.has(source)) sidecarIds.set(source, new Set());
-      const lines = fs.readFileSync(path.join(dataDir, fname), 'utf8').trim().split('\n').filter(Boolean);
-      for (const line of lines) {
-        sidecarRows[source]++;
-        try {
-          const row = JSON.parse(line);
-          if (typeof row.description_text === 'string' && row.description_text.trim()) sidecarNonempty[source]++;
-          if (row.id) sidecarIds.get(source).add(row.id);
-        } catch {
-          // malformed rows still count toward file size but not toward matches/nonempty text
-        }
-      }
-    }
-  } catch {
-    // Missing sidecar files are reflected as zero coverage below.
-  }
-
-  const finalRows = {};
-  const finalInlineDescriptions = {};
-  const finalRowsWithSidecarMatch = {};
-  for (const job of jobs || []) {
-    const source = (job.source || 'unknown').toLowerCase();
-    if (excludedSources.has(source)) continue;
-    finalRows[source] = (finalRows[source] || 0) + 1;
-    if (typeof job.description === 'string' && job.description.trim()) {
-      finalInlineDescriptions[source] = (finalInlineDescriptions[source] || 0) + 1;
-    }
-    if (sidecarIds.get(source)?.has(job.id)) {
-      finalRowsWithSidecarMatch[source] = (finalRowsWithSidecarMatch[source] || 0) + 1;
-    }
-  }
-
-  const summary = {};
-  const sources = new Set([
-    ...Object.keys(sidecarRows),
-    ...Object.keys(finalRows),
-  ]);
-  for (const source of [...sources].sort()) {
-    const finalPool = finalRows[source] || 0;
-    const matched = finalRowsWithSidecarMatch[source] || 0;
-    const sidecars = sidecarRows[source] || 0;
-    let mode = 'none_visible';
-    if (finalPool === 0) mode = 'no_final_rows';
-    else if (matched === finalPool && finalPool > 0) mode = 'sidecar_only';
-    else if (matched > 0) mode = 'partial_sidecar_coverage';
-    else if ((finalInlineDescriptions[source] || 0) > 0) mode = 'inline_only';
-    summary[source] = {
-      final_rows: finalPool,
-      final_inline_description_rows: finalInlineDescriptions[source] || 0,
-      sidecar_rows: sidecars,
-      sidecar_nonempty_description_rows: sidecarNonempty[source] || 0,
-      final_rows_with_sidecar_match: matched,
-      coverage_pct: finalPool > 0 ? Math.round((matched / finalPool) * 1000) / 10 : null,
-      mode,
-    };
-  }
-
-  return {
-    generated_at: new Date().toISOString(),
-    basis: 'final_public_pool_vs_description_sidecars',
-    sources: summary,
-  };
-}
-
-
-function buildSeniorRolloutProjection(seniorJobs, seniorBySource) {
-  const projection = {
-    generated_at: new Date().toISOString(),
-    sample_basis: {
-      type: 'current_run_filtered_senior_jobs',
-      total_senior_filtered: Array.isArray(seniorJobs) ? seniorJobs.length : 0,
-    },
-    by_source: seniorBySource || {},
-    by_domain: {},
-    by_surface: {
-      ngj_main: 0,
-      software: 0,
-      data_science: 0,
-      hardware: 0,
-      healthcare: 0,
-    },
-    quality: {
-      surface_projection_exact: false,
-      surface_projection_method: 'directional_current_run_domain_location_mapping',
-      notes: 'Directional projection for current-run senior-filtered jobs. Source counts are exact; domain and surface counts use tag-engine projection on filtered jobs and should guide rollout decisions, not exact publish counts.',
-    },
-  };
-
-  if (!Array.isArray(seniorJobs) || seniorJobs.length === 0) return projection;
-
-  const mainSurfaceDomains = new Set(['software', 'data_science', 'hardware', 'ai', 'finance']);
-  for (const job of seniorJobs) {
-    const domains = tagDomains(job);
-    const normalizedDomains = domains.length > 0 ? domains : ['general'];
-    for (const domain of normalizedDomains) {
-      projection.by_domain[domain] = (projection.by_domain[domain] || 0) + 1;
-    }
-
-    const locations = tagLocations(job);
-    const isUs = locations.includes('us');
-    if (!isUs) continue;
-
-    if (normalizedDomains.some(domain => mainSurfaceDomains.has(domain))) projection.by_surface.ngj_main++;
-    if (normalizedDomains.includes('software')) projection.by_surface.software++;
-    if (normalizedDomains.includes('data_science') || normalizedDomains.includes('ai')) projection.by_surface.data_science++;
-    if (normalizedDomains.includes('hardware')) projection.by_surface.hardware++;
-    if (normalizedDomains.includes('healthcare')) projection.by_surface.healthcare++;
-  }
-
-  return projection;
-}
-
-/**
- * TAG-DIM-1: Build G1 by-domain breakdown for DASH visibility.
- * Categorizes US general jobs by source, company, fix category, engine version, employment type.
- * @param {Array} jobs - Full public pool (post-merge + post-AGG-32)
- * @returns {Object} g1_breakdown object for metadata
- */
-function buildG1Breakdown(jobs) {
-  const usJobs = jobs.filter(j => j.tags && j.tags.locations && j.tags.locations.includes('us'));
-  const g1Jobs = usJobs.filter(j => j.tags.domains && j.tags.domains.includes('general'));
-
-  if (g1Jobs.length === 0) return null;
-
-  // By source
-  const bySource = {};
-  const sourceTotals = {};
-  for (const j of usJobs) {
-    sourceTotals[j.source] = (sourceTotals[j.source] || 0) + 1;
-  }
-  for (const j of g1Jobs) {
-    bySource[j.source] = (bySource[j.source] || 0) + 1;
-  }
-  const bySourceFormatted = {};
-  for (const [src, g1] of Object.entries(bySource)) {
-    const total = sourceTotals[src] || 0;
-    bySourceFormatted[src] = { g1, total, rate: total > 0 ? Math.round(g1 / total * 1000) / 10 : 0 };
-  }
-
-  // Top 20 companies
-  const companyCounts = {};
-  const companySource = {};
-  const companyDepts = {};
-  for (const j of g1Jobs) {
-    const c = j.company_name || 'unknown';
-    companyCounts[c] = (companyCounts[c] || 0) + 1;
-    companySource[c] = j.source;
-    companyDepts[c] = companyDepts[c] || j.departments?.length > 0;
-  }
-  const top20 = Object.entries(companyCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 20)
-    .map(([company, g1]) => ({
-      company,
-      g1,
-      source: companySource[company],
-      has_departments: !!companyDepts[company],
-    }));
-
-  // Fix categories (heuristic based on source + departments)
-  let needsFamilyMapping = 0; // WD jobs with no departments
-  let familyMapGap = 0;       // WD jobs with departments but still G1
-  let noDescription = 0;      // Simplify T0 with no desc
-  let genuinelyAmbiguous = 0;  // Non-WD, non-Simplify, no domain signal
-  let other = 0;
-  for (const j of g1Jobs) {
-    if (j.source === 'workday') {
-      if (j.departments && j.departments.length > 0) {
-        familyMapGap++;
-      } else {
-        needsFamilyMapping++;
-      }
-    } else if (j.source === 'simplify') {
-      noDescription++;
-    } else {
-      // Check for domain keywords in title as signal
-      const title = (j.title || '').toLowerCase();
-      const hasSignal = /\b(engineer|developer|scientist|analyst|designer|manager|accountant|nurse|pharmacist|attorney|sales|marketing|operations|manufacturing|logistics|hardware|software|data|ai|product|finance|hr|legal)\b/i.test(title);
-      if (hasSignal) {
-        other++;
-      } else {
-        genuinelyAmbiguous++;
-      }
-    }
-  }
-
-  // Engine version distribution
-  const byVersion = {};
-  for (const j of g1Jobs) {
-    const v = j.tags.tag_engine_version || 'none';
-    byVersion['v' + v] = (byVersion['v' + v] || 0) + 1;
-  }
-
-  // Employment type distribution
-  const byEmployment = {};
-  for (const j of g1Jobs) {
-    const e = j.tags.employment || 'unknown';
-    byEmployment[e] = (byEmployment[e] || 0) + 1;
-  }
-
-  return {
-    updated: new Date().toISOString(),
-    us_total: usJobs.length,
-    us_g1: g1Jobs.length,
-    us_g1_rate: Math.round(g1Jobs.length / usJobs.length * 1000) / 10,
-    by_source: bySourceFormatted,
-    by_company_top20: top20,
-    by_fix_category: {
-      needs_family_mapping: { count: needsFamilyMapping, description: 'WD jobs with no departments — blocked on AGG-PIPE-16' },
-      family_map_gap: { count: familyMapGap, description: 'WD jobs with departments but still G1' },
-      genuinely_ambiguous: { count: genuinelyAmbiguous, description: 'Non-WD/Simplify jobs with no domain signal in title' },
-      no_description: { count: noDescription, description: 'Simplify T0 jobs — no description for L4 fallback' },
-      other: { count: other, description: 'Mixed ATS — some keyword gaps, some structural' },
-    },
-    by_engine_version: byVersion,
-    by_employment: byEmployment,
-  };
-}
-
-function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, pipelineTimestamps, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth, supplementalInputs, prevRunCompletedAt = null }) {
-  const bySource = {};
-  const byEmploymentType = {};
-  const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0, senior: 0 };
-  const byRemote = { remote: 0, onsite: 0 };
-  const companyCounts = {};
-  const companyDomains = {};  // DASH-4b: track domain distribution per company
-  const bySourceDomain = {};  // AGG-CROSSTAB-1: source × domain cross-tab
-  const bySourceJobType = {}; // AGG-CROSSTAB-1: source × job_type cross-tab
-  const byDomainJobType = {}; // AGG-CROSSTAB-FOLLOWUP-1: domain × job_type cross-tab
-
-  const now = Date.now();
-  const freshness = { last_1h: 0, last_6h: 0, last_24h: 0, last_48h: 0 };
-
-  for (const job of jobs) {
-    // Count by source
-    bySource[job.source] = (bySource[job.source] || 0) + 1;
-    // AGG-CROSSTAB-1: cross-dimensional breakdowns for DASH filtering
-    if (!bySourceDomain[job.source]) bySourceDomain[job.source] = {};
-    for (const d of (job.tags?.domains || [])) {
-      bySourceDomain[job.source][d] = (bySourceDomain[job.source][d] || 0) + 1;
-    }
-    if (!bySourceJobType[job.source]) bySourceJobType[job.source] = {};
-    const _jt = job.tags?.employment || 'unknown';
-    bySourceJobType[job.source][_jt] = (bySourceJobType[job.source][_jt] || 0) + 1;
-    // AGG-CROSSTAB-FOLLOWUP-1: domain × employment cross-tab (completes the CROSSTAB trio)
-    for (const d of (job.tags?.domains || [])) {
-      if (!byDomainJobType[d]) byDomainJobType[d] = {};
-      byDomainJobType[d][_jt] = (byDomainJobType[d][_jt] || 0) + 1;
-    }
-
-    // Count by employment type (AGG-DATA-13: normalize to canonical forms)
-    // AGG-PIPE-13: shared EMPLOYMENT_NORMALIZE_MAP (includes compound types)
-    const types = (job.employment_types || []).map(t => EMPLOYMENT_NORMALIZE_MAP[t] || t);
-    if (Array.isArray(types)) {
-      for (const type of types) {
-        byEmploymentType[type] = (byEmploymentType[type] || 0) + 1;
-      }
-    }
-
-    // Count by job type (use tags.employment — is_internship/is_new_grad stripped by STRIP_FIELDS)
-    if (job.tags?.employment === 'internship') {
-      byInternship.internship++;
-    } else if (job.tags?.employment === 'entry_level') {
-      byInternship['new-grad']++;
-    } else if (job.tags?.employment === 'senior' || job.tags?.employment === 'senior_level') {
-      byInternship.senior++;
-    } else {
-      byInternship.mid_level++;
-    }
-
-    // Count by remote (use tags.locations — is_remote stripped by STRIP_FIELDS)
-    if (job.tags?.locations?.includes('remote')) {
-      byRemote.remote++;
-    } else {
-      byRemote.onsite++;
-    }
-
-    // Freshness buckets
-    if (job.posted_at) {
-      const ageMs = now - new Date(job.posted_at).getTime();
-      if (ageMs <= 1 * 60 * 60 * 1000)  freshness.last_1h++;
-      if (ageMs <= 6 * 60 * 60 * 1000)  freshness.last_6h++;
-      if (ageMs <= 24 * 60 * 60 * 1000) freshness.last_24h++;
-      if (ageMs <= 48 * 60 * 60 * 1000) freshness.last_48h++;
-    }
-
-    // Company counts + domain tracking (for top-N with domain)
-    const co = job.company_name;
-    if (co) {
-      companyCounts[co] = (companyCounts[co] || 0) + 1;
-      // DASH-4b: track primary domain per company
-      const domains = (job.tags && job.tags.domains) || [];
-      if (!companyDomains[co]) companyDomains[co] = {};
-      for (const d of domains) {
-        companyDomains[co][d] = (companyDomains[co][d] || 0) + 1;
-      }
-    }
-  }
-
-  // Top 20 companies by job count
-  // DASH-4b: includes primary domain (most common domain tag for that company)
-  const top_companies = Object.entries(companyCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 20)
-    .map(([company, count]) => {
-      const domains = companyDomains[company] || {};
-      const primaryDomain = Object.entries(domains).sort((a, b) => b[1] - a[1])[0];
-      return { company, count, domain: primaryDomain ? primaryDomain[0] : 'general' };
-    });
-
-  // Senior-filtered breakdown by source
-  const seniorBySource = {};
-  if (Array.isArray(seniorJobs)) {
-    for (const job of seniorJobs) {
-      const src = job.source || 'unknown';
-      seniorBySource[src] = (seniorBySource[src] || 0) + 1;
-    }
-  }
-
-  // AGG-PERSOURCE-STAGES-1: Per-source pipeline stage counts for DASH Source Journey.
-  const sourceJourney = {};
-  for (const src of new Set([
-    ...Object.keys(fetchResults || {}),
-    ...Object.keys(seniorFilterMetrics?.by_source || {}),
-    ...Object.keys(bySource),
-  ])) {
-    sourceJourney[src] = {
-      fetched: (fetchResults || {})[src] || 0,
-      senior_filtered: (seniorFilterMetrics?.by_source || {})[src] || 0,
-      final: bySource[src] || 0,
-    };
-  }
-
-  // AGG-DEADLINK-PUBLISH-1: Read link-health.json (produced by pre-metadata workflow step)
-  let linkHealth = [];
-  try {
-    const lhPath = path.join(DATA_DIR, 'link-health.json');
-    if (fs.existsSync(lhPath)) linkHealth = JSON.parse(fs.readFileSync(lhPath, 'utf8'));
-  } catch {}
-  return {
-    version: '1.0',
-    generated: new Date().toISOString(),
-    duration_ms: duration,
-
-    total_jobs: jobs.length,
-    unique_jobs: uniqueCount,
-    duplicates_removed: duplicateCount,
-
-    by_source: bySource,
-    source_journey: sourceJourney,
-    by_source_domain: bySourceDomain,
-    by_source_job_type: bySourceJobType,
-    by_domain_job_type: byDomainJobType,
-    by_employment_type: byEmploymentType,
-    by_job_type: byInternship,
-    link_health: linkHealth,
-    by_location: byRemote,
-
-    ats_stats: getATSUsageStats(),
-
-    // Validation statistics
-    validation_stats: validationMetrics,
-
-    // Senior filter statistics
-    senior_filter_stats: {
-      ...seniorFilterMetrics,
-      by_source: seniorBySource,
-      ...(fpStats || {}),
-    },
-
-    // AGG-MEASURE-1: Directional rollout projection for filtered senior jobs.
-    senior_rollout_projection: buildSeniorRolloutProjection(seniorJobs, seniorBySource),
-
-    // AGG-SOURCE-1: Source tier/value/freshness visibility for operator decisions.
-    source_visibility: buildSourceVisibilitySummary(jobs),
-
-    // AGG-SIDECAR-HEALTH-1: Producer-owned truth for sources whose downstream descriptions
-    // depend on sidecars because all_jobs strips description text.
-    description_delivery: buildDescriptionDeliverySummary(jobs, DATA_DIR),
-
-    // AGG latency markers: producer-owned timing anchors for downstream latency measurement.
-    latency_markers: buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps, prevRunCompletedAt }),
-
-    // Tag statistics (Phase 1)
-    tag_stats: tagStats,
-
-    // TAG-SELF-2: Tag monitoring snapshots for metrics pipeline.
-    tag_drift: tagDriftReport ? {
-      drift_rate: tagDriftReport.drift_rate,
-      sample_size: tagDriftReport.sample_size,
-      drifted: tagDriftReport.drifted,
-      warnings: tagDriftReport.warnings,
-    } : null,
-    tag_precision: tagPrecisionReport ? {
-      domains: Object.fromEntries(
-        Object.entries(tagPrecisionReport.domains).map(([d, r]) => [d, { total: r.total, fps: r.fps, fp_rate: r.fp_rate }])
-      ),
-      warnings: tagPrecisionReport.warnings,
-    } : null,
-    keyword_health: keywordHealthReport ? Object.fromEntries(
-      Object.entries(keywordHealthReport.domains).map(([d, r]) => [d, {
-        total_jobs: r.total_jobs,
-        keyword_count: r.keyword_count,
-        keywords_with_matches: r.keywords_with_matches,
-        top_5: r.top_contributors.slice(0, 5).map(tc => ({ keyword: tc.keyword, matches: tc.matches, rate_pct: tc.rate_pct })),
-        high_volume: r.high_volume,
-      }])
-    ) : null,
-    keyword_overlap: keywordOverlapReport ? Object.fromEntries(
-      Object.entries(keywordOverlapReport.domains).filter(([, r]) => r.foreign_keyword_overlaps > 0).map(([d, r]) => [d, {
-        total_jobs: r.total_jobs,
-        overlap_count: r.foreign_keyword_overlaps,
-        top_overlaps: r.top_overlaps.slice(0, 3),
-      }])
-    ) : null,
-
-    // TAG-DIM-1: G1 by-domain breakdown for DASH visibility.
-    // Categorizes G1 jobs by source, company, fix category, engine version, and employment type.
-    g1_breakdown: buildG1Breakdown(jobs),
-
-    // Freshness — jobs posted within last N hours (entry-level pool)
-    freshness,
-
-    // Top 20 companies by job count (entry-level pool)
-    top_companies,
-
-    // GAP-6: Companies that returned 0 raw jobs this run (pre-filter).
-    // Used by pipeline-alert.js for consecutive-failure detection.
-    zero_yield_companies: zeroYieldCompanies || [],
-
-    stage_timings: stageTimings || {},
-
-    // AGG-HOTPATH-1: Sources intentionally excluded from the fast publish workflow.
-    // Alerting must distinguish "not attempted here" from "attempted and fetched 0".
-    hot_path_demoted_sources: [...HOTPATH_DEMOTED_SOURCES],
-
-    supplemental_inputs: supplementalInputs || {},
-
-    // TAG-DIM-1: Tag engine version deployed in this run.
-    // Enables zjp-metrics to surface engine_version (was null because this field was missing).
-    tag_engine_version: TAG_ENGINE_VERSION,
-
-    // A91: Per-source fetch counts from current run (before carry-forward merge).
-    // Enables alert checks to detect source fetch failures masked by carry-forward.
-    fetch_results: fetchResults || {},
-
-    // AGG-FETCH-14: Per-company fetcher health from current run.
-    // status: 'alive' (has jobs), 'zero' (fetched ok but 0 jobs), 'error' (fetch failed).
-    // Enables check-19 to classify without HTTP probing.
-    fetcher_health: fetcherHealth || {},
-
-    // AGG-LIFECYCLE-1: lifecycle_state distribution + version. Evergreen/ghost/TTL-expired jobs are
-    // now KEPT+TAGGED (fresh / carry-forward / evergreen / stale-candidate / dead) instead of dropped.
-    // Consumers replicate the pre-LIFECYCLE "dropped" set by excluding {dead, stale-candidate}.
-    lifecycle: {
-      version: LIFECYCLE_VERSION,
-      distribution: jobs.reduce((acc, j) => {
-        const s = j?.tags?.lifecycle_state || 'untagged';
-        acc[s] = (acc[s] || 0) + 1;
-        return acc;
-      }, {}),
-    },
-  };
-}
-
-/**
- * Print execution summary
- * @param {Array} jobs - Final job array
- * @param {number} uniqueCount - Unique job count
- * @param {number} duplicateCount - Duplicate count
- * @param {number} duration - Duration in ms
- */
-function printSummary(jobs, uniqueCount, duplicateCount, duration) {
-  console.log('📊 Execution Summary:');
-  console.log('━'.repeat(60));
-
-  // Count by job type (use tag fields — is_internship/is_new_grad/is_remote are never set)
-  const internships = jobs.filter(j => j.tags?.employment === 'internship').length;
-  const newGrad = jobs.filter(j => j.tags?.employment === 'entry_level').length;
-  const remote = jobs.filter(j => j.tags?.locations?.includes('remote')).length;
-
-  console.log(`Total jobs in output: ${jobs.length}`);
-  console.log(`  - Internships: ${internships}`);
-  console.log(`  - New Grad: ${newGrad}`);
-  console.log(`  - Remote: ${remote}`);
-  console.log('');
-  console.log(`Duplicates removed: ${duplicateCount}`);
-  console.log(`Duration: ${(duration / 1000).toFixed(1)}s`);
-}
-
-
-// Run main function
-if (require.main === module) {
-  main();
-}
-
-module.exports = { main, resolvePostedAt, mergeCarryForward, dropOrphanJobs, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, buildMidLevelTechFeed, buildMidLevelTechSummary, buildSeniorTechFeed, buildSeniorTechSummary, buildCanadaTechFeed, buildCanadaInternshipsFeed, buildCanadaSentinelChecks, buildCanadaAllFeed, activePublicWindowTs, applicableTtlMs, classifyAgeLifecycle, isLifecycleHardRetired, LIFECYCLE_VERSION, LIFECYCLE_EVERGREEN_THRESHOLD_DAYS, injectDescriptions, generateMetadata, buildLatencyMarkers };
+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

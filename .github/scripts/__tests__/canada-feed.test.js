@@ -1,146 +1,185 @@
-#!/usr/bin/env node
-'use strict';
-
-// CANADA-LANE feed partition tests.
-// Mirrors us-snapshot.test.js: exercises the producer-owned tag-driven partition (buildCanadaTechFeed,
-// buildCanadaInternshipsFeed, buildCanadaSentinelChecks) exported from ../index. No framework —
-// plain node + assert, run by the gate workflow (.github/workflows/gate.yml).
-
-const assert = require('assert');
-const {
-  buildCanadaTechFeed,
-  buildCanadaInternshipsFeed,
-  buildCanadaSentinelChecks,
-  buildCanadaAllFeed,
-} = require('../index');
-// --- Fixtures -----------------------------------------------------------------
-
-// Pure canada tech job (Toronto, software, entry-level) — must be in BOTH the tech feed and the
-// internships (entry_level + internship) feed.
-const canadaTechEntry = {
-  id: 'workday-can-1', source: 'workday', company_name: 'Shopify', title: 'iOS Engineer',
-  location: 'Toronto, ON', tags: { locations: ['canada'], employment: 'entry_level', domains: ['software'] },
-};
-
-// Dual-tagged canada+us tech job (AGG-8 multi-country rule). Must be KEPT in the canada feed
-// (dual-tag policy: a "Canada; United States" job appears in BOTH us_jobs and canada feeds).
-const canadaUsDual = {
-  id: 'oracle-can-2', source: 'oracle', company_name: 'Oracle', title: 'Data Scientist',
-  location: 'Canada; United States', tags: { locations: ['canada', 'us'], employment: 'mid_level', domains: ['data_science'] },
-};
-
-// Canada tech internship — must be in the tech feed AND the internships feed.
-const canadaTechIntern = {
-  id: 'ashby-can-3', source: 'ashby', company_name: 'Ashby', title: 'ML Intern',
-  location: 'Vancouver, BC', tags: { locations: ['canada'], employment: 'internship', domains: ['ai'] },
-};
-
-// Canada NON-tech job (product domain) — must NOT be in the canada TECH feed.
-const canadaNonTech = {
-  id: 'greenhouse-can-4', source: 'greenhouse', company_name: 'Foo', title: 'Product Manager',
-  location: 'Montreal, QC', tags: { locations: ['canada'], employment: 'mid_level', domains: ['product'] },
-};
-
-// US-only tech job — must NOT be in the canada feed (zero US leak into canada lane).
-const usOnlyTech = {
-  id: 'greenhouse-us-5', source: 'greenhouse', company_name: 'Bar', title: 'Backend Engineer',
-  location: 'San Francisco, CA', tags: { locations: ['us'], employment: 'mid_level', domains: ['software'] },
-};
-
-// Suspicious leak: tagged canada-ONLY (no us, no remote) but raw location text reads US-only
-// (US cue matches, canada cue does not). The sentinel must FLAG this (suspicious_us_only_location).
-const suspiciousUsOnly = {
-  id: 'lever-leak-6', source: 'lever', company_name: 'Leaky', title: 'Frontend Engineer',
-  location: 'Austin, TX', tags: { locations: ['canada'], employment: 'mid_level', domains: ['software'] },
-};
-
-const POOL = [canadaTechEntry, canadaUsDual, canadaTechIntern, canadaNonTech, usOnlyTech];
-
-// --- 1. Partition correctness -------------------------------------------------
-
-const feed = buildCanadaTechFeed(POOL);
-const ids = feed.jobs.map(j => j.id);
-
-assert.ok(ids.includes('workday-can-1'), 'pure canada tech job must be in the canada tech feed');
-assert.ok(ids.includes('oracle-can-2'), 'dual-tagged canada+us tech job must be KEPT (dual-tag policy)');
-assert.ok(ids.includes('ashby-can-3'), 'canada tech internship must be in the canada tech feed');
-assert.ok(!ids.includes('greenhouse-can-4'), 'canada NON-tech job must NOT be in the canada tech feed');
-assert.ok(!ids.includes('greenhouse-us-5'), 'US-only tech job must NOT leak into the canada feed');
-
-// Summary counts.
-assert.strictEqual(feed.summary.canada_tech_jobs, 3, 'canada_tech_jobs count');
-assert.strictEqual(feed.summary.canada_jobs, 4, 'canada_jobs total (incl. the non-tech canada row)');
-assert.strictEqual(feed.summary.canada_tech_internships, 1, 'canada_tech_internships count');
-assert.strictEqual(feed.summary.contract_version, 'canada-tech-feed-v1', 'contract_version stamp');
-assert.deepStrictEqual(
-  [...feed.summary.included_domains].sort(),
-  ['ai', 'data_science', 'hardware', 'software'],
-  'included_domains must be the tech slice',
-);
-
-console.log('PASS partition correctness (canada tag + tech domain selection, dual-tag keep, US-exclusion)');
-
-// --- 2. Internships lane (entry_level + internship subset) --------------------
-
-const internships = buildCanadaInternshipsFeed(feed.jobs);
-const internIds = internships.map(j => j.id);
-
-assert.ok(internIds.includes('workday-can-1'), 'entry_level canada tech job must be in internships feed');
-assert.ok(internIds.includes('ashby-can-3'), 'internship canada tech job must be in internships feed');
-assert.ok(!internIds.includes('oracle-can-2'), 'mid_level canada tech job must NOT be in internships feed');
-assert.strictEqual(internIds.length, 2, 'internships feed = entry_level + internship only');
-
-console.log('PASS internships lane (entry_level + internship subset of canada tech feed)');
-
-// --- 3. Sentinel FP guard -----------------------------------------------------
-
-// 3a. Clean pool (no suspicious leaks) — sentinel passes.
-const cleanChecks = buildCanadaSentinelChecks(feed.jobs);
-assert.strictEqual(cleanChecks.passed, true, 'clean canada tech feed must pass sentinel checks');
-assert.strictEqual(cleanChecks.checks.missing_canada_tag, 0, 'no missing-canada-tag in clean feed');
-assert.strictEqual(cleanChecks.checks.non_tech_domain, 0, 'no non-tech-domain in clean feed');
-assert.strictEqual(cleanChecks.checks.suspicious_us_only_location, 0, 'no suspicious US-only in clean feed');
-
-// 3b. Pool WITH a suspicious leak — sentinel flags it and does NOT pass.
-const leakyChecks = buildCanadaSentinelChecks([...feed.jobs, suspiciousUsOnly]);
-assert.strictEqual(leakyChecks.passed, false, 'a US-only-text canada-tagged row must fail the sentinel');
-assert.strictEqual(leakyChecks.checks.suspicious_us_only_location, 1, 'suspicious_us_only_location must count the leak');
-assert.ok(leakyChecks.suspicious_us_only_samples.some(s => s.id === 'lever-leak-6'), 'leak sample must be captured');
-
-// 3c. A dual-tagged (canada+us) row with US-only text must NOT flag — the us tag disqualifies
-// canadaOnly, so a genuine dual-country posting is never a false alarm.
-const dualUsTextChecks = buildCanadaSentinelChecks([canadaUsDual]);
-assert.strictEqual(dualUsTextChecks.passed, true, 'dual-tagged canada+us row must not trigger the sentinel');
-
-console.log('PASS sentinel FP guard (clean passes, US-only leak flagged, dual-tag whitelisted)');
-
-// --- 4. Empty input -----------------------------------------------------------
-
-const empty = buildCanadaTechFeed([]);
-assert.strictEqual(empty.jobs.length, 0, 'empty pool yields empty canada tech feed');
-assert.strictEqual(empty.summary.canada_tech_jobs, 0, 'empty pool yields zero canada_tech_jobs');
-assert.strictEqual(empty.summary.canada_jobs, 0, 'empty pool yields zero canada_jobs');
-assert.strictEqual(empty.summary.sentinel_false_positive_checks.passed, true, 'empty feed must still pass the sentinel');
-assert.strictEqual(buildCanadaInternshipsFeed(empty.jobs).length, 0, 'empty pool yields empty internships feed');
-
-console.log('PASS empty input (empty feeds, sentinel still passes)');
-
-// --- 5. ALL-Canada feed (AGG-CANADAFEED-1): broadens tech → all domains, tech-prioritized ---
-const allFeed = buildCanadaAllFeed(POOL);
-const allIds = allFeed.jobs.map(j => j.id);
-assert.ok(allIds.includes('workday-can-1'), 'all-canada feed includes pure canada tech');
-assert.ok(allIds.includes('oracle-can-2'), 'all-canada feed includes dual-tagged canada+us');
-assert.ok(allIds.includes('ashby-can-3'), 'all-canada feed includes canada tech internship');
-assert.ok(allIds.includes('greenhouse-can-4'), 'all-canada feed includes canada NON-tech (the broaden)');
-assert.ok(!allIds.includes('greenhouse-us-5'), 'US-only job must NOT leak into all-canada feed');
-assert.strictEqual(allFeed.summary.canada_jobs, 4, 'all-canada total = all 4 canada jobs (tech+non-tech)');
-assert.strictEqual(allFeed.summary.canada_tech_jobs, 3, 'all-canada tech count');
-assert.strictEqual(allFeed.summary.canada_non_tech_jobs, 1, 'all-canada non-tech count');
-assert.strictEqual(allFeed.summary.tech_prioritized, true, 'tech_prioritized flag set');
-assert.strictEqual(allFeed.summary.contract_version, 'canada-all-feed-v1', 'all-canada contract version');
-const nonTechIdx = allIds.indexOf('greenhouse-can-4');
-assert.ok(['workday-can-1', 'oracle-can-2', 'ashby-can-3'].every(id => allIds.indexOf(id) < nonTechIdx), 'tech jobs sorted before non-tech (tech-prioritized)');
-assert.strictEqual(allFeed.summary.sentinel_false_positive_checks.passed, true, 'clean all-canada feed passes sentinel');
-console.log('PASS all-canada feed (tech+non-tech included, US-excluded, tech-prioritized, counts)');
-
-console.log('\n✅ canada-feed: all partition/sentinel/dual-tag/empty checks passed');
+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
+zecQ4K/O2HCkbu1g0oyF6g==

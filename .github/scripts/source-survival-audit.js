@@ -1,264 +1,221 @@
-#!/usr/bin/env node
-'use strict';
-
-const fs = require('fs');
-const path = require('path');
-
-const TECH_DOMAINS = new Set(['software', 'data_science', 'hardware', 'ai']);
-const STRUCTURAL_NO_DESCRIPTION = new Set(['simplify', 'eightfold', 'jsearch']);
-const INLINE_DESCRIPTION_SOURCES = new Set(['greenhouse', 'lever', 'ashby', 'amazon', 'netflix', 'microsoft', 'oracle']);
-
-function parseArgs(argv) {
-  const args = { dataDir: path.join(process.cwd(), '.github', 'data'), json: false };
-  for (let i = 2; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === '--json') args.json = true;
-    else if (arg === '--data-dir') args.dataDir = argv[++i];
-    else if (arg.startsWith('--data-dir=')) args.dataDir = arg.slice('--data-dir='.length);
-    else throw new Error(`Unknown argument: ${arg}`);
-  }
-  return args;
-}
-
-function readTextIfExists(file) {
-  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
-}
-
-function readJsonOrJsonl(file, fallback = null) {
-  const text = readTextIfExists(file);
-  if (text === null) return fallback;
-  const trimmed = text.trim();
-  if (trimmed[0] === '[' || trimmed[0] === '{') {
-    try { return JSON.parse(trimmed); } catch { /* fall through to JSONL */ }
-  }
-  return trimmed.split('\n').filter(Boolean).map(line => JSON.parse(line));
-}
-
-function jobId(job) {
-  return job.id || job.job_id;
-}
-
-function sourceOf(job) {
-  return String(job.source || job.fetcher_type || 'unknown').toLowerCase();
-}
-
-function hasDescription(job) {
-  return String(job.description || job.description_text || job.extraction_text || '').trim().length > 0;
-}
-
-function isTechUS(job) {
-  const tags = job.tags || {};
-  const domains = tags.domains || job.domain_tags || [];
-  const locations = tags.locations || job.location_tags || [];
-  return domains.some(domain => TECH_DOMAINS.has(domain)) && locations.includes('us');
-}
-
-function isInternship(job) {
-  const employment = String(job.tags?.employment || job.employment_type || job.employment || '').toLowerCase();
-  return employment === 'internship' || /\b(intern|internship|co[- ]?op|coop)\b/i.test(job.title || '');
-}
-
-function addSource(map, source) {
-  const key = String(source || 'unknown').toLowerCase();
-  if (!map.has(key)) {
-    map.set(key, {
-      source: key,
-      fetched_raw: null,
-      supplemental_input: 0,
-      final_rows: 0,
-      tech_us_rows: 0,
-      internship_rows: 0,
-      tech_us_internship_rows: 0,
-      inline_description_rows: 0,
-      posted_at_missing: 0,
-      posted_at_basis: {},
-      sidecar_rows: 0,
-      enriched_rows: 0,
-      enriched_with_skills: 0,
-      sample_missing_posted_at: [],
-      sample_no_description: [],
-      flags: [],
-    });
-  }
-  return map.get(key);
-}
-
-function incrementBasis(row, basis) {
-  const key = basis || 'source_or_none';
-  row.posted_at_basis[key] = (row.posted_at_basis[key] || 0) + 1;
-}
-
-function loadSidecarCoverage(dataDir, allJobsById) {
-  const coverageBySource = new Map();
-  if (!fs.existsSync(dataDir)) return coverageBySource;
-
-  for (const file of fs.readdirSync(dataDir)) {
-    if (!/^descriptions-.+\.jsonl$/.test(file)) continue;
-    const fullPath = path.join(dataDir, file);
-    const rows = readJsonOrJsonl(fullPath, []);
-    const sourceFromFile = file
-      .replace(/^descriptions-/, '')
-      .replace(/\.jsonl$/, '')
-      .replace(/-\d+$/, '');
-
-    for (const row of rows) {
-      const id = jobId(row);
-      if (!id || !allJobsById.has(id)) continue;
-      const source = sourceFromFile.startsWith('enriched')
-        ? sourceOf(allJobsById.get(id) || {})
-        : sourceFromFile;
-      if (!source || source === 'unknown') continue;
-      if (!coverageBySource.has(source)) coverageBySource.set(source, new Set());
-      coverageBySource.get(source).add(id);
-    }
-  }
-  return coverageBySource;
-}
-
-function ratio(numerator, denominator) {
-  if (!denominator) return null;
-  return numerator / denominator;
-}
-
-function pct(value) {
-  return value === null ? null : Number((value * 100).toFixed(1));
-}
-
-function buildAudit(dataDir) {
-  const metadata = readJsonOrJsonl(path.join(dataDir, 'jobs-metadata.json'));
-  const allJobs = readJsonOrJsonl(path.join(dataDir, 'all_jobs.json'), []);
-  const enrichedJobs = readJsonOrJsonl(path.join(dataDir, 'enriched_jobs.json'), []);
-
-  const allJobsById = new Map(allJobs.map(job => [jobId(job), job]).filter(([id]) => id));
-  const sources = new Map();
-
-  for (const [source, count] of Object.entries(metadata.fetch_results || {})) {
-    addSource(sources, source).fetched_raw = count;
-  }
-
-  for (const input of Object.values(metadata.supplemental_inputs || {})) {
-    for (const [source, count] of Object.entries(input.by_source || {})) {
-      addSource(sources, source).supplemental_input += count;
-    }
-  }
-
-  for (const job of allJobs) {
-    const row = addSource(sources, sourceOf(job));
-    row.final_rows++;
-    if (isTechUS(job)) row.tech_us_rows++;
-    if (isInternship(job)) row.internship_rows++;
-    if (isTechUS(job) && isInternship(job)) row.tech_us_internship_rows++;
-    if (hasDescription(job)) row.inline_description_rows++;
-    if (!job.posted_at) {
-      row.posted_at_missing++;
-      if (row.sample_missing_posted_at.length < 3) row.sample_missing_posted_at.push({ id: jobId(job), title: job.title });
-    } else {
-      incrementBasis(row, job.posted_at_basis);
-    }
-    if (!hasDescription(job) && row.sample_no_description.length < 3) {
-      row.sample_no_description.push({ id: jobId(job), title: job.title });
-    }
-  }
-
-  const sidecarCoverage = loadSidecarCoverage(dataDir, allJobsById);
-  for (const [source, ids] of sidecarCoverage.entries()) {
-    addSource(sources, source).sidecar_rows = ids.size;
-  }
-
-  for (const job of enrichedJobs) {
-    const row = addSource(sources, sourceOf(job));
-    row.enriched_rows++;
-    const skills = job.required_skills || job.skills || [];
-    if (Array.isArray(skills) && skills.length > 0) row.enriched_with_skills++;
-  }
-
-  const rows = [...sources.values()].map(row => {
-    const upstream = row.supplemental_input || row.fetched_raw || null;
-    const finalSurvival = ratio(row.final_rows, upstream);
-    const descriptionCoverage = ratio(row.inline_description_rows + row.sidecar_rows, row.final_rows);
-    const enrichedCoverage = ratio(row.enriched_rows, row.tech_us_rows || row.final_rows);
-    const skillCoverage = ratio(row.enriched_with_skills, row.enriched_rows);
-
-    if (row.supplemental_input >= 100 && row.final_rows < row.supplemental_input * 0.5) {
-      row.flags.push({ severity: 'high', code: 'low_supplemental_survival', detail: `${row.final_rows}/${row.supplemental_input} supplemental rows survived final output` });
-    }
-    if (row.final_rows >= 50 && row.posted_at_missing > 0) {
-      row.flags.push({ severity: 'high', code: 'missing_posted_at_final_rows', detail: `${row.posted_at_missing}/${row.final_rows} final rows lack posted_at` });
-    }
-    if (row.final_rows >= 100 && !STRUCTURAL_NO_DESCRIPTION.has(row.source) && !INLINE_DESCRIPTION_SOURCES.has(row.source) && (descriptionCoverage === null || descriptionCoverage < 0.2)) {
-      row.flags.push({ severity: 'high', code: 'low_description_input', detail: `${row.inline_description_rows + row.sidecar_rows}/${row.final_rows} rows have inline or sidecar text` });
-    }
-    if (row.tech_us_rows >= 50 && (enrichedCoverage === null || enrichedCoverage < 0.5)) {
-      row.flags.push({ severity: 'medium', code: 'low_enrichment_survival', detail: `${row.enriched_rows}/${row.tech_us_rows} tech-US rows have enriched output` });
-    }
-    if (row.enriched_rows >= 50 && (skillCoverage === null || skillCoverage < 0.5)) {
-      row.flags.push({ severity: 'medium', code: 'low_skill_fill', detail: `${row.enriched_with_skills}/${row.enriched_rows} enriched rows have skills` });
-    }
-
-    return {
-      source: row.source,
-      fetched_raw: row.fetched_raw,
-      supplemental_input: row.supplemental_input,
-      final_rows: row.final_rows,
-      final_survival_pct: pct(finalSurvival),
-      tech_us_rows: row.tech_us_rows,
-      internship_rows: row.internship_rows,
-      tech_us_internship_rows: row.tech_us_internship_rows,
-      inline_description_rows: row.inline_description_rows,
-      sidecar_rows: row.sidecar_rows,
-      description_coverage_pct: pct(descriptionCoverage),
-      posted_at_missing: row.posted_at_missing,
-      posted_at_basis: row.posted_at_basis,
-      enriched_rows: row.enriched_rows,
-      enriched_coverage_pct: pct(enrichedCoverage),
-      enriched_with_skills: row.enriched_with_skills,
-      skill_coverage_pct: pct(skillCoverage),
-      flags: row.flags,
-      samples: {
-        missing_posted_at: row.sample_missing_posted_at,
-        no_description: row.sample_no_description,
-      },
-    };
-  }).sort((a, b) => {
-    const severity = flag => flag.severity === 'high' ? 2 : flag.severity === 'medium' ? 1 : 0;
-    const aScore = a.flags.reduce((sum, flag) => sum + severity(flag), 0);
-    const bScore = b.flags.reduce((sum, flag) => sum + severity(flag), 0);
-    return bScore - aScore || b.tech_us_rows - a.tech_us_rows || a.source.localeCompare(b.source);
-  });
-
-  return {
-    generated_at: new Date().toISOString(),
-    data_dir: dataDir,
-    total_sources: rows.length,
-    flagged_sources: rows.filter(row => row.flags.length > 0).length,
-    summary: {
-      final_rows: allJobs.length,
-      enriched_rows: enrichedJobs.length,
-      high_flags: rows.flatMap(row => row.flags.filter(flag => flag.severity === 'high').map(flag => ({ source: row.source, code: flag.code, detail: flag.detail }))),
-    },
-    sources: rows,
-  };
-}
-
-function printText(audit) {
-  console.log(`Source survival audit (${audit.generated_at})`);
-  console.log(`sources=${audit.total_sources} flagged=${audit.flagged_sources} final_rows=${audit.summary.final_rows} enriched_rows=${audit.summary.enriched_rows}`);
-  for (const row of audit.sources.filter(source => source.flags.length > 0)) {
-    console.log(`\n${row.source}: final=${row.final_rows} tech_us=${row.tech_us_rows} enriched=${row.enriched_rows} desc=${row.description_coverage_pct ?? 'n/a'}%`);
-    for (const flag of row.flags) console.log(`  ${flag.severity.toUpperCase()} ${flag.code}: ${flag.detail}`);
-  }
-}
-
-if (require.main === module) {
-  try {
-    const args = parseArgs(process.argv);
-    const audit = buildAudit(args.dataDir);
-    if (args.json) console.log(JSON.stringify(audit, null, 2));
-    else printText(audit);
-  } catch (err) {
-    console.error(`[source-survival-audit] ${err.message}`);
-    process.exit(1);
-  }
-}
-
-module.exports = { buildAudit, parseArgs };
+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

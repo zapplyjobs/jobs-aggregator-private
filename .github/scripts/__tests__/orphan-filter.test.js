@@ -1,53 +1,61 @@
-#!/usr/bin/env node
-'use strict';
-// AGG-STALEUPSTREAM-1 (2026-07-04): orphan cleanup test.
-// Asserts dropOrphanJobs removes jobs whose company left the active multi-tenant config AND are
-// >14d unfetched, while KEEPING (a) configured-company jobs, (b) single-tenant-source jobs,
-// (c) recently-fetched orphans (the 14d grace), and (d) orphans with no fetched_at (can't confirm age).
-// Also: an empty active set is a no-op (safety — never flag everything as orphan).
-const { dropOrphanJobs } = require('../index');
-
-let pass = 0, fail = 0;
-function check(name, cond) { if (cond) { pass++; } else { fail++; console.error(`  FAIL: ${name}`); } }
-
-const DAY = 86400000;
-const now = new Date('2026-07-04T12:00:00Z').getTime();
-const ago = (d) => new Date(now - d * DAY).toISOString();
-const activeWd = new Set(['Configured-Co']);
-const activeSR = new Set(['Configured-SR']);
-
-{
-  const jobs = [
-    { source: 'workday', company_name: 'Sanofi', fetched_at: ago(30) },          // orphan, old -> DROP
-    { source: 'workday', company_name: 'Configured-Co', fetched_at: ago(30) },   // configured -> KEEP
-    { source: 'workday', company_name: 'RecentlyRemoved', fetched_at: ago(3) },  // orphan, recent -> KEEP (grace)
-    { source: 'greenhouse', company_name: 'Anything', fetched_at: ago(60) },     // single-tenant -> KEEP
-    { source: 'smartrecruiters', company_name: 'Veolia', fetched_at: ago(40) },  // orphan SR, old -> DROP
-    { source: 'smartrecruiters', company_name: 'Configured-SR', fetched_at: ago(30) }, // configured SR -> KEEP
-    { source: 'workday', company_name: 'NoDate', fetched_at: null },             // no fetched_at -> KEEP
-  ];
-  const dropped = dropOrphanJobs(jobs, activeWd, activeSR, 14 * DAY, now);
-  const remaining = jobs.map(j => j.company_name);
-  check('dropped exactly 2 (Sanofi, Veolia)', dropped === 2);
-  check('kept configured workday', remaining.includes('Configured-Co'));
-  check('kept recent orphan (within 14d grace)', remaining.includes('RecentlyRemoved'));
-  check('kept single-tenant (greenhouse) — not multi-tenant scope', remaining.includes('Anything'));
-  check('kept configured smartrecruiters', remaining.includes('Configured-SR'));
-  check('kept orphan with no fetched_at (cannot confirm age)', remaining.includes('NoDate'));
-  check('removed Sanofi', !remaining.includes('Sanofi'));
-  check('removed Veolia', !remaining.includes('Veolia'));
-}
-
-// Empty active set -> no-op (safety: never flag everything orphan if the list fails to load).
-{
-  const jobs = [{ source: 'workday', company_name: 'X', fetched_at: ago(30) }];
-  check('empty active set -> no-op (safety)', dropOrphanJobs(jobs, new Set(), new Set(), 14 * DAY, now) === 0);
-}
-
-// Empty input.
-{
-  check('empty input -> 0 dropped', dropOrphanJobs([], activeWd, activeSR) === 0);
-}
-
-console.log(`\norphan-filter: ${pass} pass, ${fail} fail`);
-process.exit(fail === 0 ? 0 : 1);
+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

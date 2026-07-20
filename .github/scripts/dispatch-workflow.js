@@ -1,131 +1,98 @@
-#!/usr/bin/env node
-'use strict';
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function parsePositiveInt(value, fallback) {
-  const n = Number.parseInt(value, 10);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
-function truncate(text, max = 1000) {
-  if (!text) return '';
-  return text.length > max ? `${text.slice(0, max)}…` : text;
-}
-
-function classifyDispatchFailure(status) {
-  if (status === 429) return { retryable: true, className: 'rate_limited' };
-  if (status >= 500 && status <= 599) return { retryable: true, className: 'github_transient' };
-  if (status === 401 || status === 403) return { retryable: false, className: 'auth' };
-  if (status === 404) return { retryable: false, className: 'not_found' };
-  if (status === 422) return { retryable: false, className: 'invalid_dispatch' };
-  if (status >= 400 && status <= 499) return { retryable: false, className: 'client' };
-  return { retryable: false, className: 'unexpected' };
-}
-
-function retryDelayMs(response, baseDelayMs, attempt) {
-  const header = response?.headers?.get?.('retry-after');
-  const seconds = Number.parseInt(header, 10);
-  if (Number.isFinite(seconds) && seconds > 0) {
-    return Math.min(seconds * 1000, 10000);
-  }
-  return Math.min(baseDelayMs * (2 ** (attempt - 1)), 10000);
-}
-
-async function dispatchWorkflow(options) {
-  const {
-    token,
-    owner = 'zapplyjobs',
-    repo,
-    workflow,
-    ref = 'main',
-    maxAttempts = 3,
-    baseDelayMs = 1000,
-    fetchImpl = globalThis.fetch,
-    sleepImpl = sleep,
-    log = console.log,
-    warn = console.warn,
-    error = console.error,
-  } = options;
-
-  if (!token) throw new Error('GH_PAT is required for workflow dispatch');
-  if (!repo) throw new Error('DISPATCH_REPO is required');
-  if (!workflow) throw new Error('DISPATCH_WORKFLOW is required');
-  if (!fetchImpl) throw new Error('fetch is not available in this Node runtime');
-
-  const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow}/dispatches`;
-  let lastFailure = null;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    let response;
-    let body = '';
-    try {
-      response = await fetchImpl(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ ref }),
-      });
-      body = response.status === 204 ? '' : await response.text();
-    } catch (err) {
-      lastFailure = `network ${err?.message || err}`;
-      if (attempt === maxAttempts) {
-        error(`Workflow dispatch FAILED: ${owner}/${repo}/${workflow} attempt=${attempt}/${maxAttempts} class=network message=${err?.message || err}`);
-        return false;
-      }
-      warn(`Workflow dispatch retry ${attempt}/${maxAttempts - 1}: ${owner}/${repo}/${workflow} — network ${err?.message || err}`);
-      await sleepImpl(Math.min(baseDelayMs * (2 ** (attempt - 1)), 10000));
-      continue;
-    }
-
-    if (response.status === 204) {
-      log(`Workflow dispatch OK: ${owner}/${repo}/${workflow} ref=${ref} attempt=${attempt}/${maxAttempts}`);
-      return true;
-    }
-
-    const classification = classifyDispatchFailure(response.status);
-    lastFailure = `status=${response.status} class=${classification.className} body=${truncate(body)}`;
-    if (!classification.retryable || attempt === maxAttempts) {
-      error(`Workflow dispatch FAILED: ${owner}/${repo}/${workflow} attempt=${attempt}/${maxAttempts} ${lastFailure}`);
-      return false;
-    }
-
-    warn(`Workflow dispatch retry ${attempt}/${maxAttempts - 1}: ${owner}/${repo}/${workflow} — ${lastFailure}`);
-    await sleepImpl(retryDelayMs(response, baseDelayMs, attempt));
-  }
-
-  error(`Workflow dispatch FAILED: ${owner}/${repo}/${workflow} ${lastFailure || 'unknown failure'}`);
-  return false;
-}
-
-async function main() {
-  const ok = await dispatchWorkflow({
-    token: process.env.GH_PAT,
-    owner: process.env.DISPATCH_OWNER || 'zapplyjobs',
-    repo: process.env.DISPATCH_REPO,
-    workflow: process.env.DISPATCH_WORKFLOW,
-    ref: process.env.DISPATCH_REF || 'main',
-    maxAttempts: parsePositiveInt(process.env.DISPATCH_MAX_ATTEMPTS, 3),
-    baseDelayMs: parsePositiveInt(process.env.DISPATCH_RETRY_DELAY_MS, 1000),
-  });
-  if (!ok) process.exit(1);
-}
-
-if (require.main === module) {
-  main().catch(err => {
-    console.error(`Workflow dispatch fatal: ${err.message}`);
-    process.exit(1);
-  });
-}
-
-module.exports = {
-  classifyDispatchFailure,
-  dispatchWorkflow,
-  retryDelayMs,
-};
+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
+gUDY59NOY5VeWUsgdrWfuw==

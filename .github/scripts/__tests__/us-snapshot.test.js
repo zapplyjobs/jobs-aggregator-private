@@ -1,46 +1,27 @@
-#!/usr/bin/env node
-'use strict';
-
-const assert = require('assert');
-const { buildUsSnapshotJobs } = require('../index');
-
-const jobs = [
-  {
-    id: 'us-tagged',
-    title: 'Software Engineer',
-    tags: { locations: ['us'], employment: 'entry_level', domains: ['software'] },
-  },
-  {
-    id: 'remote-us-plus-other-tags',
-    title: 'Hardware Engineer',
-    tags: { locations: ['remote', 'us'], employment: 'entry_level', domains: ['hardware'] },
-  },
-  {
-    id: 'missing-tags-location-text-us',
-    title: 'Support Engineer',
-    location: 'Remote, United States',
-    tags: { employment: 'entry_level', domains: ['software'] },
-  },
-  {
-    id: 'state-code-false-positive',
-    title: 'Product Manager',
-    location: 'La Ciotat',
-    job_state: 'LA',
-    tags: { locations: [], employment: 'entry_level', domains: ['product'] },
-  },
-  {
-    id: 'canada-tagged',
-    title: 'Data Analyst',
-    tags: { locations: ['canada'], employment: 'entry_level', domains: ['data_science'] },
-  },
-];
-
-const snapshot = buildUsSnapshotJobs(jobs);
-
-assert.deepStrictEqual(
-  snapshot.map((job) => job.id),
-  ['us-tagged', 'remote-us-plus-other-tags'],
-  'US snapshot must use the producer-owned tags.locations contract only'
-);
-
-console.log('PASS us snapshot tag contract');
+U2FsdGVkX1+dOtNDH8WeICyc62MZplSie4BxR2msJl5VEiNnfLv3SrskXfFn4oB6
+rcYDgvxhMMZEDLpSMG6X1ZTitryrMi6O7N9LS21QSKk3+ExhmEzSA1AGns3kZtFz
+lgR08i+SwYUZncvWv2Z/431uz2koELb/DsPGHSEpsseL5u24O+P1yiVUrz6syjD+
+EnD7VW93eNka+g2bdsXAOJC4btJwmipv0/N5pnzQeRtzJkxi144gi+ODVuGn9bie
+2BuKWoKHRpLjrYS+ep3HHRag/DK/AslvvBvsNdBtvDOun8xlc2OJytLItTbNLZhb
+i/Cl3rrz9WHosW7xO3x3IVB9UQ0DRTXGDMYnihfMGzzu0B+WwEsdB7KpwZAldwoh
+WT0tiBD/FRG9bVb9rybMcHD52ZZSzIvXUCvDHJ9weIVOXQiAHu3Ew8YYjgC8AqDd
+EIIpXKe/s9abUQDX4re+U/BWTLqLLf6WIEJ3fNxDQ7pnoDXU+Jc9HBCcTZq1CAJx
+B2preEt6VaYHvFxMv6TMJ0lMS1YW09GfnxzYChlHAMim/YJ+rDeUD0Ou5jX3nkWw
+LpN7yBrzSyyra8ZrQKb8kYWmijT0C18EIdZPAXADnDaQ7aiIZrzJ0GMye1nluN3g
+u8IC6UYBwFSYn8BVKzHpg1PVKVY0KXSMe2NKJRx3feEWVUWwCC2UwiQkHdmeIZ7P
+AlavgpyF875e9ZyGLYq6ZNidMxi+oXo3hAEAGfJG+rl0LI3HmyggpMuctFubWxYP
+AxbeVKZc64rwy6JeSIHhf5W/PkbAoGoZYqOu485lRmQmyX9JCFQIi6R3Lar7mpJj
+9d087vcNXbfCDh2t0pFu7Oq4pZ7QQZQ4UO5oiFOVz+rfaYNwFHLCfjG3sO5WLWyg
+51jsLVePncGLQMbmrZ1/zrQBudnBgnBGCtKCt8WvEjjGtmBkh3hkPOdhDPSMoKn/
+2DkXFHAZkKvFEOYaH8c+u97CBWwTRU19dgcSLqbfVsQxro5fr8JbDzyawRjFpefB
+SwjpV2ZHhxVdpn+UyJ5QlDf1HCrPHmgUTV8BqcseYsQ7S6m5sC9/aTu8bpB88B0N
+s35zL1YbmEugH37OIw7nMc5V6FX5rdKNfACNhfyPl2PUUi5BD08EPxNtKdFSYFNQ
+cpy1AJgsJvjavxsCn9U/yTKY9PgPNFoqekUcKXLumrdC2XrL4Z6A7lTpBIez2cok
+yYB3MGKNSu/1t9xEUVuPugwsa5D/AARup2blOIr9BMLJnp9efLwgJaA1krKyhrqI
+U9rKIAPwP5K9RLEK9Mm0MRZxmzYztYRVD3ZMNc9/Sp15+lp13dykeFkF1DBCq67n
+IjSS+2q88iHsg87eq7FKYw5eOb/fa4r10WJOmTUnXyGP9/T20yoBjJGw6AfpF19N
+SvJRSEKqPxsO7tul6tZJXg6zL3EEakiqRtgHDZ/zZXcQB8wV1/XhxeC3HNdEA7fJ
+a+cR/p8eTxTCrXIZXNw1BSqGBHWTrJybBtOjnvoi5jb+liprct6yfUUzOCM/L5R9
+x3euUrlBuALXnKPra9F5B2LcjaKe0/Jwlhi1VjBoPg/Ovy7z1BXkY7UlMg02Lcjz
+HJ/N/AD2gMpEcg3rjlotFMFdzYBGv6cX5xtnGaLaNeFUoFZBR57aWwCmGJG59pOv
+/JWsXJXtkUZCZUAMPUqOSP6hqtc7xAZUSPTJikqu3OGIvN/9RdOHbWNzNkraR6+m
