@@ -1,135 +1,186 @@
-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
+#!/usr/bin/env node
+'use strict';
+
+const assert = require('assert');
+const { mergeCarryForward, RETIRED_CARRY_FORWARD_SOURCES, LIFECYCLE_VERSION } = require('../index');
+
+function line(job) {
+  return JSON.stringify(job);
+}
+
+const now = new Date().toISOString();
+
+assert.ok(RETIRED_CARRY_FORWARD_SOURCES.has('jsearch'), 'jsearch must be retired');
+
+// Case 1: retired-source job is DROPPED upstream (OPERATOR 2026-07-03; reverses AGG-LIFECYCLE-1 tag-and-keep; dead never reaches R2/consumers).
+{
+  const publicJobs = [];
+  mergeCarryForward(
+    publicJobs,
+    [line({
+      id: 'js-stale-internship',
+      source: 'jsearch',
+      title: 'Software Engineering Intern',
+      company_name: 'Dead Source',
+      posted_at: now,
+      tags: { employment: 'internship', domains: ['software'], locations: ['us'] },
+    })],
+    new Set(),
+    new Set(),
+    [],
+    new Set()
+  );
+  assert.strictEqual(publicJobs.length, 0, 'retired jsearch dead jobs DROPPED upstream (not in pool)');
+}
+
+// Case 2: active non-fetched source carries forward within TTL, tagged 'carry-forward'.
+{
+  const publicJobs = [];
+  mergeCarryForward(
+    publicJobs,
+    [line({
+      id: 'greenhouse-live-carry',
+      source: 'greenhouse',
+      title: 'Software Engineer',
+      company_name: 'Active Source',
+      posted_at: now,
+      tags: { employment: 'entry_level', domains: ['software'], locations: ['us'] },
+    })],
+    new Set(),
+    new Set(),
+    [],
+    new Set()
+  );
+  assert.strictEqual(publicJobs.length, 1, 'active non-fetched sources still carry forward within TTL');
+  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'carry-forward', 'alive prior-run job tagged carry-forward');
+}
+
+// Case 3: fresh job whose source fetched successfully is DROPPED upstream (OPERATOR 2026-07-03; closed/ghost = dead).
+// (Uses a fresh posted_at so it reaches the closed→dead branch, not the TTL branch.)
+{
+  const publicJobs = [];
+  mergeCarryForward(
+    publicJobs,
+    [line({
+      id: 'greenhouse-closed-ghost',
+      source: 'greenhouse',
+      title: 'Quantitative Researcher Intern',
+      company_name: 'Point72',
+      posted_at: now,
+      tags: { employment: 'internship', domains: ['software'], locations: ['us'] },
+    })],
+    new Set(),
+    new Set(),
+    [],
+    new Set(['greenhouse'])
+  );
+  assert.strictEqual(publicJobs.length, 0, 'closed/ghost (dead) job DROPPED upstream (not in pool)');
+}
+
+// Case 7: STALE + DEAD job (old posted_at, source fetched OK but absent) is DROPPED upstream.
+// OPERATOR-2026-07-04: dead takes precedence over age. Previously this leaked as stale-candidate
+// (kept) because the age check fired before the dead check. Regression guard for the precedence fix.
+{
+  const publicJobs = [];
+  const staleDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(); // 30d old -> stale-candidate (>14d regular TTL)
+  mergeCarryForward(
+    publicJobs,
+    [line({
+      id: 'greenhouse-stale-dead',
+      source: 'greenhouse',
+      title: 'Backend Engineer',
+      company_name: 'Closed Co',
+      posted_at: staleDate,
+      tags: { employment: 'entry_level', domains: ['software'], locations: ['us'] },
+    })],
+    new Set(),
+    new Set(),
+    [],
+    new Set(['greenhouse'])  // greenhouse fetched OK this run -> job absent = dead
+  );
+  assert.strictEqual(publicJobs.length, 0, 'stale-candidate + dead (source absent) job DROPPED upstream (dead takes precedence over age)');
+}
+
+
+// Case 4: carry-forward Canada row, tagged 'carry-forward'; location tags recomputed.
+{
+  const publicJobs = [];
+  mergeCarryForward(
+    publicJobs,
+    [line({
+      id: 'workday-canada-carry',
+      source: 'workday',
+      title: 'Manufacturing Engineer',
+      company_name: 'Magna',
+      company_slug: 'magna',
+      location: 'Mississauga, Ontario, CA',
+      job_city: 'Mississauga',
+      job_state: 'CA',
+      posted_at: now,
+      tags: { employment: 'entry_level', domains: ['manufacturing'], locations: ['us'], tag_engine_version: 30 },
+    })],
+    new Set(),
+    new Set(),
+    [],
+    new Set()
+  );
+  assert.strictEqual(publicJobs.length, 1, 'carry-forward Canada row should remain in rolling pool');
+  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'carry-forward', 'canada carry-forward tagged carry-forward');
+  assert.deepStrictEqual(publicJobs[0].tags.locations, ['canada'], 'carry-forward location tags must be recomputed from current tagLocations logic');
+}
+
+// Case 5: carry-forward India row, tagged 'carry-forward'; stale us tag dropped.
+{
+  const publicJobs = [];
+  mergeCarryForward(
+    publicJobs,
+    [line({
+      id: 'workday-india-carry',
+      source: 'workday',
+      title: 'Memory Circuit Design Engineer',
+      company_name: 'Micron',
+      company_slug: 'micron',
+      location: 'Hyderabad - Phoenix Aquila, India',
+      job_city: 'Hyderabad - Phoenix Aquila',
+      job_state: '',
+      posted_at: now,
+      tags: { employment: 'entry_level', domains: ['hardware'], locations: ['us'], tag_engine_version: 56 },
+    })],
+    new Set(),
+    new Set(),
+    [],
+    new Set()
+  );
+  assert.strictEqual(publicJobs.length, 1, 'carry-forward India row should remain in rolling pool');
+  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'carry-forward', 'india carry-forward tagged carry-forward');
+  assert.deepStrictEqual(publicJobs[0].tags.locations, [], 'carry-forward India row must drop stale us tag');
+}
+
+// Case 6: carry-forward Heredia row, tagged 'carry-forward'; stale us tag dropped.
+{
+  const publicJobs = [];
+  mergeCarryForward(
+    publicJobs,
+    [line({
+      id: 'workday-heredia-carry',
+      source: 'workday',
+      title: 'Junior Analyst, Channel Operations',
+      company_name: 'Baxter International',
+      company_slug: 'baxter-international',
+      location: 'La Aurora, Heredia',
+      job_city: 'La Aurora',
+      job_state: '',
+      posted_at: now,
+      tags: { employment: 'entry_level', domains: ['operations'], locations: ['us'], tag_engine_version: 56 },
+    })],
+    new Set(),
+    new Set(),
+    [],
+    new Set()
+  );
+  assert.strictEqual(publicJobs.length, 1, 'carry-forward Heredia row should remain in rolling pool');
+  assert.strictEqual(publicJobs[0].tags.lifecycle_state, 'carry-forward', 'heredia carry-forward tagged carry-forward');
+  assert.deepStrictEqual(publicJobs[0].tags.locations, [], 'carry-forward Heredia row must drop stale us tag');
+}
+
+console.log('PASS carry-forward lifecycle tag-and-keep');

@@ -1,16 +1,22 @@
-U2FsdGVkX19KqgyLD+fFqMuC07odW0kOCObfpX5gZfiSw6dtuvCWB2wP7ZCnHN6L
-vjbbIjk9DsZAAs040uyEeftg99YDlrhRSOKcPlulpWeE8o6M38Lj23eSAP9393h3
-wslpD6EJg96csYYNDNpJhMwdZAu/4eHtUI4m71aJf1e1GPMR0/xzHjmdzIRZcbZM
-wFZY/DkSa3oG49hVwMsezcHImqatBsV/5NEz2jgux88Z2d1wL8dZ0tYiris0ZfhH
-LGfZDGCVV1mdicVp/9BnSfbwizh2BB9a3g9YJyR0erO+ciw2ScqQsGL4klwRLvOs
-hO7BxRy2fOydszexlWmVpeiPuGDlsFvLK1zNl4Tqcj3pDa1fz8BG7YozzpZtetxJ
-rtbiQjnJPjxTWfdKr0Jgi/CwhQmieSPuDgl4YidwVb68klnxeC0sJAcxWzdoSScm
-k3W3Gi0hFddIRrRi179q/YPv5n6HK4RXzx5ltR8cOdPOaQol6f5d/bj8WzIVSt3W
-uoHrHQ37c0UGKjLd6WprQN5L5Ozhka8M3Ij9nXGy3I6MtSOwm/F9k+RjX3Wmhnz9
-qS7AAaxag3+lTdvnEtMM1kxdxgCFTP3+pwKv7kY2oLUtn40/de7pLt/m2XMzLu+v
-YlJ6tvBv6N7wBAz518+ZUO3dRHaxrVrbVLLTO08t1Z9rDyizaeE3maWIEj7ZfjxK
-Y5D4cVEFA0pEIep2/VjG8rPc+3EPtHqvhxEVK4tI4cTrYyY+juaSKnSzI6rVDKda
-XO+ORnQ+QQXABJiibbuWZh5jEP/sPZjppdxqFEgGf9d5LUK1isGZ5FyKyiZaSeNI
-ElnPmJBNVGM0CtmZI/bWvD21CoRQR3ndhGhAHQZ5tibUBv8I1btQz4bMnVKgGcnJ
-hFrEGRm9fjeIXciBqa11IGykIoDjXqJohNaSVTvv6PJfD8CSaMHHOLucbZPPsV2D
-s45gjtpOZNfVH0l2gAe5sa0gsGDHsEqu23eWU4Sb1vclluUp4AgvJUpt8NvmlYj4
+#!/usr/bin/env node
+'use strict';
+
+const assert = require('assert');
+const { injectDescriptions } = require('../index');
+
+const jobs = [
+  { id: 'sr-1', source: 'smartrecruiters', description: null },
+  { id: 'sr-2', source: 'smartrecruiters', description: 'already here' },
+  { id: 'sr-3', source: 'smartrecruiters', description: null },
+];
+const map = new Map([
+  ['sr-1', 'desc one'],
+  ['sr-2', 'desc two should not overwrite'],
+]);
+
+const injected = injectDescriptions(jobs, map, 'SR');
+assert.strictEqual(injected, 1);
+assert.strictEqual(jobs[0].description, 'desc one');
+assert.strictEqual(jobs[1].description, 'already here');
+assert.strictEqual(jobs[2].description, null);
+console.log('PASS smartrecruiters description injection');

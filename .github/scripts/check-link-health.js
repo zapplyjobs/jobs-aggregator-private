@@ -1,207 +1,250 @@
-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
+#!/usr/bin/env node
+'use strict';
+
+const http = require('http');
+const https = require('https');
+const fs = require('fs');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+
+const TECH_DOMAINS = new Set(['software', 'data_science', 'hardware', 'ai', 'finance']);
+const DEFAULT_GROUPS = ['greenhouse', 'lever', 'ashby', 'workday', 'smartrecruiters', 'custom'];
+// AGG-DEADNESS-1 (bounded): companies whose career sites 403 bot HEAD requests regardless of
+// liveness. Excluded from the Simplify high-suspicion pass so the sample budget isn't burned on
+// guaranteed-uncertain checks. Noise control only — checkUrl already treats 403 as 'uncertain'
+// (never 'dead'), so this guards budget, not false positives. 404/410 remain the only 'dead' codes.
+const BOT_BLOCKED_COMPANIES = new Set(['tesla', 'citadel', 'citadel securities']);
+
+function parseArgs(argv) {
+  const args = { minAgeDays: 2, maxAgeDays: 4, perGroup: 8, groups: [...DEFAULT_GROUPS], perSimplify: 16, simplifyBypass: true, writeDead: null, historyIn: null, writeHistory: null };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--min-age-days') args.minAgeDays = Number(argv[++i]);
+    else if (arg === '--max-age-days') args.maxAgeDays = Number(argv[++i]);
+    else if (arg === '--per-group') args.perGroup = Number(argv[++i]);
+    else if (arg === '--groups') args.groups = argv[++i].split(',').map(s => s.trim()).filter(Boolean);
+    else if (arg === '--per-simplify') args.perSimplify = Number(argv[++i]);
+    else if (arg === '--no-simplify-bypass') args.simplifyBypass = false;
+    else if (arg === '--write-dead') args.writeDead = argv[++i];
+    else if (arg === '--history-in') args.historyIn = argv[++i];
+    else if (arg === '--write-history') args.writeHistory = argv[++i];
+  }
+  return args;
+}
+
+async function loadJsonlFromR2(filename) {
+  const client = new S3Client({
+    region: 'auto',
+    endpoint: process.env.R2_ENDPOINT,
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    },
+  });
+  const resp = await client.send(new GetObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME,
+    Key: `data/${filename}`,
+  }));
+  const text = await resp.Body.transformToString();
+  return text.split('\n').filter(Boolean).map(line => JSON.parse(line));
+}
+
+function ageDays(job) {
+  return (Date.now() - new Date(job.posted_at || 0).getTime()) / 86400000;
+}
+
+function isConsumerVisible(job) {
+  const domains = job.tags?.domains || [];
+  const locations = job.tags?.locations || [];
+  return locations.includes('us') && domains.some(d => TECH_DOMAINS.has(d));
+}
+
+function groupName(source) {
+  if (['greenhouse', 'lever', 'ashby', 'workday', 'smartrecruiters'].includes(source)) return source;
+  return 'custom';
+}
+
+function isBotBlocked(job) {
+  return BOT_BLOCKED_COMPANIES.has((job.company_name || '').trim().toLowerCase());
+}
+
+function pickSample(arr, n) {
+  const rows = [...arr].sort((a, b) => (a.id || '').localeCompare(b.id || ''));
+  if (rows.length <= n) return rows;
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(rows[Math.floor(i * (rows.length - 1) / (n - 1))]);
+  return out;
+}
+
+function checkUrl(url, redirects = 0) {
+  return new Promise(resolve => {
+    let parsed;
+    try { parsed = new URL(url); } catch { return resolve({ status: 'invalid_url', code: null, final_url: url }); }
+    const lib = parsed.protocol === 'http:' ? http : https;
+    const req = lib.request(parsed, {
+      method: 'GET',
+      timeout: 15000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 ZJP-LinkHealth/1.0',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+    }, res => {
+      const code = res.statusCode;
+      const loc = res.headers.location;
+      if ([301, 302, 303, 307, 308].includes(code) && loc && redirects < 5) {
+        res.resume();
+        return resolve(checkUrl(new URL(loc, parsed).toString(), redirects + 1));
+      }
+      res.resume();
+      res.on('end', () => {
+        const status = code >= 200 && code < 400 ? 'ok' : (code === 404 || code === 410 ? 'dead' : 'uncertain');
+        resolve({ status, code, final_url: parsed.toString() });
+      });
+    });
+    req.on('timeout', () => { req.destroy(); resolve({ status: 'timeout', code: null, final_url: parsed.toString() }); });
+    req.on('error', err => resolve({ status: 'error', code: null, error: err.code || err.message, final_url: parsed.toString() }));
+    req.end();
+  });
+}
+
+function loadHistory(file) {
+  if (!file || !fs.existsSync(file)) return { checked_at: null, history: {} };
+  try {
+    const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return data && typeof data === 'object' && data.history ? data : { checked_at: null, history: {} };
+  } catch {
+    return { checked_at: null, history: {} };
+  }
+}
+
+function buildHistory(previous, deadResults, checkedAt) {
+  const history = { ...(previous.history || {}) };
+  for (const row of deadResults) {
+    const prior = history[row.id] || {
+      id: row.id,
+      source: row.source,
+      company_name: row.company_name,
+      title: row.title,
+      url: row.url,
+      group: row.group,
+      first_seen: checkedAt,
+      hit_count: 0,
+    };
+    history[row.id] = {
+      ...prior,
+      source: row.source,
+      company_name: row.company_name,
+      title: row.title,
+      url: row.url,
+      group: row.group,
+      last_seen: checkedAt,
+      hit_count: (prior.hit_count || 0) + 1,
+      latest_status: row.status,
+      latest_code: row.code ?? null,
+    };
+  }
+  return { checked_at: checkedAt, history };
+}
+
+/**
+ * AGG-DEADNESS-1 (bounded, off-hot-path): build the sample set to be HEAD-checked.
+ * Regular groups are sampled within the [minAgeDays, maxAgeDays) age window. A separate Simplify
+ * pass samples Simplify-sourced jobs REGARDLESS of age, because Simplify re-stamps posted_at=today
+ * every run, so re-fetched-but-404/410 dead jobs (the BAE class, e.g. BAE1US118005) are always
+ * age<minAgeDays and would otherwise never be checked. checkUrl only treats 404/410 as 'dead', so
+ * the bypass cannot manufacture false dead tags; bot-blocked companies are excluded (budget only).
+ * Pure (no I/O) for testability. Returns { samples, grouped, simplifyCandidates }.
+ */
+function buildSamples(jobs, args) {
+  const grouped = Object.fromEntries(args.groups.map(g => [g, []]));
+  for (const job of jobs) {
+    const group = groupName(job.source || 'unknown');
+    if (!grouped[group]) continue;
+    const age = ageDays(job);
+    if (age < args.minAgeDays || age >= args.maxAgeDays) continue;
+    if (!job.url || !isConsumerVisible(job)) continue;
+    grouped[group].push(job);
+  }
+  const samples = [];
+  for (const group of args.groups) {
+    for (const job of pickSample(grouped[group], args.perGroup)) {
+      samples.push({ group, id: job.id, source: job.source, company_name: job.company_name, title: job.title, posted_at: job.posted_at, url: job.url });
+    }
+  }
+
+  let simplifyCandidates = 0;
+  if (args.simplifyBypass) {
+    const seen = new Set(samples.map(s => s.id));
+    const simplifyPool = [];
+    for (const job of jobs) {
+      if ((job.source || '').toLowerCase() !== 'simplify') continue;
+      if (!job.url || !isConsumerVisible(job)) continue;
+      if (isBotBlocked(job)) continue;
+      if (seen.has(job.id)) continue;
+      simplifyPool.push(job);
+    }
+    simplifyCandidates = simplifyPool.length;
+    for (const job of pickSample(simplifyPool, args.perSimplify)) {
+      samples.push({ group: 'simplify-fresh', id: job.id, source: job.source, company_name: job.company_name, title: job.title, posted_at: job.posted_at, url: job.url });
+    }
+  }
+  return { samples, grouped, simplifyCandidates };
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const jobs = await loadJsonlFromR2('all_jobs.json');
+  const { samples, grouped, simplifyCandidates } = buildSamples(jobs, args);
+
+  const results = [];
+  for (const item of samples) results.push({ ...item, ...(await checkUrl(item.url)) });
+  const summary = {};
+  let deadTotal = 0;
+  const summaryGroups = args.simplifyBypass ? [...args.groups, 'simplify-fresh'] : args.groups;
+  for (const group of summaryGroups) {
+    const arr = results.filter(r => r.group === group);
+    summary[group] = {
+      candidates: group === 'simplify-fresh' ? simplifyCandidates : (grouped[group] ? grouped[group].length : 0),
+      checked: arr.length,
+      dead: arr.filter(r => r.status === 'dead').length,
+      uncertain: arr.filter(r => !['ok', 'dead'].includes(r.status)).length,
+    };
+    deadTotal += summary[group].dead;
+  }
+  const checkedAt = new Date().toISOString();
+  const dead = results.filter(r => r.status === 'dead').map(r => ({
+    id: r.id,
+    source: r.source,
+    company_name: r.company_name,
+    title: r.title,
+    url: r.url,
+    checked_at: checkedAt,
+    group: r.group,
+    code: r.code ?? null,
+    status: r.status,
+  }));
+  const output = {
+    checked_at: checkedAt,
+    sample_window: { minAgeDays: args.minAgeDays, maxAgeDays: args.maxAgeDays },
+    simplify_age_bypass: args.simplifyBypass,
+    bot_blocked_companies: [...BOT_BLOCKED_COMPANIES],
+    per_group: args.perGroup,
+    per_simplify: args.simplifyBypass ? args.perSimplify : 0,
+    summary,
+    results,
+  };
+  console.log(JSON.stringify(output, null, 2));
+  if (args.writeDead) {
+    fs.writeFileSync(args.writeDead, JSON.stringify({ checked_at: checkedAt, dead }, null, 2) + '\n');
+  }
+  if (args.writeHistory) {
+    const history = buildHistory(loadHistory(args.historyIn), dead, checkedAt);
+    fs.writeFileSync(args.writeHistory, JSON.stringify(history, null, 2) + '\n');
+  }
+  if (deadTotal > 0) process.exit(1);
+}
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = { parseArgs, buildSamples, groupName, ageDays, isConsumerVisible, pickSample, isBotBlocked, BOT_BLOCKED_COMPANIES, DEFAULT_GROUPS };

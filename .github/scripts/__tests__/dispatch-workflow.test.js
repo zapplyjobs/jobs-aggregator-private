@@ -1,76 +1,105 @@
-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
+#!/usr/bin/env node
+'use strict';
+
+const assert = require('assert');
+const { classifyDispatchFailure, dispatchWorkflow, retryDelayMs } = require('../dispatch-workflow');
+
+function response(status, body = '', headers = {}) {
+  return {
+    status,
+    headers: { get: name => headers[name.toLowerCase()] || null },
+    async text() { return body; },
+  };
+}
+
+function fakeFetch(steps) {
+  const calls = [];
+  const fn = async (url, options) => {
+    calls.push({ url, options });
+    const step = steps.shift();
+    if (!step) return response(204);
+    if (step.throw) throw step.throw;
+    return step.response;
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+const base = {
+  token: 'token',
+  repo: 'jobs-data-2026',
+  workflow: 'refresh-zjp-public-snapshot.yml',
+  ref: 'main',
+  baseDelayMs: 1,
+  sleepImpl: async () => {},
+  log: () => {},
+  warn: () => {},
+  error: () => {},
+};
+
+(async () => {
+  assert.deepStrictEqual(classifyDispatchFailure(500), { retryable: true, className: 'github_transient' });
+  assert.deepStrictEqual(classifyDispatchFailure(429), { retryable: true, className: 'rate_limited' });
+  assert.deepStrictEqual(classifyDispatchFailure(401), { retryable: false, className: 'auth' });
+  assert.deepStrictEqual(classifyDispatchFailure(422), { retryable: false, className: 'invalid_dispatch' });
+  assert.strictEqual(retryDelayMs(response(429, '', { 'retry-after': '2' }), 1000, 1), 2000);
+
+  {
+    const fetchImpl = fakeFetch([{ response: response(204) }]);
+    const ok = await dispatchWorkflow({ ...base, fetchImpl });
+    assert.strictEqual(ok, true, '204 dispatch should succeed');
+    assert.strictEqual(fetchImpl.calls.length, 1);
+    assert.strictEqual(fetchImpl.calls[0].url, 'https://api.github.com/repos/zapplyjobs/jobs-data-2026/actions/workflows/refresh-zjp-public-snapshot.yml/dispatches');
+    assert.strictEqual(JSON.parse(fetchImpl.calls[0].options.body).ref, 'main');
+  }
+
+  {
+    const fetchImpl = fakeFetch([
+      { response: response(500, '{"message":"internal"}') },
+      { response: response(204) },
+    ]);
+    const ok = await dispatchWorkflow({ ...base, fetchImpl, maxAttempts: 3 });
+    assert.strictEqual(ok, true, '500 should retry and then succeed');
+    assert.strictEqual(fetchImpl.calls.length, 2);
+  }
+
+  {
+    const fetchImpl = fakeFetch([
+      { response: response(401, '{"message":"Requires authentication"}') },
+    ]);
+    const ok = await dispatchWorkflow({ ...base, fetchImpl, maxAttempts: 3 });
+    assert.strictEqual(ok, false, '401 should fail loud without retry');
+    assert.strictEqual(fetchImpl.calls.length, 1);
+  }
+
+  {
+    const fetchImpl = fakeFetch([
+      { throw: new Error('socket hang up') },
+      { response: response(204) },
+    ]);
+    const ok = await dispatchWorkflow({ ...base, fetchImpl, maxAttempts: 2 });
+    assert.strictEqual(ok, true, 'network failure should retry');
+    assert.strictEqual(fetchImpl.calls.length, 2);
+  }
+
+  {
+    const fetchImpl = fakeFetch([
+      { response: response(500, '{"message":"internal"}') },
+      { response: response(502, '{"message":"bad gateway"}') },
+    ]);
+    const ok = await dispatchWorkflow({ ...base, fetchImpl, maxAttempts: 2 });
+    assert.strictEqual(ok, false, 'exhausted transient retries should fail loud');
+    assert.strictEqual(fetchImpl.calls.length, 2);
+  }
+
+  await assert.rejects(
+    () => dispatchWorkflow({ ...base, token: '', fetchImpl: fakeFetch([]) }),
+    /GH_PAT is required/,
+    'missing token should be a fatal config error'
+  );
+
+  console.log('PASS dispatch-workflow behavior');
+})().catch(err => {
+  console.error(err);
+  process.exit(1);
+});

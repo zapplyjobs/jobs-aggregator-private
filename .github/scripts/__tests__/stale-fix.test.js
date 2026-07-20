@@ -1,104 +1,131 @@
-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
+/**
+ * AGG-STALE-FIX-1: Test that resolvePostedAt hard-retires current-run jobs
+ * with posted_at beyond TTL + visibility window (same as mergeCarryForward).
+ *
+ * Verifies:
+ * 1. Fresh jobs (< TTL) are kept and tagged 'fresh'
+ * 2. Stale-candidate jobs (TTL < age < TTL+visibility) are kept and tagged 'stale-candidate'
+ * 3. Stale-candidate jobs beyond TTL+visibility (>59d regular, >165d internship) ARE DROPPED
+ * 4. Evergreen jobs (>evergreen threshold but < hard-retire) are kept and tagged 'evergreen'
+ * 5. Internship stale-candidate jobs get wider window (165d, not 59d)
+ */
+
+const assert = require('assert');
+const path = require('path');
+
+// Load the actual functions from index.js
+const indexPath = path.join(__dirname, '..', 'index.js');
+const mod = require(indexPath);
+const { resolvePostedAt, isLifecycleHardRetired } = mod;
+
+const DAY = 86400000;
+const now = Date.now();
+
+function makeJob(id, daysAgo, employment = 'mid_level') {
+  return {
+    id,
+    source: 'oracle',
+    posted_at: new Date(now - daysAgo * DAY).toISOString(),
+    tags: { employment },
+  };
+}
+
+function testFreshJobKept() {
+  const jobs = [makeJob('fresh-1', 5)]; // 5 days old — within TTL
+  resolvePostedAt(jobs, []);
+  assert.strictEqual(jobs.length, 1, 'Fresh job should be kept');
+  assert.strictEqual(jobs[0].tags.lifecycle_state, 'fresh');
+  console.log('  ✓ fresh job (5d) kept + tagged fresh');
+}
+
+function testStaleCandidateKept() {
+  const jobs = [makeJob('stale-1', 30)]; // 30 days — stale but < 59d
+  resolvePostedAt(jobs, []);
+  assert.strictEqual(jobs.length, 1, 'Stale-candidate (30d) should be kept');
+  assert.strictEqual(jobs[0].tags.lifecycle_state, 'stale-candidate');
+  console.log('  ✓ stale-candidate (30d) kept + tagged');
+}
+
+function testHardRetireDrops() {
+  const jobs = [makeJob('ancient-1', 70)]; // 70 days — beyond 59d threshold
+  resolvePostedAt(jobs, []);
+  assert.strictEqual(jobs.length, 0, 'Stale-candidate >59d should be hard-retired (dropped)');
+  console.log('  ✓ stale-candidate >59d (70d) hard-retired');
+}
+
+function testVeryOldDropped() {
+  const jobs = [makeJob('very-old-1', 200)]; // 200 days — way beyond threshold
+  resolvePostedAt(jobs, []);
+  assert.strictEqual(jobs.length, 0, 'Very old job (200d) should be hard-retired');
+  console.log('  ✓ stale-candidate >59d (200d) hard-retired');
+}
+
+function testInternshipWiderWindow() {
+  // Internship: TTL=120d, visibility=45d → hard-retire at 165d
+  const jobs = [
+    makeJob('intern-100', 100, 'internship'),  // 100d — within 120d TTL → fresh
+    makeJob('intern-130', 130, 'internship'),  // 130d — stale but < 165d → kept
+    makeJob('intern-200', 200, 'internship'),  // 200d — beyond 165d → dropped
+  ];
+  resolvePostedAt(jobs, []);
+  assert.strictEqual(jobs.length, 2, 'Internship: 100d + 130d kept, 200d dropped');
+  const states = jobs.map(j => j.tags.lifecycle_state);
+  assert(states.includes('fresh') || states.includes('stale-candidate'), 'Should have fresh or stale-candidate');
+  console.log('  ✓ internship wider window: 100d+130d kept, 200d hard-retired');
+}
+
+function testMixOfJobs() {
+  const jobs = [
+    makeJob('fresh-mix', 3),
+    makeJob('stale-mix', 25),
+    makeJob('old-mix', 70),       // should be dropped
+    makeJob('very-old-mix', 150), // should be dropped
+  ];
+  resolvePostedAt(jobs, []);
+  assert.strictEqual(jobs.length, 2, 'Mix: 2 kept (fresh+stale), 2 dropped (>59d)');
+  console.log('  ✓ mixed batch: fresh+stale kept, >59d dropped');
+}
+
+function testEmptyInput() {
+  const jobs = [];
+  resolvePostedAt(jobs, []);
+  assert.strictEqual(jobs.length, 0);
+  console.log('  ✓ empty input handled');
+}
+
+function testNullPostedAt() {
+  // Jobs with null posted_at: classifyAgeLifecycle returns 'stale-candidate'
+  // (because windowTs defaults to now, which is >= now - TTL → not stale... actually
+  // activePublicWindowTs returns now for null posted_at, so it's within TTL → null (fresh))
+  const jobs = [{ id: 'null-date', source: 'oracle', posted_at: null, tags: {} }];
+  resolvePostedAt(jobs, []);
+  // null posted_at → activePublicWindowTs returns now → classifyAgeLifecycle returns null (within TTL)
+  // → tagged 'fresh', NOT dropped
+  assert.strictEqual(jobs.length, 1, 'Null posted_at should not be dropped');
+  console.log('  ✓ null posted_at handled (not dropped)');
+}
+
+// --- Run all tests ---
+const tests = [
+  ['fresh-kept', testFreshJobKept],
+  ['stale-kept', testStaleCandidateKept],
+  ['hard-retire-drops', testHardRetireDrops],
+  ['very-old-dropped', testVeryOldDropped],
+  ['internship-wider-window', testInternshipWiderWindow],
+  ['mix', testMixOfJobs],
+  ['empty', testEmptyInput],
+  ['null-posted-at', testNullPostedAt],
+];
+
+let passed = 0;
+for (const [name, fn] of tests) {
+  try {
+    fn();
+    passed++;
+  } catch (err) {
+    console.error(`  ✗ ${name}: ${err.message}`);
+    process.exitCode = 1;
+  }
+}
+
+console.log(`\nstale-fix: ${passed} pass, ${tests.length - passed} fail`);

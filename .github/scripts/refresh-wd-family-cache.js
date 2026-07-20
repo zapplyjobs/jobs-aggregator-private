@@ -1,184 +1,277 @@
-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
+#!/usr/bin/env node
+
+/**
+ * Refresh Workday family cache outside the hot publish path.
+ *
+ * Main fetch uses wd-family-cache.json to annotate Workday departments before TAG
+ * decisions. The cache refresh is intentionally separate from output production:
+ * fresh all_jobs.json can publish first, then this script refreshes the cache for
+ * the next run.
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+const SHARED = path.join(__dirname, 'aggregator', 'lib');
+const DATA_DIR = path.join(process.cwd(), '.github', 'data');
+const COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');
+const CACHE_FILE = path.join(DATA_DIR, 'wd-family-cache.json');
+const DEFAULT_MAX_DURATION_MS = 120000;
+const TENANT_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+const { buildFamilyCache } = require(`${SHARED}/fetchers/workday`);
+
+function parseMaxDurationMs() {
+  const raw = process.env.WD_FAMILY_CACHE_MAX_MS;
+  if (!raw) return DEFAULT_MAX_DURATION_MS;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`Invalid WD_FAMILY_CACHE_MAX_MS: ${raw}`);
+  }
+  return value;
+}
+
+
+function readExistingCache() {
+  try {
+    return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+const TECH_DOMAINS = new Set(['software', 'data_science', 'hardware', 'cybersecurity', 'ai', 'devops', 'product', 'design', 'qa', 'it']);
+
+function isTechUs(job) {
+  return Array.isArray(job.tags?.locations)
+    && job.tags.locations.includes('us')
+    && Array.isArray(job.tags?.domains)
+    && job.tags.domains.some(domain => TECH_DOMAINS.has(domain));
+}
+
+function readJobsFile(jobsPath) {
+  let text = '';
+  try {
+    text = fs.readFileSync(jobsPath, 'utf8');
+  } catch {
+    return [];
+  }
+
+  try {
+    const jobs = JSON.parse(text);
+    if (Array.isArray(jobs)) return jobs;
+    if (Array.isArray(jobs.jobs)) return jobs.jobs;
+  } catch {}
+
+  const records = [];
+  for (const line of text.trim().split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      records.push(JSON.parse(line));
+    } catch {}
+  }
+  return records;
+}
+function readCurrentJobs() {
+  return readJobsFile(path.join(DATA_DIR, 'all_jobs.json'));
+}
+
+async function loadCurrentJobs(r2) {
+  const localJobs = readCurrentJobs();
+  if (localJobs.length > 0) return localJobs;
+
+  const fallbackPath = path.join(DATA_DIR, 'all_jobs.priority.json');
+  try {
+    const result = await r2.downloadToFile('all_jobs.json', fallbackPath);
+    if (result) return readJobsFile(fallbackPath);
+  } catch (error) {
+    console.warn(`Could not load all_jobs.json for WD cache priority scoring: ${error.message}`);
+  }
+
+  return [];
+}
+
+function getTenantPriorityScores(cache, jobs = readCurrentJobs()) {
+  const scores = {};
+  const stats = {};
+
+  for (const job of jobs) {
+    if (job.source !== 'workday' || !job.company_name) continue;
+
+    const row = stats[job.company_name] || {
+      total: 0,
+      techUs: 0,
+      noCacheRows: 0,
+      noCacheTechUs: 0,
+      pathNoHit: 0,
+      techPathNoHit: 0,
+    };
+
+    row.total += 1;
+    const techUs = isTechUs(job);
+    if (techUs) row.techUs += 1;
+
+    const cached = cache?.tenants?.[job.company_name];
+    if (!cached || !cached.pathMap || typeof cached.pathMap !== 'object') {
+      row.noCacheRows += 1;
+      if (techUs) row.noCacheTechUs += 1;
+    } else if (job.wd_path && !cached.pathMap[job.wd_path]) {
+      row.pathNoHit += 1;
+      if (techUs) row.techPathNoHit += 1;
+    }
+
+    stats[job.company_name] = row;
+  }
+
+  for (const [name, row] of Object.entries(stats)) {
+    scores[name] = (row.noCacheTechUs + row.techPathNoHit) * 10000
+      + (row.noCacheRows + row.pathNoHit) * 100
+      + row.techUs * 10
+      + row.total;
+  }
+
+  return { scores, stats };
+}
+
+function getTenantCacheStatus(cache, tenants, now = Date.now(), maxAgeMs = TENANT_REFRESH_INTERVAL_MS) {
+  if (!cache || !cache.tenants || typeof cache.tenants !== 'object') {
+    return {
+      fresh: false,
+      tenantCount: tenants.length,
+      cacheTenantCount: 0,
+      missing: tenants.map(t => t.name),
+      stale: [],
+      invalid: [],
+    };
+  }
+
+  const missing = [];
+  const stale = [];
+  const invalid = [];
+
+  for (const tenant of tenants) {
+    const cached = cache.tenants[tenant.name];
+    if (!cached || !cached.pathMap || typeof cached.pathMap !== 'object') {
+      missing.push(tenant.name);
+      continue;
+    }
+
+    const fetchedAt = cached.fetched_at ? new Date(cached.fetched_at).getTime() : NaN;
+    if (!Number.isFinite(fetchedAt)) {
+      invalid.push(tenant.name);
+      continue;
+    }
+
+    if (now - fetchedAt >= maxAgeMs) {
+      stale.push(tenant.name);
+    }
+  }
+
+  return {
+    fresh: missing.length === 0 && stale.length === 0 && invalid.length === 0,
+    tenantCount: tenants.length,
+    cacheTenantCount: Object.keys(cache.tenants).length,
+    missing,
+    stale,
+    invalid,
+  };
+}
+
+function loadWorkdayTenants() {
+  const companyList = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));
+  const tenants = companyList.workday;
+  if (!Array.isArray(tenants) || tenants.length === 0) {
+    throw new Error('company-list.json has no Workday tenants');
+  }
+  return tenants;
+}
+
+async function seedExistingCache(r2) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  try {
+    const result = await r2.downloadToFile('wd-family-cache.json', CACHE_FILE);
+    if (result) {
+      console.log(`Seeded existing wd-family-cache.json from R2 (${Math.round(result.size / 1024)} KB)`);
+      return true;
+    }
+  } catch (error) {
+    console.warn(`Could not seed existing WD family cache from R2: ${error.message}`);
+  }
+  console.warn('No existing WD family cache seeded; rebuilding from local state only');
+  return false;
+}
+
+async function uploadCache(r2) {
+  const raw = fs.readFileSync(CACHE_FILE, 'utf8');
+  const parsed = JSON.parse(raw);
+  const tenantCount = Object.keys(parsed.tenants || {}).length;
+  if (tenantCount === 0) {
+    throw new Error('Refusing to upload empty wd-family-cache.json');
+  }
+  const uploaded = await r2.uploadRaw('wd-family-cache.json', raw, 'application/json');
+  if (!uploaded) {
+    throw new Error('R2 uploadRaw returned false for wd-family-cache.json');
+  }
+  console.log(`Uploaded wd-family-cache.json to R2 (${tenantCount} tenants)`);
+}
+
+async function main() {
+  const maxDurationMs = parseMaxDurationMs();
+  const tenants = loadWorkdayTenants();
+  const { createR2Client } = require(`${SHARED}/storage/r2-client`);
+  const r2 = createR2Client({ prefix: 'data/' });
+
+  await seedExistingCache(r2);
+
+  const cache = readExistingCache();
+  const status = getTenantCacheStatus(cache, tenants);
+  if (status.fresh) {
+    console.log(`WD family cache tenant entries fresh (${status.tenantCount} tenants, refresh interval: ${(TENANT_REFRESH_INTERVAL_MS / 3600000).toFixed(0)}h); skipping refresh`);
+    return;
+  }
+
+  const dueNames = new Set([...status.missing, ...status.stale, ...status.invalid]);
+  const tenantsToRefresh = tenants.filter(t => dueNames.has(t.name));
+  const currentJobs = await loadCurrentJobs(r2);
+  const { scores: tenantPriorityScores, stats: tenantPriorityStats } = getTenantPriorityScores(cache, currentJobs);
+  const scoredDueTenants = tenantsToRefresh
+    .map(tenant => ({
+      name: tenant.name,
+      score: tenantPriorityScores[tenant.name] || 0,
+      stats: tenantPriorityStats[tenant.name] || null,
+    }))
+    .filter(row => row.score > 0)
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+    .slice(0, 8);
+
+  console.log(`WD family cache refresh needed: ${status.missing.length} missing, ${status.stale.length} stale, ${status.invalid.length} invalid tenant entries (${status.cacheTenantCount}/${status.tenantCount} cached); refreshing ${tenantsToRefresh.length} due tenants`);
+  console.log(`WD family cache priority input: ${currentJobs.length} current jobs, ${scoredDueTenants.length} due tenants with live headroom scores`);
+  if (scoredDueTenants.length > 0) {
+    console.log(`WD family cache priority tenants: ${scoredDueTenants.map(row => `${row.name}:${row.score}`).join(', ')}`);
+  }
+  const report = await buildFamilyCache(tenantsToRefresh, DATA_DIR, { maxDurationMs, tenantPriorityScores });
+  if (!fs.existsSync(CACHE_FILE)) {
+    throw new Error('buildFamilyCache did not write wd-family-cache.json');
+  }
+  await uploadCache(r2);
+
+  console.log(JSON.stringify({
+    refreshed_at: new Date().toISOString(),
+    max_duration_ms: maxDurationMs,
+    tenant_refresh_interval_hours: TENANT_REFRESH_INTERVAL_MS / 3600000,
+    report,
+  }));
+}
+
+if (require.main === module) {
+  main().catch(error => {
+    console.error(`WD family cache refresh failed: ${error.stack || error.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  getTenantCacheStatus,
+  getTenantPriorityScores,
+  isTechUs,
+};

@@ -1,21 +1,24 @@
-U2FsdGVkX1+usT4tWseeQ5YEjGlUsqyayn+KUjCsZLSY0p6H4+yKfbdDcmaL0bhq
-OmD0/xu7C9c9p9Z4Nd2c6G4R90v+Wua9FfTJVUqZ9qs0BGgT5akDGvXyIOwAIQJw
-dLhZFLpLGL4MX88/hBDSEiZFgkpOD63NcVHwALkHqUfPkGT6sfYY93O6pnegeYMS
-s+vGmjDy2HrtEwe+b2NsIlTUwP7QKhAVx3RyKJvdsVInC0ZW6ViwQwQaq2iMrwNA
-NMWmOXhap9z2B7ySPWbNllCJdr928Wm5ZRs6HKFVeEo2uQWbuZSdQLzgGlYhvXlC
-rf95HtpO/D9iH2iDFDmWYGlDvZCAHrmWrFREcxy43CeKxY4FaBwfmWvPMQulnaYq
-Ig03D1IN8CbNAsYKHUsrtO7gjVkATu+KLahrlqMwy9AVJlJ1ctXlGlcCotsXYBYJ
-Cu8tTXJNfOVwRoRE6ZwxhdeR17pKMgl5eKmbJXW+/FKoeM7zH/u+WwUA6hhiVyMl
-eHFg1ZVvDUiEHntmkV+R/4PShJteVsd43/uezL1y2IxZKKg2XH7P+HiHb7tpKKt7
-r77/DW7RYawWE7YIu4Gs8RnVIvTwbWqashPvC5Dz0/8zBZMe4dk9diVyzi+10ynL
-13Zg/y6/nWfQJEW+GHvegogIcfYITD0kU3YGwpa0sy7r8igPekoVtkeF2QvB2gMD
-TNBf60Cwsgl5y9BJ6oZKj6y4Q2lVObGxhy0dD6OM+BV6OJ2W3+ec1xxVRAt/5jjr
-XpNkGFn46B4gxAXl1R4mUutixyUCZILo67I1RwWHBqIExdMIYuJsz0anOvljBqhh
-BVoBejTfJLaQbMWUMiwh8UWUDSoJC8UQgXsUsbyxvc7lTYYkvCgEpSm3SJYRFVqm
-hleo+30GFld37iAC04rQ4M8xjhuxE5HDxc7W1wQbhWmh8dxXkbCYXUvkE628ReoP
-nb/cD9EjXrhSrmZnrDYo+CFj96vxn5ER3ghhOqRGIBEZp9yLGoddmTin09Ty5lyL
-hraElEhcHH89ryO+SK4tbNYqPNLMB9Pz7ql2WArLxMisa0NdU3ed9yEkSsYrjWpA
-dFEjeBo+lZXZgDPTOA+U+ALkCM9drKZYhy2A+eO+/w3idEzzJFfb/+Zsi1nbffgy
-Fn1o8xEGxSjQ1basEF2n3EapwSvrrOYnNwI0fGwNWNrwcFNzn4ZyF/Dp71gVkOKS
-6H6IKRFF6s6u/zobwKrVdErjbCyTf7qIoiNdXaXjGx5Z5JF0rNwWt6b94dIDx8h+
-9bhfl/iVXCbaOF/Ffai1ow==
+#!/usr/bin/env node
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { writeSidecar } = require('../fetch-supplemental-custom');
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'icims-sidecar-'));
+const out = path.join(tmp, 'descriptions-icims.jsonl');
+const rows = writeSidecar(out, [
+  { id: 'icims-1', description: 'x'.repeat(100) },
+  { id: 'icims-2', description: '' },
+  { id: 'icims-3', description: '  ' },
+  { id: 'icims-4', description: 'y'.repeat(60) },
+]);
+assert.strictEqual(rows, 2);
+const lines = fs.readFileSync(out, 'utf8').trim().split('\n').map(JSON.parse);
+assert.deepStrictEqual(lines.map(r => r.id), ['icims-1', 'icims-4']);
+assert.strictEqual(lines[0].description_text.length, 100);
+assert.strictEqual(lines[1].description_text.length, 60);
+fs.rmSync(tmp, { recursive: true, force: true });
+console.log('PASS icims sidecar writer');

@@ -1,65 +1,98 @@
-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
-VXQdVQfZjlb0ZEFBBgl3mw==
+#!/usr/bin/env node
+'use strict';
+
+const fs = require('fs');
+
+function parseArgs(argv) {
+  const args = {
+    input: 'agg-link-health.json',
+    output: 'link-verification-sample.json',
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--input') args.input = argv[++i];
+    else if (arg === '--output') args.output = argv[++i];
+    else if (arg === '--help' || arg === '-h') {
+      console.log('Usage: node .github/scripts/build-link-verification-sample.js [--input agg-link-health.json] [--output link-verification-sample.json]');
+      process.exit(0);
+    }
+  }
+  return args;
+}
+
+function loadJson(path) {
+  return JSON.parse(fs.readFileSync(path, 'utf8'));
+}
+
+function statusBucket(status) {
+  if (status === 'ok') return 'verified_live';
+  if (status === 'dead') return 'stale_candidate';
+  return 'uncertain';
+}
+
+function buildVerificationSample(input) {
+  const checkedAt = input.checked_at || new Date().toISOString();
+  const results = Array.isArray(input.results) ? input.results : [];
+  const samples = results.map(row => ({
+    id: row.id,
+    lifecycle_state: statusBucket(row.status),
+    source: row.source || null,
+    group: row.group || null,
+    company_name: row.company_name || null,
+    title: row.title || null,
+    posted_at: row.posted_at || null,
+    url: row.url || null,
+    final_url: row.final_url || null,
+    last_checked_at: checkedAt,
+    last_verified_live_at: row.status === 'ok' ? checkedAt : null,
+    status: row.status || null,
+    code: row.code ?? null,
+    error: row.error || null,
+  }));
+
+  const summary = {
+    total_checked: samples.length,
+    verified_live: 0,
+    stale_candidate: 0,
+    uncertain: 0,
+    by_group: {},
+    by_status: {},
+  };
+
+  for (const row of samples) {
+    if (row.lifecycle_state === 'verified_live') summary.verified_live += 1;
+    else if (row.lifecycle_state === 'stale_candidate') summary.stale_candidate += 1;
+    else summary.uncertain += 1;
+    const group = row.group || 'unknown';
+    summary.by_group[group] = (summary.by_group[group] || 0) + 1;
+    const status = row.status || 'unknown';
+    summary.by_status[status] = (summary.by_status[status] || 0) + 1;
+  }
+
+  return {
+    generated_at: new Date().toISOString(),
+    source_artifact: 'agg-link-health.json',
+    artifact_type: 'link_verification_sample',
+    policy: {
+      coverage: 'sample_only',
+      full_pool_proof: false,
+      note: 'This artifact records live/dead/uncertain evidence for the sampled URLs checked by Check Link Health. Do not present sampled verification as full-pool freshness proof.',
+    },
+    sample_window: input.sample_window || null,
+    per_group: input.per_group ?? null,
+    summary,
+    samples,
+  };
+}
+
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const sample = buildVerificationSample(loadJson(args.input));
+  const text = JSON.stringify(sample, null, 2) + '\n';
+  fs.writeFileSync(args.output, text);
+  console.log(text);
+}
+
+if (require.main === module) main();
+
+module.exports = { buildVerificationSample, parseArgs };
