@@ -1,89 +1,65 @@
-#!/usr/bin/env node
-'use strict';
-
-const assert = require('assert');
-const { normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge } = require('../index');
-
-const generatedAt = '2026-06-17T06:49:17.331Z';
-
-{
-  const row = normalizeSupplementalJobForMerge(
-    { id: 'tiktok-1', source: 'TikTok', title: 'Software Engineer Intern', description: 'Rich text' },
-    { generated_at: generatedAt }
-  );
-  assert.strictEqual(row.source, 'tiktok');
-  assert.strictEqual(row.posted_at, generatedAt);
-  assert.strictEqual(row.posted_at_basis, 'supplemental_generated_at');
-}
-
-{
-  const row = normalizeSupplementalJobForMerge(
-    { id: 'oracle-1', source: 'oracle', posted_at: '2026-01-01T00:00:00.000Z' },
-    { generated_at: generatedAt }
-  );
-  assert.strictEqual(row.posted_at, '2026-01-01T00:00:00.000Z');
-  assert.strictEqual(row.posted_at_basis, undefined);
-}
-
-assert.strictEqual(normalizeSupplementalJobForMerge(null, { generated_at: generatedAt }), null);
-assert.strictEqual(normalizeSupplementalJobForMerge({ id: 'missing-source' }, { generated_at: generatedAt }), null);
-
-{
-  const summary = summarizeSupplementalLaneForMerge(
-    'custom',
-    [
-      { id: 'google-1', source: 'Google', title: 'Software Engineer' },
-      { id: 'microsoft-1', source: 'Microsoft', title: 'Software Engineer' },
-    ],
-    {
-      generated_at: '2026-06-17T06:49:17.331Z',
-      lane_name: 'custom',
-      jobs_fetched: 2,
-      publish_contract: { max_staleness_minutes: 90 },
-      sources: { google: 1, microsoft: 1 },
-    },
-    new Date('2026-06-17T07:30:00.000Z').getTime()
-  );
-  assert.strictEqual(summary.info.status, 'merged');
-  assert.deepStrictEqual(summary.info.by_source, { google: 1, microsoft: 1 });
-  assert.strictEqual(summary.jobs.length, 2);
-}
-
-{
-  const summary = summarizeSupplementalLaneForMerge(
-    'custom',
-    [{ id: 'google-1', source: 'Google' }],
-    {
-      generated_at: '2026-06-17T06:49:17.331Z',
-      lane_name: 'custom',
-      jobs_fetched: 1,
-      publish_contract: { max_staleness_minutes: 30 },
-      sources: { google: 1 },
-    },
-    new Date('2026-06-17T08:00:00.000Z').getTime()
-  );
-  assert.strictEqual(summary.info.status, 'skipped_stale');
-  assert.strictEqual(summary.info.skip_reason, 'stale_artifact');
-  assert.strictEqual(summary.jobs.length, 0);
-}
-
-{
-  const summary = summarizeSupplementalLaneForMerge(
-    'custom',
-    [{ id: 'google-1', source: 'Google' }],
-    {
-      generated_at: '2026-06-17T06:49:17.331Z',
-      lane_name: 'custom',
-      jobs_fetched: 1,
-      publish_contract: { max_staleness_minutes: 90 },
-      sources: { google: 1, tiktok: 0 },
-    },
-    new Date('2026-06-17T07:00:00.000Z').getTime()
-  );
-  // source_set_mismatch check was never implemented — declared-but-zero sources are tolerated
-  // (zero-yield is normal: sources rotate; only UNDECLARED sources trigger a skip).
-  assert.strictEqual(summary.info.status, 'merged', 'declared-but-zero sources tolerated (no source_set_mismatch check)');
-  assert.strictEqual(summary.jobs.length, 1);
-}
-
-console.log('PASS supplemental merge normalization');
+U2FsdGVkX19YowYkUqOm97zIyeAE9E0bkD3gONqqGCw8/oo/JfP+0ThwJIJlVMom
+aFxjHGtkhk58tXBW2zMBQWK+lPte4FIcBwf8hMJIvDp2q/f7qyMnmd+Df5HjHPjE
+P/z0ITyPRcVxOwhMFaBpjNdoMv0FFRP9qqa3qUdoqIj77TDSJq9O9fdqGHRQmi2i
+IRlicSEtXAw3TjOAh1nyJIoqEznSRAZw2hDlhufcsNt+WMU6aF2d3W+R6P1/Emkx
+JgcZNvlGTvcdud5cKapTACNHyl3A6J4++W91soiIBzImFj6PSzmDkmKoC4N3JjwC
+HLjnDIIW7EUO81iZy0YqqdzWD1Gt6Ah6KRc1R9Hjc+E2dbDA9hDtNr+cJ5+PINZ8
+ue5ujI8K5Max4jYMsUILYjANO3MycRinsj7a4hOJBw2ZSyvP6NkeC76eWEJjuA1r
+/JMd1TNardsSvtkZDmBM0jsSJHWd4NFeBHFk3NiSQp2oZqD4loC03j8OvL6ms/Bl
+w7GjC34gEnlB8qtjz+YA4PZJg718H7tMKhaJqq0ti+TWQ7HH5qRmLTRF2Q29xVCi
+kg+N0kB0Ez/rTLhFJ41GidRpKYH2hsuBtAA4h5uSC29FxstqXl0jDK8giT1V3PP8
+3OQsjjwdWVm0QQDIdb8MBUO+Ijl4XP65ss2dI45mwecLNCGY1eV5XJQt3/P20hJp
+0pnsPUiY+NEbo4WZhHSAtQnfBVhRPWiovyqewC9v9mpW9SD710gyWImDAjjBpzxk
+LIw3n8rX7X+Yr87Azt539ql79QIITKr1YQDpDv5ZVG9wP1SDkcmg9gr59y45r46o
+7qnuOBJ0g2iEmliddS+hBUAtWI5WIkYGloF89E5y4dnC9zshx+8L/1AKaU00xrPS
+hFrr3a3gVj6UudrLkVNo6Mwks9bZKlS+HjdFf8lW5oUG2NDtihGSwjVPAJfoCCXQ
+3feJomEfuCzEvKMFFjjolh/Ty7M30wRriTSr5d2mOWWfnXTWhQUlNT/uDFjbWnYk
+jjMZsHEHOVJi/2vqDJYbvjIGCN5t6EWu1qM6c4IU7wrMDyZ26j4BNP5OFyKoia7L
+W2PNCY37VDhOQeQl1ZD2rzUCiNlyhogrK2Eob7WkjLE2sUhKViozsF9nA6pKHXQS
+D6sFAFEoP5lbxnK0R3fZAFI2goI8gBNe5wl2nknZT7gLxdtJLWa9Trih+U5zUqxV
+cQwsqJLsuAslBuXPB0QNXWWG/Hmp9vuDkKhJUmqVFQnsP09n1pUEucAQT6WqGaPg
+YiSI1u7ERx48RIYKaoYY097lGZPmUrbqtxhBIB5+Ym4BxqvDmKYES/syODy+/T6m
+XCZxBK2oU8k5NX5Bn0bcu35wd9JkBbnJFm8mhfOEco5tVJJcFst8fR51iQNEDLZR
+vCSGDOqSfz8SIzsh69kVgJCqElWLrJyBqf50TDgJiPPMJ8zAG/R+04YwAQ3+dCl9
+aVhZGExtDXQHMeMnhJjKBYPSrk+GOctsLlnRDIfu6XjyQvT9i9b0087kTDWN79gv
+2UOoyItOKYyCp59qAO35bx85CJFMQbQR4LCuyTcEiww+9eDlLS37uT5JPDto2ksM
+5o3bv5JbKPLYTDtXx6URzI0ZCHzEAUDnLBHd0CWUzvtmmwfYqespuYinvrs2Bpom
+3wXE06thhRhzCjcEGznnh+rYvOJvP1w8V95TOUCHJG99/S3j/A/+pzshsYY9X56z
+bRi2Z1f/v5vW41lQmmOCtcLNsxFCRj4SW1NrSZlbvarlG+1zblIv/Wcz8T2fk3AS
+bzz1DoTykwH1r4iPcOXy3cAq0qS5kyvlrEvSXXL9Gzi7kyn9BZf6A3nDjsno0Uy2
+Bsb1RE7SgBlDJoShm6KjGcn8ehunLCZxqsbCTacwmp89xuVj5CJDBlGwlySQ7ZeO
+b3PQ5F52OjXFz4BkHhcIn+Em2sfQTD7DH+jl2yEnPNYeExCu4Q2E306huxiueqny
+rTOu8y42vrU7YuDvScbkjT4w8As5Qd0FWgPf/Cgcj4pKo6dUFk2douwgbJaWcHzl
+QVtQpMLQo4Q3F8V1bPothPfl5nCvP7T62LJrFNSQcbRwL3AAEqFJcFNA9RYGGTNO
+HnfJwKfDG54aPQAJNKSSLv1zKoi6dc1W3rXBINu8ga6+iUZRhFECfBgS/xuzqGis
+HkQE8UKrtcrwpm+jBTLoeNNzVU1PFvo6BAug5ecJ89kzlCXK6he3H+GRdAY8pBa8
+sIChySH/khthWmTmtgwGT+JzzQdTzbWBqNKja8oV0f5lw11sX0zu6bJweNXlqXN6
+SMBaPFAxM0IUh2lV98z+9DKuBgRGrNrxZ8hR8mSOj+D5XFOzzK97EsfumiGLNsnM
+vvCyOTtnrlGCFfGz3UATMyyKWsj5sF5b9pSNwOsiMLSfiXZNxXrbVK9STN27JjPZ
+mZQqugbKoMpmmr7SMaftLptNWBTbkrKIaUgthX1F+jyFhOjszQAMAVCLriBbFau2
+ai89WNxRl9gHeI4e7UtE4K5io1faPLsIPmmTEwg08E00e5iD5GCCpQ5ttUTfKGRe
+Ia2GqW9zIN0lihbpQa18a6S1wl/t5vUhcy32rV6RWB6KASqpMTSMT/K0EcbyN6gS
+j9Zp1V+Y+JK0hv+9jvK1Zvhvb44ENU0bVGl5MzJzVSL8Rfdb5qZic4i7XUpWoFHe
+bl/EzMeioMvBVCER+rBc1gSwczZsgby43370WwhGpYNoVz7ZyxxBfhKipvfSdCUU
+8mwh9aJTgMWJIbPYQFSVjQIVOHmFxqaS76DkBiBUoeDyeGVhDjFZxsOiJL+n86nn
+3SPjyVL0M0WJCuvb7AePPyJ7mCQcRiEHs9cAHFgqE2crqB2WCuiC1XXrD9mQi/Hf
+8K5D3J5eBso+UQckIvR3NhFPNNrQEU1uO+7YvGCEt1E9Sw/Ser9tlFVzQDok4LVg
+tmtAl9B+6S8sPQ2PZD9vRw/+skY/ADp4KZnMmvL3iqaPtkCNJbvVEzSg3s6tj68r
++RqnaR2PBq0WPG/q4QPcNtEvOo96ULSyKcXl40YH+zbVssSne7SX2G0ZIIrROPcl
+HBYfaUKws1h0NhNzhyoTaWffhErdiQrw4gvH8Ox1/Em/abGRDSGNpKMN+GStA/yv
+nzcxyXAJTu7ARYZuQBsM58DnTU+cVQz8wQrkra44+Y3ett1TWUPf+bKKvOuyt223
+u/+fqF+Nv82LgcrQHlmfjIHjQvdwbbNyH74ISQqZnmShu/iGniXyNpzaLuwW0dAZ
+9/IPEGCn/OXcezIW18Ijt61PVsslCyRG8pR8ToiwfRFul/Rljq91S4rZqpQZnUuR
+SGLEML7ZQULcPFhHxvUdMCk1pwNkF3vi57G4Ah+z4fUJOZYfrUdhQMIPYcXGurWv
+IUVJUWTtVhwoYyXKqj/0w5lCWl+yCzRY+EgnxYI4eRv2yaRiz77ECGG2hHjfoMoo
+3Uq2tddFfa4o9OqV9oo5ED70Ao0bOW18AlDoNtIU1YYFM7rK8i9HvkiazrelSi+v
+gWzMR0+9OOFOK99UObnUEOEUbwyp8jxtmTem+1wdwI+X02Nntuo4C2RUatkkeJkI
+1gEXEbiBulg4NAyFzF4CkB1U3/8MF3T6JRJLIHFDHed96BSMsmF3GjGnX+bv4qlh
+kaxLa85y1bDSddLNJ71jwotWcdGNG74tpg5eXvY1bkXMn1iWbdAKCufXO3rMzdyU
+G1y07+1XAl8oTC+puzENeP3vguSBsm4G/GDQPuFW/4IpfR2VG6XF/itDra4Ipxea
+amCnQsIi5c+6xwrExJPNkO/kgo4Kk288xJXLKagRIx1T+xnNa1i1KRprcYK4GnWZ
+ghpA/3+So15kwFIYw3ZNqPX9YAUiS8Mt7pXaYR9ZLbZ8JSiXvTNs0++uW5fn5YIr
+oB+w94heZ5FvIPY2r0WoarZes1H9Tvb0w6b5k+ab3Is3qV5IOraPdShk/yiLTxRQ
++tvN72lxhGLC3zJLq+JNzENEwku7L1VhDSk/2VU+2WPGnvvFesmlp1ciVHo7VuO/
+r1jH2AuTy+prQeaxkXUygWhPkCIyD+mfQtHHxiNli9UVi2YT0TaZjjvGeZYtxODK
+EEMs3+msLvzF6XyM1kc0Pxcs7TriJitsWtnAfWE4nQkaeXITBbKQy5FiIKlV3rDL

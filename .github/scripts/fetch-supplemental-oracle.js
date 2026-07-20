@@ -1,192 +1,148 @@
-#!/usr/bin/env node
-
-const fs = require('fs');
-const path = require('path');
-let SHARED = path.join(__dirname, 'aggregator', 'lib');
-if (!fs.existsSync(SHARED)) {
-  const siblingFallback = path.join(path.dirname(process.cwd()), 'job-board-aggregator', 'lib');
-  if (fs.existsSync(siblingFallback)) SHARED = siblingFallback;
-}
-const { fetchAllOracleJobs } = require(`${SHARED}/fetchers/oracle`);
-
-const DATA_DIR = path.join(process.cwd(), '.github', 'data');
-const COMPANY_LIST_PATH = path.join(SHARED, 'fetchers', 'company-list.json');
-const JOBS_FILE = path.join(DATA_DIR, 'supplemental-oracle-jobs.json');
-const META_FILE = path.join(DATA_DIR, 'supplemental-oracle-metadata.json');
-const PREV_US_JOBS_FILE = path.join(DATA_DIR, 'us_jobs.json');
-const PREV_ALL_JOBS_FILE = path.join(DATA_DIR, 'all_jobs.json');
-const TECH_DOMAINS = new Set(['software', 'data_science', 'hardware', 'ai']);
-
-function hasR2Env() {
-  return Boolean(process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_ENDPOINT && process.env.R2_BUCKET_NAME);
-}
-
-function isGitHubActions() {
-  return process.env.GITHUB_ACTIONS === 'true';
-}
-
-function looksLikeRichOracleDescription(text) {
-  if (!text || typeof text !== 'string') return false;
-  return /^(Responsibilities|Qualifications):/m.test(text) || text.length >= 2000;
-}
-
-function parseJsonOrNdjson(text) {
-  const trimmed = String(text || '').trim();
-  if (!trimmed) return [];
-  if (trimmed[0] === '[') {
-    try {
-      const parsed = JSON.parse(trimmed);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {}
-  }
-  return trimmed.split('\n').filter(Boolean).map(line => {
-    try { return JSON.parse(line); } catch { return null; }
-  }).filter(Boolean);
-}
-
-function isCurrentUsTechOracle(job) {
-  if (!job || job.source !== 'oracle') return false;
-  const tags = job.tags || {};
-  const locations = tags.locations || [];
-  const domains = tags.domains || [];
-  return locations.includes('us') && domains.some(domain => TECH_DOMAINS.has(domain));
-}
-
-function loadOracleDetailCache() {
-  const cachedIds = new Set();
-  let shortSidecarIds = 0;
-  try {
-    const files = fs.readdirSync(DATA_DIR)
-      .filter(f => f.startsWith('descriptions-oracle') && f.endsWith('.jsonl'));
-    for (const file of files) {
-      const lines = fs.readFileSync(path.join(DATA_DIR, file), 'utf8').trim().split('\n').filter(Boolean);
-      for (const line of lines) {
-        try {
-          const { id, description_text } = JSON.parse(line);
-          if (!id || !description_text) continue;
-          if (looksLikeRichOracleDescription(description_text)) cachedIds.add(id);
-          else shortSidecarIds++;
-        } catch {}
-      }
-    }
-  } catch {}
-  console.log(`  Oracle detail cache: ${cachedIds.size} rich IDs, ${shortSidecarIds} short sidecar IDs ignored for priority`);
-  return { cachedIds, priorityIds: new Set() };
-}
-
-function resolveBoardJobsPath() {
-  if (fs.existsSync(PREV_US_JOBS_FILE)) return PREV_US_JOBS_FILE;
-  if (fs.existsSync(PREV_ALL_JOBS_FILE)) return PREV_ALL_JOBS_FILE;
-  return null;
-}
-
-function loadCurrentBoardPriorityIds(cachedIds, existingPriorityIds, boardJobsPath = resolveBoardJobsPath()) {
-  const priorityIds = new Set(existingPriorityIds);
-  if (!boardJobsPath || !fs.existsSync(boardJobsPath)) return priorityIds;
-  try {
-    const rows = parseJsonOrNdjson(fs.readFileSync(boardJobsPath, 'utf8'));
-    for (const job of rows) {
-      if (!isCurrentUsTechOracle(job)) continue;
-      if (cachedIds.has(job.id)) continue;
-      priorityIds.add(job.id);
-    }
-  } catch {}
-  if (priorityIds.size > existingPriorityIds.size) {
-    const sourceLabel = path.basename(boardJobsPath);
-    console.log(`  Oracle board priority IDs: +${priorityIds.size - existingPriorityIds.size} current US tech rows from ${sourceLabel}`);
-  }
-  return priorityIds;
-}
-
-async function uploadRequired(r2, name, file, contentType) {
-  const uploaded = await r2.uploadRaw(name, fs.readFileSync(file, 'utf8'), contentType);
-  if (!uploaded) {
-    throw new Error(`R2 upload failed for ${name}`);
-  }
-}
-
-async function main() {
-  const start = Date.now();
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-
-  const companyList = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));
-  const oracleCompanies = companyList.oracle || [];
-
-  const oracleCache = loadOracleDetailCache();
-  const priorityDescriptionIds = loadCurrentBoardPriorityIds(oracleCache.cachedIds, oracleCache.priorityIds);
-  console.log(`🏛️ Supplemental Oracle lane: ${oracleCompanies.length} companies configured`);
-  const jobs = await fetchAllOracleJobs(oracleCompanies, {
-    cachedDescriptionIds: oracleCache.cachedIds,
-    priorityDescriptionIds,
-  });
-  const durationMs = Date.now() - start;
-
-  const payload = jobs.map(job => ({
-    id: job.id,
-    title: job.title,
-    company_name: job.company_name,
-    source: job.source,
-    location: job.location,
-    url: job.url,
-    posted_at: job.posted_at,
-    description: job.description || null,
-  }));
-
-  const metadata = {
-    schema: 'supplemental-lane-v1',
-    generated_at: new Date().toISOString(),
-    lane_name: 'oracle',
-    publish_contract: {
-      blocks_fast_publish: false,
-      included_in_main_all_jobs: false,
-      merge_mode: 'separate_artifact',
-      visibility: 'snapshot_only',
-      expected_cadence_minutes: 15,
-      max_staleness_minutes: 90,
-    },
-    source: 'oracle',
-    companies_configured: oracleCompanies.length,
-    jobs_fetched: payload.length,
-    duration_ms: durationMs,
-    current_board_priority_ids: priorityDescriptionIds.size,
-  };
-
-  fs.writeFileSync(JOBS_FILE, JSON.stringify(payload, null, 2), 'utf8');
-  fs.writeFileSync(META_FILE, JSON.stringify(metadata, null, 2), 'utf8');
-
-  console.log(`✅ Oracle supplemental lane wrote ${payload.length} jobs in ${Math.round(durationMs/1000)}s`);
-
-  if (hasR2Env()) {
-    try {
-      const { createR2Client } = require(`${SHARED}/storage/r2-client`);
-      const r2 = createR2Client({ prefix: 'data/' });
-      await uploadRequired(r2, 'supplemental-oracle-jobs.json', JOBS_FILE, 'application/json');
-      await uploadRequired(r2, 'supplemental-oracle-metadata.json', META_FILE, 'application/json');
-      console.log('☁️ Uploaded Oracle supplemental artifacts to R2');
-    } catch (err) {
-      if (isGitHubActions()) {
-        throw new Error(`Oracle supplemental R2 publish failed: ${err.message}`);
-      }
-      console.log(`⚠️ R2 upload unavailable locally — skipped (${err.message})`);
-    }
-  } else if (isGitHubActions()) {
-    throw new Error('R2 env missing in GitHub Actions; refusing to mark Oracle supplemental publish successful');
-  } else {
-    console.log('⚠️ R2 env missing — skipped R2 upload (local mode)');
-  }
-}
-
-if (require.main === module) {
-  main().catch(err => {
-    console.error('❌ Supplemental Oracle lane failed:', err.message);
-    process.exit(1);
-  });
-}
-
-module.exports = {
-  looksLikeRichOracleDescription,
-  parseJsonOrNdjson,
-  isCurrentUsTechOracle,
-  loadCurrentBoardPriorityIds,
-  resolveBoardJobsPath,
-};
+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
+V4UpIYwwBY8TtFlR9KqtcQ==

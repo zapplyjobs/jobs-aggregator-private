@@ -1,165 +1,135 @@
-#!/usr/bin/env node
-'use strict';
-
-const fs = require('fs');
-
-function parseArgs(argv) {
-  const args = {
-    linkHealth: 'agg-link-health.json',
-    verification: 'link-verification-sample.json',
-    tombstones: 'stale-job-tombstones.json',
-    metadata: 'jobs-metadata.json',
-    output: 'source-confidence-sample.json',
-  };
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === '--link-health') args.linkHealth = argv[++i];
-    else if (arg === '--verification') args.verification = argv[++i];
-    else if (arg === '--tombstones') args.tombstones = argv[++i];
-    else if (arg === '--metadata') args.metadata = argv[++i];
-    else if (arg === '--output') args.output = argv[++i];
-    else if (arg === '--help' || arg === '-h') {
-      console.log('Usage: node .github/scripts/build-source-confidence-sample.js [--link-health agg-link-health.json] [--verification link-verification-sample.json] [--tombstones stale-job-tombstones.json] [--metadata jobs-metadata.json] [--output source-confidence-sample.json]');
-      process.exit(0);
-    }
-  }
-  return args;
-}
-
-function loadJson(path, fallback = null) {
-  if (!path || !fs.existsSync(path)) return fallback;
-  return JSON.parse(fs.readFileSync(path, 'utf8'));
-}
-
-function emptySourceRow(source) {
-  return {
-    source,
-    final_pool_count: null,
-    sample_checked: 0,
-    sample_verified_live: 0,
-    sample_uncertain: 0,
-    sample_stale_candidate: 0,
-    sample_last_checked_at: null,
-    sample_last_verified_live_at: null,
-    latest_tombstone_seen_at: null,
-    tombstone_count: 0,
-    confidence: 'no_sample',
-    notes: [],
-  };
-}
-
-function bumpSource(row, sample) {
-  row.sample_checked += 1;
-  row.sample_last_checked_at = maxIso(row.sample_last_checked_at, sample.last_checked_at);
-  if (sample.lifecycle_state === 'verified_live') {
-    row.sample_verified_live += 1;
-    row.sample_last_verified_live_at = maxIso(row.sample_last_verified_live_at, sample.last_verified_live_at);
-  } else if (sample.lifecycle_state === 'stale_candidate') {
-    row.sample_stale_candidate += 1;
-  } else {
-    row.sample_uncertain += 1;
-  }
-}
-
-function maxIso(a, b) {
-  if (!a) return b || null;
-  if (!b) return a;
-  return String(a) >= String(b) ? a : b;
-}
-
-function confidenceFor(row) {
-  if (row.sample_stale_candidate > 0) return 'watch_stale_candidate';
-  if (row.sample_uncertain > 0) return row.sample_verified_live > 0 ? 'mixed_sample' : 'uncertain_sample';
-  if (row.sample_verified_live > 0) return 'sample_verified_live';
-  return 'no_sample';
-}
-
-function buildSourceConfidence({ linkHealth, verification, tombstones, metadata }) {
-  const sourceRows = new Map();
-  const metadataBySource = metadata && metadata.by_source && typeof metadata.by_source === 'object' ? metadata.by_source : {};
-  for (const [source, count] of Object.entries(metadataBySource)) {
-    const row = emptySourceRow(source);
-    row.final_pool_count = count;
-    sourceRows.set(source, row);
-  }
-
-  for (const sample of verification.samples || []) {
-    const source = sample.source || 'unknown';
-    if (!sourceRows.has(source)) sourceRows.set(source, emptySourceRow(source));
-    bumpSource(sourceRows.get(source), sample);
-  }
-
-  for (const tombstone of tombstones.tombstones || []) {
-    const source = tombstone.source || 'unknown';
-    if (!sourceRows.has(source)) sourceRows.set(source, emptySourceRow(source));
-    const row = sourceRows.get(source);
-    row.tombstone_count += 1;
-    row.latest_tombstone_seen_at = maxIso(row.latest_tombstone_seen_at, tombstone.last_dead_seen_at);
-  }
-
-  for (const row of sourceRows.values()) {
-    row.confidence = confidenceFor(row);
-    if (row.final_pool_count === 0) row.notes.push('metadata_final_pool_zero');
-    if (row.sample_checked === 0) row.notes.push('not_in_link_health_sample');
-    if (row.sample_uncertain > 0) row.notes.push('sample_contains_uncertain_urls');
-    if (row.tombstone_count > 0) row.notes.push('has_stale_candidate_history');
-  }
-
-  const groups = [];
-  for (const [group, summary] of Object.entries(linkHealth.summary || {})) {
-    groups.push({
-      group,
-      candidate_window_count: summary.candidates ?? null,
-      checked: summary.checked ?? null,
-      dead: summary.dead ?? null,
-      uncertain: summary.uncertain ?? null,
-      role_yield_delta_basis: 'candidate_window_count is sampled 2-4 day tech-US visible URL candidates from Check Link Health, not full-pool source yield delta.',
-    });
-  }
-
-  const sources = [...sourceRows.values()].sort((a, b) => {
-    const confidenceDiff = a.confidence.localeCompare(b.confidence);
-    return confidenceDiff || a.source.localeCompare(b.source);
-  });
-
-  return {
-    generated_at: new Date().toISOString(),
-    artifact_type: 'source_confidence_sample',
-    source_artifacts: ['agg-link-health.json', 'link-verification-sample.json', 'stale-job-tombstones.json', 'jobs-metadata.json'],
-    policy: {
-      coverage: 'sample_and_metadata',
-      dashboard_ready: true,
-      full_source_health_proof: false,
-      note: 'This packet is safe for operator/DASH review as sampled source confidence. It must not be treated as complete fetcher health or full-pool source-yield proof.',
-    },
-    metadata_generated_at: metadata?.generated || metadata?.generated_at || null,
-    checked_at: linkHealth.checked_at || verification.generated_at || null,
-    group_candidate_window: groups,
-    summary: {
-      sources: sources.length,
-      sample_checked: sources.reduce((sum, row) => sum + row.sample_checked, 0),
-      sample_verified_live: sources.reduce((sum, row) => sum + row.sample_verified_live, 0),
-      sample_uncertain: sources.reduce((sum, row) => sum + row.sample_uncertain, 0),
-      sample_stale_candidate: sources.reduce((sum, row) => sum + row.sample_stale_candidate, 0),
-      tombstone_sources: sources.filter(row => row.tombstone_count > 0).length,
-    },
-    sources,
-  };
-}
-
-function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const output = buildSourceConfidence({
-    linkHealth: loadJson(args.linkHealth, { summary: {} }),
-    verification: loadJson(args.verification, { samples: [] }),
-    tombstones: loadJson(args.tombstones, { tombstones: [] }),
-    metadata: loadJson(args.metadata, {}),
-  });
-  const text = JSON.stringify(output, null, 2) + '\n';
-  fs.writeFileSync(args.output, text);
-  console.log(text);
-}
-
-if (require.main === module) main();
-
-module.exports = { buildSourceConfidence, parseArgs };
+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

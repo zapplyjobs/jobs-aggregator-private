@@ -1,193 +1,196 @@
-#!/usr/bin/env node
-'use strict';
-
-const fs = require('fs');
-
-const DEFAULT_FILES = {
-  linkHealth: 'agg-link-health.json',
-  candidates: 'stale-job-candidates.json',
-  history: 'stale-job-history.json',
-  tombstones: 'stale-job-tombstones.json',
-  verification: 'link-verification-sample.json',
-  confidence: 'source-confidence-sample.json',
-};
-
-function parseArgs(argv) {
-  const args = { ...DEFAULT_FILES, printSummary: false };
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === '--link-health') args.linkHealth = argv[++i];
-    else if (arg === '--candidates') args.candidates = argv[++i];
-    else if (arg === '--history') args.history = argv[++i];
-    else if (arg === '--tombstones') args.tombstones = argv[++i];
-    else if (arg === '--verification') args.verification = argv[++i];
-    else if (arg === '--confidence') args.confidence = argv[++i];
-    else if (arg === '--print-summary') args.printSummary = true;
-    else if (arg === '--help' || arg === '-h') {
-      console.log('Usage: node .github/scripts/validate-link-health-artifacts.js [--print-summary]');
-      process.exit(0);
-    } else {
-      throw new Error(`Unknown argument: ${arg}`);
-    }
-  }
-  return args;
-}
-
-function loadJson(path) {
-  if (!fs.existsSync(path)) throw new Error(`missing artifact: ${path}`);
-  try {
-    return JSON.parse(fs.readFileSync(path, 'utf8'));
-  } catch (err) {
-    throw new Error(`invalid JSON in ${path}: ${err.message}`);
-  }
-}
-
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
-
-function assertIsoOrNull(value, path) {
-  if (value == null) return;
-  assert(typeof value === 'string' && !Number.isNaN(Date.parse(value)), `${path} must be ISO timestamp or null`);
-}
-
-function assertObject(value, path) {
-  assert(value && typeof value === 'object' && !Array.isArray(value), `${path} must be object`);
-}
-
-function assertArray(value, path) {
-  assert(Array.isArray(value), `${path} must be array`);
-}
-
-function validateLinkHealth(obj) {
-  assertIsoOrNull(obj.checked_at, 'agg-link-health.checked_at');
-  assertObject(obj.sample_window, 'agg-link-health.sample_window');
-  assert(Number.isFinite(obj.sample_window.minAgeDays), 'agg-link-health.sample_window.minAgeDays must be number');
-  assert(Number.isFinite(obj.sample_window.maxAgeDays), 'agg-link-health.sample_window.maxAgeDays must be number');
-  assert(Number.isFinite(obj.per_group), 'agg-link-health.per_group must be number');
-  assertObject(obj.summary, 'agg-link-health.summary');
-  assertArray(obj.results, 'agg-link-health.results');
-  for (const [group, summary] of Object.entries(obj.summary)) {
-    assertObject(summary, `agg-link-health.summary.${group}`);
-    for (const field of ['candidates', 'checked', 'dead', 'uncertain']) {
-      assert(Number.isFinite(summary[field]), `agg-link-health.summary.${group}.${field} must be number`);
-    }
-  }
-}
-
-function validateCandidates(obj) {
-  assertIsoOrNull(obj.checked_at, 'stale-job-candidates.checked_at');
-  assertArray(obj.dead, 'stale-job-candidates.dead');
-}
-
-function validateHistory(obj) {
-  assertIsoOrNull(obj.checked_at, 'stale-job-history.checked_at');
-  assertObject(obj.history, 'stale-job-history.history');
-}
-
-function validateTombstones(obj) {
-  assert(obj.artifact_type === 'stale_tombstone_candidates', 'stale-job-tombstones.artifact_type mismatch');
-  assertIsoOrNull(obj.generated_at, 'stale-job-tombstones.generated_at');
-  assert(obj.source_artifact === 'stale-job-history.json', 'stale-job-tombstones.source_artifact mismatch');
-  assertObject(obj.policy, 'stale-job-tombstones.policy');
-  assert(obj.policy.lifecycle_state === 'stale_candidate', 'stale-job-tombstones.policy.lifecycle_state must be stale_candidate');
-  assert(obj.policy.automatic_removal === false, 'stale-job-tombstones.policy.automatic_removal must be false');
-  assert(obj.policy.removal_authority === 'none', 'stale-job-tombstones.policy.removal_authority must be none');
-  assertObject(obj.summary, 'stale-job-tombstones.summary');
-  assert(Number.isFinite(obj.summary.total), 'stale-job-tombstones.summary.total must be number');
-  assertArray(obj.tombstones, 'stale-job-tombstones.tombstones');
-  for (const row of obj.tombstones) {
-    assert(row.lifecycle_state === 'stale_candidate', 'tombstone row lifecycle_state must be stale_candidate');
-    assertIsoOrNull(row.first_dead_seen_at, 'tombstone.first_dead_seen_at');
-    assertIsoOrNull(row.last_dead_seen_at, 'tombstone.last_dead_seen_at');
-    assert(Number.isFinite(row.hit_count), 'tombstone.hit_count must be number');
-  }
-}
-
-function validateVerification(obj) {
-  assert(obj.artifact_type === 'link_verification_sample', 'link-verification-sample.artifact_type mismatch');
-  assertIsoOrNull(obj.generated_at, 'link-verification-sample.generated_at');
-  assertObject(obj.policy, 'link-verification-sample.policy');
-  assert(obj.policy.coverage === 'sample_only', 'link-verification-sample.policy.coverage must be sample_only');
-  assert(obj.policy.full_pool_proof === false, 'link-verification-sample.policy.full_pool_proof must be false');
-  assertObject(obj.summary, 'link-verification-sample.summary');
-  for (const field of ['total_checked', 'verified_live', 'stale_candidate', 'uncertain']) {
-    assert(Number.isFinite(obj.summary[field]), `link-verification-sample.summary.${field} must be number`);
-  }
-  assertArray(obj.samples, 'link-verification-sample.samples');
-  for (const sample of obj.samples) {
-    assert(['verified_live', 'stale_candidate', 'uncertain'].includes(sample.lifecycle_state), 'sample lifecycle_state invalid');
-    assertIsoOrNull(sample.last_checked_at, 'sample.last_checked_at');
-    assertIsoOrNull(sample.last_verified_live_at, 'sample.last_verified_live_at');
-    if (sample.lifecycle_state === 'verified_live') {
-      assert(sample.last_verified_live_at, 'verified_live sample must have last_verified_live_at');
-    }
-  }
-}
-
-function validateConfidence(obj) {
-  assert(obj.artifact_type === 'source_confidence_sample', 'source-confidence-sample.artifact_type mismatch');
-  assertIsoOrNull(obj.generated_at, 'source-confidence-sample.generated_at');
-  assertObject(obj.policy, 'source-confidence-sample.policy');
-  assert(obj.policy.coverage === 'sample_and_metadata', 'source-confidence-sample.policy.coverage must be sample_and_metadata');
-  assert(obj.policy.dashboard_ready === true, 'source-confidence-sample.policy.dashboard_ready must be true');
-  assert(obj.policy.full_source_health_proof === false, 'source-confidence-sample.policy.full_source_health_proof must be false');
-  assertArray(obj.group_candidate_window, 'source-confidence-sample.group_candidate_window');
-  assertObject(obj.summary, 'source-confidence-sample.summary');
-  for (const field of ['sources', 'sample_checked', 'sample_verified_live', 'sample_uncertain', 'sample_stale_candidate', 'tombstone_sources']) {
-    assert(Number.isFinite(obj.summary[field]), `source-confidence-sample.summary.${field} must be number`);
-  }
-  assertArray(obj.sources, 'source-confidence-sample.sources');
-  for (const row of obj.sources) {
-    assert(typeof row.source === 'string' && row.source, 'source row must have source');
-    assert(['no_sample', 'sample_verified_live', 'mixed_sample', 'uncertain_sample', 'watch_stale_candidate'].includes(row.confidence), `invalid confidence for ${row.source}`);
-    assertIsoOrNull(row.sample_last_checked_at, `${row.source}.sample_last_checked_at`);
-    assertIsoOrNull(row.sample_last_verified_live_at, `${row.source}.sample_last_verified_live_at`);
-    assertIsoOrNull(row.latest_tombstone_seen_at, `${row.source}.latest_tombstone_seen_at`);
-  }
-}
-
-function validateArtifacts(paths) {
-  const artifacts = {
-    linkHealth: loadJson(paths.linkHealth),
-    candidates: loadJson(paths.candidates),
-    history: loadJson(paths.history),
-    tombstones: loadJson(paths.tombstones),
-    verification: loadJson(paths.verification),
-    confidence: loadJson(paths.confidence),
-  };
-
-  validateLinkHealth(artifacts.linkHealth);
-  validateCandidates(artifacts.candidates);
-  validateHistory(artifacts.history);
-  validateTombstones(artifacts.tombstones);
-  validateVerification(artifacts.verification);
-  validateConfidence(artifacts.confidence);
-
-  assert(artifacts.verification.summary.total_checked === artifacts.linkHealth.results.length, 'verification total_checked must equal link-health results length');
-  assert(artifacts.confidence.summary.sample_checked === artifacts.verification.summary.total_checked, 'confidence sample_checked must equal verification total_checked');
-  assert(artifacts.tombstones.summary.total === artifacts.tombstones.tombstones.length, 'tombstone summary total must equal row count');
-
-  return artifacts;
-}
-
-function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const artifacts = validateArtifacts(args);
-  if (args.printSummary) {
-    console.log(JSON.stringify({
-      ok: true,
-      checked_at: artifacts.linkHealth.checked_at,
-      link_health_results: artifacts.linkHealth.results.length,
-      tombstones: artifacts.tombstones.summary.total,
-      verification: artifacts.verification.summary,
-      confidence: artifacts.confidence.summary,
-    }, null, 2));
-  } else {
-    console.log('PASS link-health artifact contract');
-  }
-}
-
-if (require.main === module) main();
-
-module.exports = { validateArtifacts, parseArgs };
+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

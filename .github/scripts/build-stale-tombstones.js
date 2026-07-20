@@ -1,113 +1,86 @@
-#!/usr/bin/env node
-'use strict';
-
-const fs = require('fs');
-
-function parseArgs(argv) {
-  const args = {
-    historyIn: 'stale-job-history.json',
-    output: 'stale-job-tombstones.json',
-    minHitCount: 1,
-  };
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === '--history-in') args.historyIn = argv[++i];
-    else if (arg === '--output') args.output = argv[++i];
-    else if (arg === '--min-hit-count') args.minHitCount = Number(argv[++i]);
-    else if (arg === '--help' || arg === '-h') {
-      console.log('Usage: node .github/scripts/build-stale-tombstones.js [--history-in stale-job-history.json] [--output stale-job-tombstones.json] [--min-hit-count 1]');
-      process.exit(0);
-    }
-  }
-  if (!Number.isFinite(args.minHitCount) || args.minHitCount < 1) {
-    throw new Error('--min-hit-count must be a positive number');
-  }
-  return args;
-}
-
-function loadJson(path) {
-  return JSON.parse(fs.readFileSync(path, 'utf8'));
-}
-
-function asHistoryMap(input) {
-  if (!input || typeof input !== 'object') return {};
-  if (input.history && typeof input.history === 'object' && !Array.isArray(input.history)) return input.history;
-  if (Array.isArray(input.tombstones)) return Object.fromEntries(input.tombstones.map(row => [row.id, row]));
-  return {};
-}
-
-function evidenceFor(row) {
-  if (row.latest_code === 404 || row.latest_code === 410) return `http_${row.latest_code}`;
-  if (row.latest_status) return String(row.latest_status);
-  return 'link_health_dead';
-}
-
-function buildTombstones(historyInput, options = {}) {
-  const minHitCount = options.minHitCount || 1;
-  const history = asHistoryMap(historyInput);
-  const tombstones = Object.values(history)
-    .filter(row => row && row.id && (row.hit_count || 0) >= minHitCount)
-    .map(row => ({
-      id: row.id,
-      lifecycle_state: 'stale_candidate',
-      source: row.source || null,
-      group: row.group || null,
-      company_name: row.company_name || null,
-      title: row.title || null,
-      url: row.url || null,
-      first_dead_seen_at: row.first_seen || null,
-      last_dead_seen_at: row.last_seen || null,
-      hit_count: row.hit_count || 0,
-      latest_status: row.latest_status || null,
-      latest_code: row.latest_code ?? null,
-      evidence: evidenceFor(row),
-    }))
-    .sort((a, b) => {
-      const timeDiff = String(b.last_dead_seen_at || '').localeCompare(String(a.last_dead_seen_at || ''));
-      return timeDiff || a.id.localeCompare(b.id);
-    });
-
-  const bySource = {};
-  const byGroup = {};
-  const byCode = {};
-  for (const row of tombstones) {
-    const source = row.source || 'unknown';
-    const group = row.group || 'unknown';
-    const code = row.latest_code == null ? 'none' : String(row.latest_code);
-    bySource[source] = (bySource[source] || 0) + 1;
-    byGroup[group] = (byGroup[group] || 0) + 1;
-    byCode[code] = (byCode[code] || 0) + 1;
-  }
-
-  return {
-    generated_at: new Date().toISOString(),
-    source_artifact: 'stale-job-history.json',
-    artifact_type: 'stale_tombstone_candidates',
-    policy: {
-      lifecycle_state: 'stale_candidate',
-      automatic_removal: false,
-      removal_authority: 'none',
-      note: 'Confirmed-dead (hard 404/410, recurrence-confirmed) ids ARE now suppressed at the CONSUMER (job-board-consumer), which consults data/stale-job-candidates.json fresh each generation and hides matching ids everywhere. PRODUCER rows are NOT dropped here (tag-not-filter preserved; automatic_removal=false, removal_authority=none); only the consumer hides them.',
-    },
-    summary: {
-      total: tombstones.length,
-      min_hit_count: minHitCount,
-      by_source: bySource,
-      by_group: byGroup,
-      by_latest_code: byCode,
-    },
-    tombstones,
-  };
-}
-
-function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const tombstones = buildTombstones(loadJson(args.historyIn), { minHitCount: args.minHitCount });
-  const text = JSON.stringify(tombstones, null, 2) + '\n';
-  fs.writeFileSync(args.output, text);
-  console.log(text);
-}
-
-if (require.main === module) main();
-
-module.exports = { buildTombstones, parseArgs };
+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

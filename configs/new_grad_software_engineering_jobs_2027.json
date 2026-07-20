@@ -1,180 +1,102 @@
-{
-  "version": 1,
-  "repoPrefix": "sej",
-  "headingImageAlt": "Software Engineering Jobs 2027 - Illustration of people working on tech.",
-  "title": "Software Engineering Jobs 2027",
-  "tagline": "",
-  "jobCountBadgeLabel": "Software Jobs",
-  "descriptionLine1": "\ud83d\ude80 Software engineering and IT jobs for new graduates, updated in real time.",
-  "descriptionLine2": "",
-  "noteType": "TIP",
-  "noteText": "\ud83d\udee0 Help us grow! Add new jobs by submitting an issue! View contributing steps [here](CONTRIBUTING-GUIDE.md).",
-  "jobsSectionHeader": "Fresh Software Jobs 2027",
-  "features": {
-    "internships": false,
-    "moreResources": true
-  },
-  "defaultCategory": "backend",
-  "activeWindowDays": 14,
-  "repo": "New-Grad-Software-Engineering-Jobs-2027",
-  "boardName": "new_grad_software_engineering_jobs_2027",
-  "categories": {
-    "software_engineering": {
-      "title": "Software Engineering",
-      "emoji": "\ud83d\udcbb",
-      "keywords": [
-        "software engineer",
-        "software developer",
-        "software development",
-        "swe",
-        "backend engineer",
-        "backend developer",
-        "frontend engineer",
-        "frontend developer",
-        "full stack",
-        "fullstack",
-        "web developer",
-        "web engineer",
-        "mobile engineer",
-        "mobile developer",
-        "ios engineer",
-        "android engineer",
-        "ios developer",
-        "android developer",
-        "application developer",
-        "application engineer",
-        "platform developer",
-        "platform engineer",
-        "java developer",
-        "python developer",
-        "javascript developer",
-        "mobile development",
-        "frontend",
-        "react",
-        "angular",
-        "vue",
-        "swift",
-        "kotlin"
-      ]
-    },
-    "ai_ml_engineering": {
-      "title": "AI / ML Engineering",
-      "emoji": "\ud83e\udd16",
-      "keywords": [
-        "machine learning",
-        "ml engineer",
-        "ai engineer",
-        "artificial intelligence",
-        "deep learning",
-        "computer vision",
-        "nlp engineer",
-        "natural language",
-        "data scientist",
-        "data science",
-        "research engineer",
-        "applied scientist",
-        "applied researcher",
-        "research scientist",
-        "data engineer",
-        "data analyst"
-      ]
-    },
-    "infrastructure_security": {
-      "title": "Infrastructure & Security",
-      "emoji": "\ud83d\udd12",
-      "keywords": [
-        "devops",
-        "devops engineer",
-        "site reliability",
-        "sre",
-        "infrastructure engineer",
-        "cloud engineer",
-        "reliability engineer",
-        "cloud architect",
-        "network engineer",
-        "system administrator",
-        "systems administrator",
-        "qa engineer",
-        "qa engineering",
-        "quality assurance",
-        "test engineer",
-        "testing engineer",
-        "automation engineer",
-        "sdet",
-        "security engineer",
-        "security software",
-        "product security",
-        "cybersecurity",
-        "cyber security",
-        "information security",
-        "appsec",
-        "netsec",
-        "penetration tester",
-        "vulnerability",
-        "cryptography engineer",
-        "security analyst",
-        "soc analyst",
-        "threat engineer",
-        "security architect"
-      ]
-    },
-    "systems_embedded": {
-      "title": "Systems & Embedded",
-      "emoji": "\u2699\ufe0f",
-      "keywords": [
-        "embedded engineer",
-        "embedded systems",
-        "firmware engineer",
-        "firmware developer",
-        "systems engineer",
-        "systems engineering",
-        "hardware engineer",
-        "electrical engineer",
-        "fpga",
-        "asic",
-        "silicon engineer",
-        "chip design",
-        "rf engineer",
-        "signal processing",
-        "linux engineer",
-        "data center",
-        "it systems",
-        "it support",
-        "network engineering",
-        "systems programming",
-        "kernel",
-        "driver",
-        "iot",
-        "robotics software",
-        "robotics engineer",
-        "controls engineer"
-      ]
-    },
-    "solutions_pm": {
-      "title": "Solutions & Program Management",
-      "emoji": "\ud83d\udccb",
-      "keywords": [
-        "solutions architect",
-        "solutions engineer",
-        "deployment strategist",
-        "implementation consultant",
-        "sales engineer",
-        "technical program manager",
-        "technical project manager",
-        "scrum master",
-        "product manager",
-        "technical product manager",
-        "product analyst",
-        "program coordinator",
-        "project coordinator",
-        "pre-sales",
-        "presales"
-      ]
-    },
-    "other": {
-      "title": "Other Software Roles",
-      "emoji": "\ud83d\udcc2",
-      "keywords": []
-    }
-  }
-}
+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
