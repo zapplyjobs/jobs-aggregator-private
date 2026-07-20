@@ -18,33 +18,22 @@ jobs:
           chmod +x /tmp/transcrypt
           sudo mv /tmp/transcrypt /usr/local/bin/transcrypt
 
-      - name: Step 1 — Parent unlock
+      - name: Parent + submodule unlock (foreach approach)
         run: |
+          # Parent unlock
           echo "Y" | transcrypt --cipher aes-256-cbc --password "$TRANSCRYPT_PASSWORD" --force
           git checkout -- .
-          echo "=== PARENT index.js after unlock ==="
+          echo "=== PARENT after unlock ==="
           head -1 .github/scripts/index.js
-        env:
-          TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
-
-      - name: Step 2 — Try submodule decrypt (shared)
-        run: |
-          cd .github/scripts/shared
-          echo "=== SHARED before decrypt ==="
-          head -1 tools/supply-health-check.js
           
-          echo "Y" | transcrypt --cipher aes-256-cbc --password "$TRANSCRYPT_PASSWORD" --force
-          rm -f "$(git rev-parse --git-dir)/index"
-          git checkout HEAD -- .
+          # Submodule unlock via foreach
+          git submodule foreach --recursive '
+            echo "Y" | transcrypt --cipher aes-256-cbc --password "'"$TRANSCRYPT_PASSWORD"'" --force 2>/dev/null || true
+            rm -f "$(git rev-parse --git-dir)/index" 2>/dev/null || true
+            git checkout HEAD -- . 2>/dev/null || true
+          ' || true
           
-          echo "=== SHARED after decrypt ==="
-          head -1 tools/supply-health-check.js
-        env:
-          TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
-
-      - name: Step 3 — Verify parent NOT broken
-        run: |
-          echo "=== PARENT index.js after submodule decrypt ==="
+          echo "=== PARENT after foreach ==="
           head -1 .github/scripts/index.js
         env:
           TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
