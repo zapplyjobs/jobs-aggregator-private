@@ -1,6 +1,0 @@
-# ZJP transcrypt — encrypt source files (filter name is "crypt")
-*.js filter=crypt diff=crypt
-*.json filter=crypt diff=crypt
-*.jsonl filter=crypt diff=crypt
-/package.json !filter !diff
-/package-lock.json !filter !diff

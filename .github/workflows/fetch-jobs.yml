@@ -7,7 +7,7 @@ on:
 
 # Prevent concurrent runs
 concurrency:
-  group: job-fetch
+  group: job-fetch-v2
   cancel-in-progress: false
 
 jobs:
@@ -31,12 +31,6 @@ jobs:
         fetch-depth: 1  # Shallow clone — rebase fetches missing objects on demand
         submodules: recursive
         token: ${{ secrets.GH_PAT }}
-
-    - name: Install transcrypt
-      run: |
-        curl -sSL https://raw.githubusercontent.com/elasticdog/transcrypt/5effa13/transcrypt -o /tmp/transcrypt
-        chmod +x /tmp/transcrypt
-        sudo mv /tmp/transcrypt /usr/local/bin/transcrypt
 
     - name: Unlock encrypted files
       run: |
