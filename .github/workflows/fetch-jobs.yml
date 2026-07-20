@@ -7,7 +7,7 @@ on:
 
 # Prevent concurrent runs
 concurrency:
-  group: job-fetch-v2
+  group: job-fetch
   cancel-in-progress: false
 
 jobs:
@@ -31,13 +31,6 @@ jobs:
         fetch-depth: 1  # Shallow clone — rebase fetches missing objects on demand
         submodules: recursive
         token: ${{ secrets.GH_PAT }}
-
-    - name: Unlock encrypted files
-      run: |
-        echo "Y" | transcrypt --cipher aes-256-cbc --password "$TRANSCRYPT_PASSWORD" --force
-          git checkout -- .
-        env:
-          TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
 
     - name: Fix submodule index
       run: |

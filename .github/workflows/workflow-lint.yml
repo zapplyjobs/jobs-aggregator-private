@@ -21,13 +21,6 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Unlock encrypted files
-        run: |
-          echo "Y" | transcrypt --cipher aes-256-cbc --password "$TRANSCRYPT_PASSWORD" --force
-            git checkout -- .
-          env:
-            TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
-
       - name: Lint workflows
         uses: docker://rhysd/actionlint:1.7.12
         with:

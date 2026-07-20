@@ -20,13 +20,6 @@ jobs:
           submodules: recursive
           token: ${{ secrets.GH_PAT }}
       - name: Check for large files (>5MB)
-      - name: Unlock encrypted files
-        run: |
-          echo "Y" | transcrypt --cipher aes-256-cbc --password "$TRANSCRYPT_PASSWORD" --force
-            git checkout -- .
-          env:
-            TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
-
         run: |
           LARGE_FILES=$(find . -not -path './.git/*' -not -path '*/node_modules/*' -type f -size +5M 2>/dev/null)
           if [ -n "$LARGE_FILES" ]; then
