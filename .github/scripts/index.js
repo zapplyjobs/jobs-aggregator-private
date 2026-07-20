@@ -1257,4 +1257,1474 @@ async function main() {
     // produced jobs this run. A company returning 0 raw jobs may have a broken
     // slug, API change, or auth issue (LLNL incident class).
     const zeroYieldCompanies = computeZeroYield(atsResult, fetcherResults, COMPANY_LIST_PATH, atsResult.wdCurrentTotals);
-    if (zeroYieldCom
+    if (zeroYieldCompanies.length > 0) {
+      console.log(`   ⚠️  GAP-6: ${zeroYieldCompanies.length} companies returned 0 raw jobs`);
+    }
+
+    // AGG-PIPE-4: Build set of sources that fetched successfully this run.
+    // Used by mergeCarryForward to detect closed jobs (source fetched OK, job absent = closed).
+    const successfulSources = new Set();
+    for (const [source, count] of Object.entries((atsResult.stats || {}).by_source || {})) {
+      if (count > 0) successfulSources.add(source);
+    }
+    for (const [fetcherName, jobs] of Object.entries(fetcherResults)) {
+      const sourceKey = FETCHER_NAME_TO_SOURCE[fetcherName] || fetcherName.toLowerCase();
+      if (Array.isArray(jobs) && jobs.length > 0) successfulSources.add(sourceKey);
+    }
+    for (const source of supplementalInputs.sourcesUsed) {
+      successfulSources.add(source);
+    }
+    if (successfulSources.size > 0) {
+      console.log(`   🔍 AGG-PIPE-4: ${successfulSources.size} sources fetched successfully: ${[...successfulSources].join(', ')}`);
+    }
+
+    console.log('');
+
+    // AGG-DESCCOVERAGE-1 (2026-07-05): Workday description fetch RE-ENABLED in the main run.
+    // It was removed (AGG-HOTPATH-1) under runtime pressure, but runtime has since recovered
+    // (~5-6 min wall, under the 8-min alert), and ~1,227 in-scope workday jobs were being dropped
+    // by the bridge for lack of a description (the workday shard sat near-empty at 25 entries).
+    // The fetcher self-caps at MAX_PER_RUN=200 (~80s), prioritizes US jobs, and caches via
+    // descriptions-workday.jsonl (seeded from R2 + uploaded each run) -> backfills over ~2 days.
+    // GUARD: monitor first runs' wall-time; revert to skipping if it breaches 8 min.
+    const _skipDesc = process.env.SKIP_DESC_BACKFILL === '1';
+    const _skipWdDesc = process.env.SKIP_WD_DESC_BACKFILL === '1';  // AGG-DESC-ASYNC-1: WD-only skip (separate workflow backfills)
+    const _skipSrDesc = process.env.SKIP_SR_DESC_BACKFILL === '1';  // AGG-DESC-ASYNC-1: SR desc also decoupled
+    let _wdDescBacklog = 0, _wdDescCached = 0;
+    const _step1bStart = Date.now();
+    const wdJobs = allJobs.filter(j => j.source === 'workday');
+    if (wdJobs.length > 0) {
+      const wdDescriptions = await fetchWorkdayDescriptions(wdJobs, DATA_DIR, { skipFetch: _skipWdDesc });
+      injectDescriptions(wdJobs, wdDescriptions, 'WD');
+      _wdDescBacklog = wdJobs.filter(j => !wdDescriptions.has(j.id)).length;
+      _wdDescCached = wdDescriptions.size;
+      // AGG-DESC-ASYNC-1: when WD desc backfill is skipped, write pending jobs (with _raw,
+      // pre-strip) to a queue file for the separate desc-backfill workflow to consume.
+      if (_skipWdDesc) {
+        const _wdPending = wdJobs.filter(j => !wdDescriptions.has(j.id) && j._raw && j._raw.externalPath && j._raw.baseUrl && j._raw.site);
+        if (_wdPending.length > 0) {
+          const _qLines = _wdPending.map(j => JSON.stringify({ id: j.id, externalPath: j._raw.externalPath, baseUrl: j._raw.baseUrl, site: j._raw.site, location: j.location || '' }));
+          fs.writeFileSync(path.join(DATA_DIR, 'wd-desc-queue.jsonl'), _qLines.join('\n') + '\n', 'utf8');
+          console.log(`📄 Wrote ${_wdPending.length} pending WD jobs → wd-desc-queue.jsonl (separate desc-backfill workflow will fetch)`);
+        }
+      }
+    } else {
+      console.log('📄 Step 1b: No WD jobs this run — skipping description fetch');
+    }
+    const srJobs = allJobs.filter(j => j.source === 'smartrecruiters');
+    if (srJobs.length > 0) {
+      const srDescriptions = await fetchSRDescriptions(srJobs, DATA_DIR, { skipFetch: _skipSrDesc });
+      injectDescriptions(srJobs, srDescriptions, 'SR');
+    } else {
+      console.log('📄 SR descriptions: No SmartRecruiters jobs this run — skipping description fetch');
+    }
+    stageTimings.step1b_desc_backfill_ms = Date.now() - _step1bStart;
+    console.log(`⏱️  Step 1b (desc backfill WD+SR): ${stageTimings.step1b_desc_backfill_ms}ms`);
+    console.log('');
+
+
+    // Step 2: Enhance jobs (add fingerprints, employment_types arrays, etc.)
+    console.log('🔄 Step 2: Enhancing jobs with required fields...');
+    _stepStart = Date.now();
+    console.log('━'.repeat(60));
+
+    // Add missing fields (fingerprints, normalize employment_types to arrays)
+    const helpers = require(`${SHARED}/utils/helpers`);
+    const enhancedJobs = allJobs.map(job => {
+      // Add fingerprint if missing
+      if (!job.fingerprint) {
+        job.fingerprint = helpers.generateFingerprint(job);
+      }
+
+      // AGG-DATA-13: Normalize employment_type/employment_types to canonical array (AGG-PIPE-13: shared constant)
+      if (!job.employment_types) {
+        const types = job.employment_type || [];
+        if (Array.isArray(types)) {
+          job.employment_types = types.map(t => EMPLOYMENT_NORMALIZE_MAP[String(t).toUpperCase()] || String(t).toUpperCase());
+        } else if (typeof types === 'string') {
+          job.employment_types = types.split(',').map(t => EMPLOYMENT_NORMALIZE_MAP[t.trim().toUpperCase()] || t.trim().toUpperCase());
+        } else {
+          job.employment_types = [];
+        }
+      } else {
+        // Carry-forward: re-normalize existing array
+        job.employment_types = job.employment_types.map(t => EMPLOYMENT_NORMALIZE_MAP[t] || t);
+      }
+
+      return job;
+    });
+
+    console.log('');
+    console.log(`✅ Step 2 complete: ${enhancedJobs.length} jobs enhanced`);
+    stageTimings.step2_enhance_ms = Date.now() - _stepStart;
+    console.log('');
+
+    // Step 3: Validate and fix malformed fields
+    console.log('📝 Step 3: Validating and fixing malformed fields...');
+    _stepStart = Date.now();
+    console.log('━'.repeat(60));
+
+    const { validJobs, invalidJobs, metrics: validationMetrics } = validateAndNormalizeJobs(enhancedJobs);
+
+    console.log('');
+    printValidationSummary(validationMetrics);
+    console.log('');
+    console.log(`✅ Step 3 complete: ${validJobs.length} valid jobs (${invalidJobs.length} filtered)`);
+    stageTimings.step3_validate_ms = Date.now() - _stepStart;
+    console.log('');
+
+    // Step 4: Filter senior jobs
+    console.log('🎓 Step 4: Filtering senior-level jobs...');
+    _stepStart = Date.now();
+    console.log('━'.repeat(60));
+
+    // INF-EXPAND-1 Phase 2 (Option D, 2026-07-09): pipeline senior filter BYPASSED. All jobs enter
+    // the main pool; each consumer filters by tags.employment itself (6 GitHub boards + Discord =
+    // Phase 1 filters LIVE; zapply.jobs = isEarlyCareerJob; softwarejobs.dev = all-levels by design).
+    // filterSeniorJobs + senior-filter.js are KEPT for reference/rollback + observability: we still
+    // call it to MEASURE what would be filtered, but validJobs is the pool and seniorJobs is empty
+    // (so the shadow feed + seniorUsFold become no-ops — no double-count into us_jobs).
+    const _filterResult = filterSeniorJobs(validJobs, companyOverrideMap);
+    const entryLevelJobs = validJobs;
+    const seniorJobs = [];
+    const seniorFilterMetrics = _filterResult.metrics;
+    const _wouldBeSenior = _filterResult.seniorJobs.length;
+
+    console.log('');
+    printSeniorFilterSummary(seniorFilterMetrics);
+    console.log('');
+    const overrideCount = seniorFilterMetrics.override_applied || 0;
+    console.log(`✅ Step 4 complete (Phase 2: senior filter BYPASSED): ${entryLevelJobs.length} jobs enter pool (all levels; ${_wouldBeSenior} would-have-been-senior → flow to consumers that filter)`);
+    stageTimings.step4_filter_ms = Date.now() - _stepStart;
+    console.log('');
+
+    // Step 4b: Write senior-filter analytics summary (PIPELINE-1)
+    // Summary counts only — full job objects are ~180 MB and exceed GitHub's 100 MB limit.
+    // Tags not yet available (Step 5), so breakdown is by source only.
+    const FILTERED_OUTPUT_FILE = path.join(DATA_DIR, 'filtered_jobs.json');
+    const seniorBySource = {};
+    for (const job of seniorJobs) {
+      seniorBySource[job.source || 'unknown'] = (seniorBySource[job.source || 'unknown'] || 0) + 1;
+    }
+
+    // AGG-SELF-4 Check C: FP rate tracking for trend alerting
+    let fpStats = { sample_size: 0, potential_fp_count: 0, fp_rate_pct: '0.0' };
+    // AGG-DATA-8 / AGG-PIPE-11: Sample 500 filtered jobs for false-positive measurement.
+    // 500 jobs gives ±4.3pp CI (vs ±14pp with 50). File rotated weekly (7-day TTL).
+    {
+      const SAMPLE_SIZE = 500;
+      const SAMPLES_FILE = path.join(DATA_DIR, 'filtered-samples.jsonl');
+      const now = new Date();
+
+      // Rotate: remove entries older than 7 days
+      let existingLines = [];
+      if (fs.existsSync(SAMPLES_FILE)) {
+        const cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        existingLines = fs.readFileSync(SAMPLES_FILE, 'utf8').trim().split('\n')
+          .filter(line => { try { return JSON.parse(line).sampled_at >= cutoff; } catch { return false; } });
+      }
+
+      // Random sample without bias (Fisher-Yates partial shuffle)
+      const sampleIndices = [];
+      if (seniorJobs.length <= SAMPLE_SIZE) {
+        sampleIndices.push(...Array.from({ length: seniorJobs.length }, (_, i) => i));
+      } else {
+        const pool = Array.from({ length: seniorJobs.length }, (_, i) => i);
+        for (let i = 0; i < SAMPLE_SIZE; i++) {
+          const j = i + Math.floor(Math.random() * (pool.length - i));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+          sampleIndices.push(pool[i]);
+        }
+      }
+
+      // AGG-PIPE-11: Flag potential FPs — jobs where title has no senior keyword.
+      // Not definitive (could be filtered by experience in description), but surfaces
+      // likely FPs for review. A high potential_fp rate warrants investigation.
+      const SENIOR_TITLE_RE = /\b(senior|sr\.?|lead|principal|staff|director|vp|vice president|head of|chief|manager|mgr\.?)\b/i;
+
+      const newSamples = sampleIndices.map(idx => {
+        const job = seniorJobs[idx];
+        const hasSeniorKeyword = SENIOR_TITLE_RE.test(job.title || '');
+        return {
+          sampled_at: now.toISOString(),
+          id: job.id,
+          title: job.title,
+          company_name: job.company_name,
+          source: job.source,
+          location: job.location || null,
+          filter_reason: job._filter_reason || 'unknown',
+          potential_fp: !hasSeniorKeyword,
+        };
+      });
+
+      const fpCount = newSamples.filter(s => s.potential_fp).length;
+      const fpRate = newSamples.length > 0 ? (fpCount / newSamples.length * 100).toFixed(1) : '0.0';
+      console.log(`📋 FP estimate: ${fpCount}/${newSamples.length} (${fpRate}%) potential false positives in sample`);
+      fpStats = { sample_size: newSamples.length, potential_fp_count: fpCount, fp_rate_pct: fpRate };
+
+      const allLines = [...existingLines, ...newSamples.map(s => JSON.stringify(s))];
+      fs.writeFileSync(SAMPLES_FILE, allLines.join('\n') + '\n', 'utf8');
+      console.log(`📋 Step 4b-2: Filtered samples → filtered-samples.jsonl (${newSamples.length} sampled, ${allLines.length} total)`);
+    }
+
+    // Write summary AFTER fpStats is computed
+    const filteredSummary = {
+      generated: new Date().toISOString(),
+      total_senior_filtered: seniorJobs.length,
+      by_source: seniorBySource,
+      ...fpStats,
+    };
+    fs.writeFileSync(FILTERED_OUTPUT_FILE, JSON.stringify(filteredSummary, null, 2), 'utf8');
+    console.log(`📋 Step 4b: Senior-filter summary → filtered_jobs.json (${seniorJobs.length} total)`);
+
+    console.log('');
+
+    // Step 4c: Inject descriptions from ALL sidecar files for tag engine's description fallback.
+    // Carried-forward jobs lose their inline descriptions in Step 9 (stripped from all_jobs.json).
+    // This re-injects them from per-source sidecar files so the description-fallback layer can classify.
+    // Guard: !job.description prevents double-injection for freshly-fetched jobs with inline descriptions.
+    // TAG-9 S237: expanded from enriched-only to ALL sidecars — 1,317 additional jobs gain descriptions.
+    const _step4cStart = Date.now();
+    const descSidecarFiles = fs.readdirSync(DATA_DIR)
+      .filter(f => f.startsWith('descriptions-') && f.endsWith('.jsonl'));
+    if (descSidecarFiles.length > 0) {
+      const descMap = new Map();
+      const deptMap = new Map();   // AGG-ORACLE-DEPT: id -> departments[] (persisted capture)
+      for (const fname of descSidecarFiles) {
+        const fpath = path.join(DATA_DIR, fname);
+        const descLines = fs.readFileSync(fpath, 'utf8').trim().split('\n').filter(Boolean);
+        for (const line of descLines) {
+          try {
+            const { id, description_text, departments } = JSON.parse(line);
+            if (id && description_text) descMap.set(id, description_text);
+            if (id && Array.isArray(departments) && departments.length > 0) deptMap.set(id, departments);
+          } catch { /* skip malformed */ }
+        }
+      }
+      let injected = 0;
+      for (const job of entryLevelJobs) {
+        if (!job.description && descMap.has(job.id)) {
+          job.description = descMap.get(job.id);
+          injected++;
+        }
+      }
+      // AGG-ORACLE-DEPT: re-inject persisted departments for jobs not detail-fetched this run
+      // (description-cache-skipped or carry-forward). normalizeOracleJob only sees detailJob on
+      // the single run a job is fetched, so without this the captured department is lost and the
+      // job reverts to "general" on every later run.
+      let deptInjected = 0;
+      for (const job of entryLevelJobs) {
+        if ((!job.departments || job.departments.length === 0) && deptMap.has(job.id)) {
+          job.departments = deptMap.get(job.id);
+          deptInjected++;
+        }
+      }
+      console.log(`📄 Step 4c: Injected ${injected} descriptions from ${descSidecarFiles.length} sidecar files (${descMap.size} available)${deptInjected > 0 ? `; re-injected ${deptInjected} persisted Oracle departments` : ''}`);
+    } else {
+      console.log('📄 Step 4c: No description sidecar files found — description fallback inactive');
+    }
+    stageTimings.step4c_desc_inject_ms = Date.now() - _step4cStart;
+    console.log(`⏱️  Step 4c (desc sidecar inject): ${stageTimings.step4c_desc_inject_ms}ms`);
+    console.log('');
+
+    // Step 5: Apply tags
+    console.log('🏷️  Step 5: Applying tags...');
+    _stepStart = Date.now();
+    console.log('━'.repeat(60));
+
+    const taggedJobs = tagJobs(entryLevelJobs);
+
+    console.log(`✅ Step 5 complete: ${taggedJobs.length} jobs tagged`);
+    stageTimings.step5_tag_ms = Date.now() - _stepStart;
+    console.log('');
+
+    // Step 6: Deduplicate
+    console.log('🔍 Step 6: Deduplicating jobs...');
+    _stepStart = Date.now();
+    console.log('━'.repeat(60));
+
+    const { unique: dedupedJobs, duplicates, stats: dedupeStats } = deduplicateJobs(taggedJobs);
+
+    console.log('');
+    console.log(`✅ Step 6 complete: ${dedupedJobs.length} unique jobs (${duplicates} duplicates removed)`);
+    stageTimings.step6_dedup_ms = Date.now() - _stepStart;
+    console.log('');
+
+    // Step 7: Tag statistics deferred to post-merge (after Step 9).
+    // Previously computed from dedupedJobs (current-run only), missing ~4K carry-forward jobs.
+    // Now computed after carry-forward merge + AGG-32 stale filter for full-pool accuracy.
+    console.log('📊 Step 7: Tag statistics deferred to post-merge');
+
+    let tagStats = null;
+    console.log('');
+
+    // Step 8: Sort by date (newest first)
+    console.log('📊 Step 8: Sorting jobs by date...');
+    _stepStart = Date.now();
+    console.log('━'.repeat(60));
+
+    const sortedJobs = dedupedJobs.sort((a, b) => {
+      const dateA = new Date(a.posted_at || 0);
+      const dateB = new Date(b.posted_at || 0);
+      return dateB - dateA; // Newest first
+    });
+
+    console.log(`✅ Step 8 complete: Jobs sorted`);
+    stageTimings.step8_sort_ms = Date.now() - _stepStart;
+    console.log('');
+
+    // Step 8b: Write per-source description sidecars (AGG-PIPE-13: extracted to sidecar-writer.js)
+    console.log('📄 Step 8b: Writing description sidecars...');
+    _stepStart = Date.now();
+    const { writtenFiles: sidecarFiles, stats: sidecarStats, removedFiles: sidecarRemoved } = writeSidecars(sortedJobs, DATA_DIR);
+    // R2-prune manifest (AGG-R2-SINGLEFILE-1): list sidecar files removed locally as stale
+    // so the publish step can delete the superseded R2 copies. Always (re)write or clear it
+    // so a prior run's manifest never causes spurious deletes on a clean run.
+    const _removedManifest = path.join(DATA_DIR, '.sidecar-removed.json');
+    if (sidecarRemoved && sidecarRemoved.size > 0) {
+      fs.writeFileSync(_removedManifest, JSON.stringify([...sidecarRemoved]));
+      console.log(`🗑️  R2-prune manifest: ${sidecarRemoved.size} stale sidecar file(s) queued for R2 deletion`);
+    } else {
+      try { fs.unlinkSync(_removedManifest); } catch (_) {}
+    }
+    stageTimings.step8b_sidecars_ms = Date.now() - _stepStart;
+    pipelineTimestamps.sidecars_written_at = new Date().toISOString();
+    console.log('');
+    // AGG-SALARY-TEXT-INTEGRATION-1: Extract salary from description text for jobs
+    // without structured salary (ashby/lever already have it from the fetcher).
+    // ENR built + tested fromDescription() (30 tests, <0.3% false-positive).
+    // Runs before STRIP_FIELDS so descriptions are still on the job objects.
+    const _salaryStart = Date.now();
+    let _descSalaryCount = 0;
+    for (const job of sortedJobs) {
+      if (job.salaryMin == null && job.description) {
+        const plainText = typeof job.description === 'string'
+          ? job.description.replace(/<[^>]*>/g, ' ').replace(/&[a-z]+;/gi, ' ')
+          : '';
+        const extracted = fromDescription(plainText);
+        if (extracted.salaryMin != null) {
+          job.salaryMin = extracted.salaryMin;
+          job.salaryMax = extracted.salaryMax;
+          job.salaryCurrency = extracted.salaryCurrency;
+          _descSalaryCount++;
+        }
+      }
+    }
+    console.log(`💰 Step 8c: Salary from description text — ${_descSalaryCount} jobs extracted (${((Date.now() - _salaryStart) / 1000).toFixed(1)}s)`);
+
+    // Step 9: Write output files
+    console.log('💾 Step 9: Writing output files...');
+    _stepStart = Date.now();
+    console.log('━'.repeat(60));
+
+    // Strip pipeline internals before writing public output file
+    // (source_url, source_id, _raw are internal — not needed downstream)
+    // Note: 'source' is kept for downstream observability (which ATS produced each job)
+    const STRIP_FIELDS = ['source_url', '_raw', 'description', 'enriched', 'enriched_at', 'is_internship', 'is_new_grad', 'is_us_only', 'remote'];
+    let publicJobs = sortedJobs.map(job => {
+      const stripped = { ...job };
+      for (const field of STRIP_FIELDS) {
+        delete stripped[field];
+      }
+      return stripped;
+    });
+
+    // Merge previous all_jobs.json into current run (rolling window — TTL from deduplicator)
+    // Jobs from prior runs that weren't re-fetched this run are preserved until their TTL expires.
+    const _step9MergeStart = Date.now();
+    if (fs.existsSync(JOBS_OUTPUT_FILE)) {
+      const currentIds = new Set(publicJobs.map(j => j.id));
+      // Fingerprint guard: prevents re-injection of jobs that changed ID (e.g. WD-ID-BUG fix)
+      const currentFingerprints = new Set(publicJobs.map(j => j.fingerprint).filter(Boolean));
+      const prevLines = fs.readFileSync(JOBS_OUTPUT_FILE, 'utf8').trim().split('\n').filter(Boolean);
+
+      // AGG-32: Filter stale jobs by posted_at TTL
+      resolvePostedAt(publicJobs, prevLines);
+
+      mergeCarryForward(publicJobs, prevLines, currentIds, currentFingerprints, STRIP_FIELDS, successfulSources, atsResult.health || {});
+    }
+
+    for (const job of publicJobs) {
+      delete job.source_updated_at;
+    }
+
+    // AGG-STALEUPSTREAM-1 (2026-07-04): orphan cleanup pass — drop defunct-tenant jobs (company no longer
+    // in active workday/smartrecruiters config + not fetched >14d). Runs BEFORE the freshness metric so
+    // the metric reflects post-cleanup state.
+    {
+      const _cl = JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8'));
+      const _activeWd = new Set((_cl.workday || []).map(e => e.name));
+      const _activeSR = new Set((_cl.smartrecruiters || []).map(e => e.name));
+      const _orphanDropped = dropOrphanJobs(publicJobs, _activeWd, _activeSR);
+      if (_orphanDropped > 0) console.log(`🧹 AGG-STALEUPSTREAM-1: dropped ${_orphanDropped} ORPHAN jobs upstream (company no longer in active workday/smartrecruiters config + not fetched >14d) — no longer reach all_jobs/R2/consumers.`);
+    }
+    stageTimings.step9_carryforward_ms = Date.now() - _step9MergeStart;
+    console.log(`⏱️  Step 9 (carry-forward merge + orphan-drop): ${stageTimings.step9_carryforward_ms}ms`);
+
+    // AGG-STALEUPSTREAM-1 (2026-07-04): Freshness SLA metric — make the stale-candidate residue's age
+    // VISIBLE every run. The 4.6-day silent rot recurred because nothing measured this; if p50/max climb,
+    // the rotate sweep is losing coverage and closed jobs are lingering again — investigate.
+    const _staleResidue = publicJobs.filter(j => j?.tags?.lifecycle_state === 'stale-candidate');
+    if (_staleResidue.length > 0) {
+      const _agesH = _staleResidue.map(j => j.fetched_at ? (Date.now() - new Date(j.fetched_at).getTime()) / 3600000 : null)
+                                  .filter(a => a != null && !isNaN(a)).sort((a, b) => a - b);
+      if (_agesH.length > 0) {
+        const _pct = p => _agesH[Math.min(_agesH.length - 1, Math.floor(p * _agesH.length))];
+        const _p50 = _pct(0.5), _p90 = _pct(0.9), _max = _agesH[_agesH.length - 1];
+        console.log(`📊 FRESHNESS SLA: ${_staleResidue.length} stale-candidate in pool | age(h) p50=${_p50.toFixed(1)} p90=${_p90.toFixed(1)} max=${_max.toFixed(1)} — investigate if p50/max climb (rotate-coverage-gap signal)`);
+        // AGG-STALEUPSTREAM-1: breach check -> write freshness-status.json for the workflow alert step.
+        // THRESHOLD RATIONALE (AGG-FRESHNESS-12H-1, reviewed 2026-07-17):
+        //   12h = ~6-10x the A208-calibrated normal p50 (1.2-1.9h). Diagnostic threshold, not a user-protection SLA.
+        //   Fires when carry-forward stale-candidates with old fetched_at accumulate (typically after
+        //   incremental cache engages following a full-fetch period — carry-forward jobs age naturally at 1h/hour).
+        //   stale-candidate = posted_at > TTL (age-based via classifyAgeLifecycle, NOT URL-health-based).
+        //   The metric CANNOT: distinguish cache-engagement from rotate degradation, tell if URLs are dead,
+        //   or cross-reference link-health data. stale-candidate jobs in all_jobs.json are filtered by ALL consumers (discord-poster.js, aggregator-consumer.js, sjd API).
+        //   For real degradation detection, track lifecycle.distribution.stale-candidate COUNT trend (count
+        //   growing = problem; count stable + age fluctuating = normal). Full system review: AGG-METRICS-REVIEW-1.
+        //   Also alert at max>15d/360h (orphan/carry-forward past the bound).
+        // THRESHOLD FIX (AGG-FRESHNESS-12H-1 + AGG-METRICS-REVIEW-1, 2026-07-18):
+        //   p50 >12h alone is NOT a breach signal — carry-forward stale-candidates age naturally
+        //   past 12h after every full-fetch period. This fired every run, creating Discord noise.
+        //   Now require BOTH: p50 >12h AND stale-candidate ratio >25% of pool.
+        //   Normal: ~13% stale-candidate, p50 climbs with aging — no alert.
+        //   Problem: >25% stale-candidate + high p50 = rotate/cleanup degraded — alert.
+        //   max>360h (orphan past 15-day bound) remains a standalone breach signal.
+        const _ALERT_P50_H = 12, _ALERT_MAX_H = 360, _ALERT_STALE_RATIO = 0.25;
+        const _staleRatio = _staleResidue.length / publicJobs.length;
+        let _breached = false, _reason = '';
+        if (_p50 > _ALERT_P50_H && _staleRatio > _ALERT_STALE_RATIO) { _breached = true; _reason = `p50 ${_p50.toFixed(1)}h > ${_ALERT_P50_H}h AND stale-candidate ${(_staleRatio * 100).toFixed(1)}% > ${_ALERT_STALE_RATIO * 100}% (rotate/cleanup degraded — count accumulating + aging)`; }
+        else if (_max > _ALERT_MAX_H) { _breached = true; _reason = `max ${_max.toFixed(1)}h > ${_ALERT_MAX_H}h/15d (orphan/carry-forward past the bound — cleanup broken?)`; }
+        try { fs.writeFileSync(path.join(DATA_DIR, 'freshness-status.json'), JSON.stringify({ breached: _breached, reason: _reason, p50: +_p50.toFixed(1), p90: +_p90.toFixed(1), max: +_max.toFixed(1), staleCount: _staleResidue.length, staleRatio: +(_staleRatio * 100).toFixed(1), checkedAt: new Date().toISOString() }, null, 2)); } catch (e) { console.log(`   (freshness-status.json write skipped: ${e.message})`); }
+        if (_breached) console.log(`⚠️  FRESHNESS ALERT (AGG-STALEUPSTREAM-1): ${_reason} — staleness bound breached; investigate rotate coverage + orphan cleanup.`);
+        else if (_p50 > _ALERT_P50_H) console.log(`📊 FRESHNESS DIAGNOSTIC (non-breaching): p50 ${_p50.toFixed(1)}h > ${_ALERT_P50_H}h but stale-candidate ratio ${(_staleRatio * 100).toFixed(1)}% ≤ ${_ALERT_STALE_RATIO * 100}% — normal carry-forward aging, not degradation.`);
+      }
+    }
+
+    // Generate tag stats from full pool (post-merge + post-AGG-32 filter).
+    tagStats = computeFullPoolTagStats(publicJobs);
+
+    // Tag monitoring diagnostics (AGG-PIPE-13: extracted to monitoring.js)
+    const monitoringReports = runTagMonitoring(publicJobs, tagStats, {
+      dataDir: DATA_DIR,
+      checkTagDrift, printDriftReport,
+      tagDomainsFn: tagDomains,
+      checkDomainPrecision, printPrecisionReport,
+      checkKeywordHealth, checkKeywordOverlap,
+      getKeywordMap, tagEngineVersion: TAG_ENGINE_VERSION,
+      seniorJobs, companyOverrideMap,
+    });
+    ({ tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport } = monitoringReports);
+
+    // Archive expiring jobs BEFORE overwriting all_jobs.json
+    const { getExpiringJobs, appendToWeeklyArchive, appendToDailyArchive } = require(`${SHARED}/utils/archiver`);
+    const ARCHIVE_DIR = path.join(DATA_DIR, 'archive');
+    const expiringJobs = getExpiringJobs(JOBS_OUTPUT_FILE, publicJobs);
+    if (expiringJobs.length > 0) {
+      const weeklyFile = appendToWeeklyArchive(expiringJobs, ARCHIVE_DIR);
+      const dailyFile = appendToDailyArchive(expiringJobs, ARCHIVE_DIR);
+      console.log(`📦 Archived ${expiringJobs.length} expiring jobs → weekly: ${path.basename(weeklyFile)}, daily: ${path.basename(dailyFile)}`);
+    } else {
+      console.log('📦 No expiring jobs this run');
+    }
+
+    // AGG-PIPE-10: RETIRED for EXPAND-1 Phase 2 (2026-07-09). Was a write-step safety filter that
+    // removed senior-TAGGED jobs (catching seniors Step 4's title/experience filter missed).
+    // Post-Phase-2 the pipeline senior filter is removed ENTIRELY — all jobs enter the pool;
+    // CONSUMERS filter by tags.employment (6 GitHub boards + Discord Phase 1; zapply.jobs
+    // isEarlyCareerJob; softwarejobs.dev all-levels by design — WANTS seniors). Keeping this
+    // filter would starve softwarejobs.dev's all-levels board + duplicate the consumer filters.
+    // Count for observability only (no removal):
+    const seniorTaggedInPool = publicJobs.filter(job => job.tags?.employment === 'senior').length;
+    if (seniorTaggedInPool > 0) {
+      console.log(`📊 AGG-PIPE-10 (Phase 2: filter RETIRED): ${seniorTaggedInPool} senior-tagged jobs remain in pool → consumers filter`);
+    }
+
+    // Write jobs (JSONL format)
+    await writeJobsJSONL(publicJobs, JOBS_OUTPUT_FILE);
+
+    const usJobs = buildUsSnapshotJobs(publicJobs);
+
+    // AGG-SEN-DATAFOLD (board 2026-06-23): fold a ≤14-day US senior-tech subset into us_jobs so
+    // softwarejobs.dev's Senior filter has data (OUT verified the Senior UI/filter is correct; the
+    // gap was data-only — us_jobs had 0 senior rows). Sourced from the Step-4 seniorJobs partition
+    // (same as the senior-tech feed); windowed to ≤14d + US + tech domains to bound size/freshness.
+    // Schema matches us_jobs (lean via stripFeedInternal — same STRIP_FIELDS as all_jobs). Best-effort.
+    let seniorUsFold = [];
+    try {
+      const foldWindowMs = 14 * 24 * 3600 * 1000;
+      const foldNow = Date.now();
+      seniorUsFold = tagJobs(seniorJobs)
+        .filter(j => {
+          const doms = j.tags?.domains || [], locs = j.tags?.locations || [];
+          return doms.some(d => SENIOR_TECH_DOMAINS.includes(d))
+              && locs.includes('us')
+              && j.posted_at && (foldNow - Date.parse(j.posted_at)) <= foldWindowMs;
+        })
+        .map(stripFeedInternal);
+    } catch (e) {
+      console.warn(`⚠️ AGG-SEN-DATAFOLD: senior fold failed (non-blocking): ${e.message}`);
+    }
+    const usJobsWithSenior = usJobs.concat(seniorUsFold);
+    await writeJobsJSONL(usJobsWithSenior, US_JOBS_OUTPUT_FILE);
+    console.log(`🇺🇸 AGG-US-SNAPSHOT-1 + SEN-DATAFOLD: Wrote ${usJobsWithSenior.length} US jobs to us_jobs.json (entry-level ${usJobs.length} + ≤14d senior-tech ${seniorUsFold.length})`);
+
+    // INF-FEED-1: mid-level tech shadow feed (additive; no consumer depends on it yet)
+    const midLevelTechFeed = buildMidLevelTechFeed(publicJobs);
+    await writeJobsJSONL(midLevelTechFeed, MID_LEVEL_TECH_FILE);
+    fs.writeFileSync(MID_LEVEL_TECH_SUMMARY_FILE, JSON.stringify(buildMidLevelTechSummary(midLevelTechFeed, publicJobs.length), null, 2) + '\n', 'utf8');
+    console.log(`💼 INF-FEED-1: Wrote ${midLevelTechFeed.length} mid-level tech jobs (shadow feed) → mid-level-tech-jobs.jsonl`);
+
+    // AGG-SEN-FILTERKNOB-1: senior-tech shadow feed (additive; mirrors INF-FEED-1).
+    // seniorJobs are untagged at Step 4 (tag-engine runs at Step 5 on entryLevelJobs only), so
+    // tag the partition here to make the feed queryable. Best-effort: a shadow feed must never
+    // block the main pipeline. Main pool (all_jobs) is untouched — parity by construction.
+    try {
+      const taggedSeniorJobs = tagJobs(seniorJobs);
+      const seniorTechFeed = buildSeniorTechFeed(taggedSeniorJobs);
+      await writeJobsJSONL(seniorTechFeed, SENIOR_TECH_FILE);
+      fs.writeFileSync(SENIOR_TECH_SUMMARY_FILE, JSON.stringify(buildSeniorTechSummary(seniorTechFeed, seniorJobs.length), null, 2) + '\n', 'utf8');
+      console.log(`👔 AGG-SEN-FILTERKNOB-1: Wrote ${seniorTechFeed.length} senior tech jobs (shadow feed) → senior-tech-jobs.jsonl (of ${seniorJobs.length} senior-filtered)`);
+    } catch (e) {
+      // Empty-file fallback: these two files are in the workflow's REQUIRED R2 upload list, so
+      // they must ALWAYS exist (empty is acceptable on failure) — a shadow feed must never block
+      // the main pipeline or fail the required R2 upload. source_total stays accurate via
+      // seniorJobs.length. (tagJobs is proven at Step 5, so reaching here is defense-in-depth.)
+      await writeJobsJSONL([], SENIOR_TECH_FILE);
+      fs.writeFileSync(SENIOR_TECH_SUMMARY_FILE, JSON.stringify(buildSeniorTechSummary([], seniorJobs.length), null, 2) + '\n', 'utf8');
+      console.warn(`⚠️ AGG-SEN-FILTERKNOB-1: senior-tech feed failed, wrote EMPTY (non-blocking): ${e.message}`);
+    }
+
+    // CANADA-LANE: tag-driven additive shadow feed (additive; zero US-path impact — the US snapshot
+    // and all_jobs are already written above, untouched). Empty-file fallback: these three files
+    // are in the workflow's REQUIRED R2 upload list, so they must ALWAYS exist (empty is acceptable
+    // on failure) — a shadow feed must never block the pipeline or fail the required R2 upload
+    // (A196 lesson). A sentinel FP failure degrades to empty feeds + a warning, NOT a pipeline crash.
+    try {
+      await writeCanadaTechFeed(publicJobs);
+      await writeCanadaInternshipsFeed(publicJobs);
+    } catch (e) {
+      await writeJobsJSONL([], CANADA_TECH_JOBS_OUTPUT_FILE);
+      await writeJobsJSONL([], CANADA_TECH_INTERNSHIPS_OUTPUT_FILE);
+      const degraded = {
+        contract_version: 'canada-tech-feed-v1',
+        generated_at: new Date().toISOString(),
+        degraded: true,
+        error: e.message,
+        total_jobs: publicJobs.length,
+        canada_jobs: 0, canada_tech_jobs: 0, canada_internships: 0, canada_tech_internships: 0,
+        included_domains: [...CANADA_TECH_DOMAINS],
+        by_domain: {}, by_source: {}, top_companies: [],
+        sentinel_false_positive_checks: { contract_version: 'canada-tech-feed-v1', passed: false, checks: { degraded: true }, suspicious_us_only_samples: [] },
+      };
+      await writeMetadata(degraded, CANADA_TECH_SUMMARY_OUTPUT_FILE);
+      console.warn(`⚠️ CANADA-LANE: feed build failed, wrote EMPTY fallbacks (non-blocking): ${e.message}`);
+    }
+    // CANADA-LANE (all-Canada, AGG-CANADAFEED-1): additive shadow feed — all canada jobs (tech-prioritized).
+    // Independent try/catch so an all-feed failure cannot affect the tech feeds (or vice versa).
+    try {
+      await writeCanadaAllFeed(publicJobs);
+    } catch (e) {
+      await writeJobsJSONL([], CANADA_ALL_JOBS_OUTPUT_FILE);
+      const degradedAll = {
+        contract_version: 'canada-all-feed-v1', generated_at: new Date().toISOString(), degraded: true,
+        error: e.message, total_jobs: publicJobs.length, canada_jobs: 0, canada_tech_jobs: 0, canada_non_tech_jobs: 0,
+        by_domain: {}, by_source: {}, top_companies: [],
+        sentinel_false_positive_checks: { contract_version: 'canada-all-feed-v1', passed: false, checks: { degraded: true }, suspicious_us_only_samples: [] },
+      };
+      await writeMetadata(degradedAll, CANADA_ALL_SUMMARY_OUTPUT_FILE);
+      console.warn(`⚠️ CANADA-LANE (all): all-canada feed failed, wrote EMPTY fallback (non-blocking): ${e.message}`);
+    }
+    // INF-CANADA-INTERNSHIP-FEED-1: broad Canada internships (all domains, not just tech)
+    try {
+      await writeCanadaAllInternshipsFeed(publicJobs);
+    } catch (e) {
+      await writeJobsJSONL([], CANADA_ALL_INTERNSHIPS_OUTPUT_FILE);
+      console.warn(`⚠️ CANADA-LANE: all-internships feed failed, wrote EMPTY fallback (non-blocking): ${e.message}`);
+    }
+
+    // Write metadata
+    // Use publicJobs (full 7-day rolling window) for pool-level stats (by_source, top_companies, freshness).
+    // sortedJobs is current-run only — stats must use publicJobs (full 7-day window).
+    const duration = Date.now() - startTime;
+    stageTimings.step9_write_ms = Date.now() - _stepStart;
+    pipelineTimestamps.output_ready_at = new Date().toISOString();
+    // Build fetch_results: per-source counts from current fetch attempts (before carry-forward).
+    // Demoted hot-path sources are intentionally absent: they were not attempted in this
+    // workflow, so reporting 0 would create a false "source fetch failure" alert.
+    const fetchResults = {};
+    for (const [source, count] of Object.entries((atsResult.stats || {}).by_source || {})) {
+      if (count > 0) fetchResults[source] = (fetchResults[source] || 0) + count;
+    }
+    for (const [fetcherName, jobs] of Object.entries(fetcherResults)) {
+      if (HOTPATH_DEMOTED_FETCHERS.has(fetcherName)) continue;
+      const sourceKey = FETCHER_NAME_TO_SOURCE[fetcherName] || fetcherName.toLowerCase();
+      fetchResults[sourceKey] = Array.isArray(jobs) ? jobs.length : 0;
+    }
+
+    // AGG-FETCH-14: Build fetcher_health from ATS + custom fetcher results.
+    // Enables check-19 to classify zero-yield companies without HTTP probing.
+    const fetcherHealth = {};
+    const healthNow = new Date().toISOString();
+    // ATS health (from ats-fetcher.js)
+    if (atsResult.health) {
+      Object.assign(fetcherHealth, atsResult.health);
+    }
+    // Custom fetcher health. Demoted sources are marked as skipped, not zero:
+    // "zero" means attempted successfully and returned no jobs.
+    for (let i = 0; i < fetcherNames.length; i++) {
+      const name = fetcherNames[i];
+      const source = FETCHER_NAME_TO_SOURCE[name] || name.toLowerCase();
+      if (HOTPATH_DEMOTED_FETCHERS.has(name)) {
+        fetcherHealth[name] = {
+          status: 'skipped',
+          source,
+          jobs: null,
+          reason: 'hot_path_demoted',
+          timestamp: healthNow,
+        };
+        continue;
+      }
+      const result = phaseBSettled[i];
+      if (!result) continue;
+      const jobs = result.status === 'fulfilled' ? result.value : [];
+      const count = Array.isArray(jobs) ? jobs.length : 0;
+      fetcherHealth[name] = {
+        status: result.status === 'rejected' ? 'error' : count > 0 ? 'alive' : 'zero',
+        source,
+        jobs: count,
+        timestamp: healthNow,
+        ...(result.status === 'rejected' ? { detail: result.reason?.message } : {}),
+      };
+    }
+
+    const metadata = generateMetadata({
+      startTime,
+      jobs: publicJobs,
+      uniqueCount: dedupedJobs.length,
+      duplicateCount: duplicates,
+      duration,
+      tagStats,
+      validationMetrics,
+      seniorFilterMetrics,
+      seniorJobs,
+      zeroYieldCompanies,
+      stageTimings,
+      pipelineTimestamps,
+      tagDriftReport,
+      tagPrecisionReport,
+      keywordHealthReport,
+      keywordOverlapReport,
+      fpStats,
+      fetchResults,
+      fetcherHealth,
+      supplementalInputs: supplementalInputs.inputs,
+      prevRunCompletedAt,
+    });
+    metadata.desc_backlog = { wd_pending: _wdDescBacklog, wd_cached: _wdDescCached };
+    metadata.wd_rate_limited_count = wdRateLimited;  // AGG-WD-429MONITOR-1
+    await writeMetadata(metadata, METADATA_OUTPUT_FILE);
+
+    // Step 9c: build / refresh Workday family cache for future runs. Output is already written, so
+    // cache refresh cannot block user-visible publish correctness.
+    if (!isDryRun && !SKIP_WD_FAMILY_CACHE_BUILD) {
+      const familyCacheBuildReport = await buildFamilyCache(JSON.parse(fs.readFileSync(COMPANY_LIST_PATH, 'utf8')).workday || [], DATA_DIR);
+      stageTimings.step9c_family_cache_build_ms = familyCacheBuildReport.durationMs;
+    } else {
+      stageTimings.step9c_family_cache_build_ms = 0;
+      const reason = isDryRun ? 'dry run' : 'SKIP_WD_FAMILY_CACHE_BUILD=1';
+      console.log(`⏭️  Step 9c: Skipping Workday family cache build (${reason})`);
+    }
+
+    console.log('');
+    console.log(`✅ Step 9 complete: Output files written`);
+    console.log('');
+    // Step 9d: Unified cache pruning (AGG-CACHE-PRUNE-1).
+    // Bounds ALL description sidecars to the current pool — evicts entries for retired/dropped jobs.
+    // One mechanism covers every descriptions-*.jsonl file, present and future.
+    if (!isDryRun) {
+      _stepStart = Date.now();
+      const validIds = new Set(sortedJobs.map(j => j.id));
+      let totalPruned = 0;
+      let filesPruned = 0;
+      for (const fname of fs.readdirSync(DATA_DIR)) {
+        if (!/^descriptions-.+\.jsonl$/.test(fname)) continue;
+        // AGG-DESC-SPEED-1: workday descriptions are NOT pruned by Step 9d. The workday
+        // pool has ~35K jobs; the cache is naturally bounded at that size (~20MB). Both
+        // Step 9d (uses post-filter sortedJobs) and the fetcher's own pruning (uses
+        // current-run-only pool) are too narrow — they prune valid descriptions for
+        // carry-forward and filtered-out jobs, causing oscillation. No pruning = stable growth.
+        if (fname === 'descriptions-workday.jsonl') continue;
+        const fp = path.join(DATA_DIR, fname);
+        try {
+          const lines = fs.readFileSync(fp, 'utf8').trim().split('\n').filter(Boolean);
+          if (lines.length === 0) continue;
+          const kept = [];
+          let pruned = 0;
+          for (const line of lines) {
+            try {
+              const { id } = JSON.parse(line);
+              if (id && validIds.has(id)) kept.push(line);
+              else pruned++;
+            } catch { pruned++; } // malformed line → drop
+          }
+          // Only rewrite if we actually pruned something (avoid unnecessary I/O)
+          if (pruned > 0) {
+            const beforeKB = Math.round(lines.length * 200 / 1024); // rough estimate
+            fs.writeFileSync(fp, kept.join('\n') + '\n', 'utf8');
+            totalPruned += pruned;
+            filesPruned++;
+            console.log(`  🧹 ${fname}: pruned ${pruned} stale entries (${lines.length}→${kept.length})`);
+          }
+        } catch (e) { /* skip unreadable file */ }
+      }
+      if (totalPruned > 0) {
+        console.log(`✅ Step 9d: Cache pruned ${totalPruned} stale entries across ${filesPruned} sidecar file(s)`);
+      } else {
+        console.log(`✅ Step 9d: Cache pruning — all sidecars clean (0 stale entries)`);
+      }
+      stageTimings.step9d_cache_prune_ms = Date.now() - _stepStart;
+    } else {
+      console.log('⏭️  Step 9d: Skipping cache pruning (dry run)');
+    }
+
+
+    // Step 10: Print summary
+    printSummary(sortedJobs, dedupedJobs.length, duplicates, duration);
+
+    // Step 11: Print tag distribution
+    printTagDistribution(sortedJobs);
+
+    // Step 12 REMOVED (AGG-R2-CANONICAL-1, 2026-07-06): git commit was dead code —
+    // committed locally to the Actions runner but was NEVER pushed (no git push step
+    // for the main repo in the workflow). R2 upload (Step 10) is the sole persistence.
+    // Removed per operator directive: "no git fallback — crutch that does more harm than good."
+
+    // AGG-PREVIOUS-CYCLE-TIMESTAMP-1 v3: persist this run's completion for next cycle's seed.
+    // Written BEFORE success banner/exit. Optional upload in fetch-jobs.yml pushes to R2.
+    // Non-fatal on write failure (next run just won't see this cycle's end time).
+    try {
+      fs.writeFileSync(
+        path.join(DATA_DIR, 'pipeline-cycle-state.json'),
+        JSON.stringify({ last_completed_at: pipelineTimestamps.output_ready_at || new Date().toISOString() })
+      );
+    } catch (_writeErr) { /* non-fatal */ }
+
+    console.log('');
+    console.log('═'.repeat(60));
+    console.log('🎉 Jobs Data Fetcher - Complete!');
+    console.log('═'.repeat(60));
+
+    process.exit(0);
+
+  } catch (error) {
+    console.error('');
+    console.error('❌ Fatal error:');
+    console.error(error.message);
+    console.error('');
+    console.error('Stack trace:');
+    console.error(error.stack);
+    process.exit(1);
+  }
+}
+
+/**
+ * GAP-6: Compute companies configured in company-list.json that returned 0 raw jobs.
+ * Uses company_name from ATS stats (not slug) to match against configured company names.
+ * Excludes custom-fetcher companies (Apple, Amazon, etc.) — only ATS companies are checked.
+ * @param {Object} atsResult - ATS fetch result with stats.by_company
+ * @param {Object} fetcherResults - Custom fetcher results by name
+ * @param {string} companyListPath - Path to company-list.json
+ * @returns {Array<string>} Company names that returned 0 raw jobs
+ */
+function computeZeroYield(atsResult, fetcherResults, companyListPath, wdCache) {
+  try {
+    const companyList = JSON.parse(fs.readFileSync(companyListPath, 'utf8'));
+
+    // Build set of company names that produced jobs this run (ATS only)
+    const companiesWithJobs = new Set(Object.keys((atsResult.stats || {}).by_company || {}));
+
+    // AGG-ZEROYIELD-1: Include WD tenants from incremental cache.
+    // When the cache skips a tenant, it doesn't appear in atsResult.by_company,
+    // but it still has jobs (verified by wd-totals-cache.json).
+    if (wdCache && typeof wdCache === 'object') {
+      for (const [name, count] of Object.entries(wdCache)) {
+        if (count > 0) companiesWithJobs.add(name);
+      }
+    }
+
+    // AGG-SR-NAME-1: Build slug set for SR name mismatch.
+    // SR API returns legal names (e.g. "RE/SPEC Inc.") that differ from config names (e.g. "RESPEC").
+    // Matching by slug resolves 6 false positives per run.
+    const slugsWithJobs = new Set();
+    if (Array.isArray(atsResult.jobs)) {
+      for (const job of atsResult.jobs) {
+        if (job.company_slug) slugsWithJobs.add(job.company_slug);
+      }
+    }
+
+    // Build set of configured company names per ATS source
+    const zeroYield = [];
+    const sources = [
+      { key: 'greenhouse', entries: companyList.greenhouse },
+      { key: 'lever', entries: companyList.lever },
+      { key: 'ashby', entries: companyList.ashby },
+      { key: 'workday', entries: companyList.workday },
+      { key: 'smartrecruiters', entries: companyList.smartrecruiters },
+    ];
+
+    for (const { key, entries } of sources) {
+      if (!Array.isArray(entries)) continue;
+      for (const entry of entries) {
+        const name = entry.name;
+        const slug = entry.slug;
+        const hasName = name && companiesWithJobs.has(name);
+        const hasSlug = slug && slugsWithJobs.has(slug);
+        if (!hasName && !hasSlug) {
+          zeroYield.push(`${name} (${key})`);
+        }
+      }
+    }
+
+    return zeroYield;
+  } catch (e) {
+    console.warn(`⚠️ GAP-6: Could not compute zero-yield companies: ${e.message}`);
+    return [];
+  }
+}
+
+/**
+ * Generate metadata object
+ * @param {Array} jobs - All jobs
+ * @param {number} uniqueCount - Unique job count
+ * @param {number} duplicateCount - Duplicate count
+ * @param {number} duration - Duration in ms
+ * @param {Object} tagStats - Tag statistics from tag engine
+ * @param {Object} validationMetrics - Validation metrics
+ * @param {Object} seniorFilterMetrics - Senior filter metrics
+ * @returns {Object} - Metadata object
+ */
+
+
+const SOURCE_TIER_POLICY = {
+  workday: 'tier_a_core',
+  greenhouse: 'tier_a_core',
+  ashby: 'tier_a_core',
+  lever: 'tier_a_optional',
+  smartrecruiters: 'tier_b_async_material',
+  oracle: 'tier_b_c_scrutiny',
+  apple: 'tier_b_c_scrutiny',
+  google: 'tier_b_c_scrutiny',
+  microsoft: 'tier_b_c_scrutiny',
+  amd: 'tier_b_c_scrutiny',
+  amazon: 'tier_b_c_scrutiny',
+  tiktok: 'tier_b_c_scrutiny',
+  icims: 'tier_b_c_scrutiny',
+  simplify: 'tier_c_fallback',
+  jsearch: 'tier_c_fallback',
+  eightfold: 'tier_c_fallback',
+  uber: 'tier_c_fallback',
+  twosigma: 'tier_c_fallback',
+};
+
+const TECH_US_DOMAINS = new Set(['software', 'data_science', 'hardware', 'ai', 'finance']);
+
+function buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps, prevRunCompletedAt = null }) {
+  return {
+    pipeline_started_at: new Date(startTime).toISOString(),
+    fetch_completed_at: pipelineTimestamps.fetch_completed_at || null,
+    sidecars_written_at: pipelineTimestamps.sidecars_written_at || null,
+    output_ready_at: pipelineTimestamps.output_ready_at || null,
+    previous_run_completed_at: prevRunCompletedAt || null,  // AGG-PREVIOUS-CYCLE-TIMESTAMP-1
+    total_runtime_ms: duration,
+    step_timings_ms: {
+      step1_fetch_ms: stageTimings.step1_fetch_ms || 0,
+      step2_enhance_ms: stageTimings.step2_enhance_ms || 0,
+      step3_validate_ms: stageTimings.step3_validate_ms || 0,
+      step4_filter_ms: stageTimings.step4_filter_ms || 0,
+      step5_tag_ms: stageTimings.step5_tag_ms || 0,
+      step6_dedup_ms: stageTimings.step6_dedup_ms || 0,
+      step8_sort_ms: stageTimings.step8_sort_ms || 0,
+      step8b_sidecars_ms: stageTimings.step8b_sidecars_ms || 0,
+      step9_write_ms: stageTimings.step9_write_ms || 0,
+      step1b_desc_backfill_ms: stageTimings.step1b_desc_backfill_ms || 0,
+      step4c_desc_inject_ms: stageTimings.step4c_desc_inject_ms || 0,
+      step9_carryforward_ms: stageTimings.step9_carryforward_ms || 0,
+      // step12_commit_ms removed (AGG-R2-CANONICAL-1): git commit step deleted
+    },
+  };
+}
+
+function buildSourceVisibilitySummary(jobs) {
+  const now = Date.now();
+  const sources = {};
+
+  for (const job of jobs || []) {
+    const source = job.source || 'unknown';
+    const row = sources[source] || (sources[source] = {
+      tier: SOURCE_TIER_POLICY[source] || 'unclassified',
+      total_jobs: 0,
+      tech_us_jobs: 0,
+      freshness: {
+        last_24h: 0,
+        last_72h: 0,
+      },
+      newest_posted_at: null,
+      oldest_posted_at: null,
+    });
+
+    row.total_jobs++;
+
+    const domains = job.tags?.domains || [];
+    const locations = job.tags?.locations || [];
+    if (locations.includes('us') && domains.some(domain => TECH_US_DOMAINS.has(domain))) {
+      row.tech_us_jobs++;
+    }
+
+    if (!job.posted_at) continue;
+    const postedMs = new Date(job.posted_at).getTime();
+    if (!Number.isFinite(postedMs)) continue;
+
+    const ageMs = now - postedMs;
+    if (ageMs <= 24 * 60 * 60 * 1000) row.freshness.last_24h++;
+    if (ageMs <= 72 * 60 * 60 * 1000) row.freshness.last_72h++;
+
+    if (!row.newest_posted_at || postedMs > new Date(row.newest_posted_at).getTime()) {
+      row.newest_posted_at = new Date(postedMs).toISOString();
+    }
+    if (!row.oldest_posted_at || postedMs < new Date(row.oldest_posted_at).getTime()) {
+      row.oldest_posted_at = new Date(postedMs).toISOString();
+    }
+  }
+
+  return {
+    generated_at: new Date().toISOString(),
+    policy_version: 'source-tier-a141',
+    metric_basis: 'final_public_pool',
+    tech_us_definition: ['software', 'data_science', 'hardware', 'ai', 'finance'].join('+') + ' with us location tag',
+    tiers: {
+      tier_a_core: ['workday', 'greenhouse', 'ashby'],
+      tier_a_optional: ['lever'],
+      tier_b_async_material: ['smartrecruiters'],
+      tier_b_c_scrutiny: ['oracle', 'apple', 'google', 'microsoft', 'amd', 'amazon', 'tiktok', 'icims'],
+      tier_c_fallback: ['simplify', 'jsearch', 'eightfold', 'uber', 'twosigma'],
+    },
+    sources,
+  };
+}
+
+function buildDescriptionDeliverySummary(jobs, dataDir) {
+  // AGG-DESCCOVERAGE-METRIC-1: removed stale 'workday' + 'smartrecruiters' exclusions.
+  // These were excluded when workday descriptions were not in the hot path (AGG-HOTPATH-1).
+  // Now that the backfill is running (Step 1b) and sidecars are uploaded to R2,
+  // the exclusion hides real coverage data from monitoring.
+  const excludedSources = new Set(['enriched']);
+  const sidecarRows = {};
+  const sidecarNonempty = {};
+  const sidecarIds = new Map();
+
+  try {
+    const files = fs.readdirSync(dataDir)
+      .filter(f => /^descriptions-.+\.jsonl$/.test(f))
+      .filter(f => !f.startsWith('descriptions-enriched'));
+    for (const fname of files) {
+      const source = fname.replace(/^descriptions-/, '').replace(/-\d+\.jsonl$/, '').replace(/\.jsonl$/, '').toLowerCase();
+      sidecarRows[source] = sidecarRows[source] || 0;
+      sidecarNonempty[source] = sidecarNonempty[source] || 0;
+      if (!sidecarIds.has(source)) sidecarIds.set(source, new Set());
+      const lines = fs.readFileSync(path.join(dataDir, fname), 'utf8').trim().split('\n').filter(Boolean);
+      for (const line of lines) {
+        sidecarRows[source]++;
+        try {
+          const row = JSON.parse(line);
+          if (typeof row.description_text === 'string' && row.description_text.trim()) sidecarNonempty[source]++;
+          if (row.id) sidecarIds.get(source).add(row.id);
+        } catch {
+          // malformed rows still count toward file size but not toward matches/nonempty text
+        }
+      }
+    }
+  } catch {
+    // Missing sidecar files are reflected as zero coverage below.
+  }
+
+  const finalRows = {};
+  const finalInlineDescriptions = {};
+  const finalRowsWithSidecarMatch = {};
+  for (const job of jobs || []) {
+    const source = (job.source || 'unknown').toLowerCase();
+    if (excludedSources.has(source)) continue;
+    finalRows[source] = (finalRows[source] || 0) + 1;
+    if (typeof job.description === 'string' && job.description.trim()) {
+      finalInlineDescriptions[source] = (finalInlineDescriptions[source] || 0) + 1;
+    }
+    if (sidecarIds.get(source)?.has(job.id)) {
+      finalRowsWithSidecarMatch[source] = (finalRowsWithSidecarMatch[source] || 0) + 1;
+    }
+  }
+
+  const summary = {};
+  const sources = new Set([
+    ...Object.keys(sidecarRows),
+    ...Object.keys(finalRows),
+  ]);
+  for (const source of [...sources].sort()) {
+    const finalPool = finalRows[source] || 0;
+    const matched = finalRowsWithSidecarMatch[source] || 0;
+    const sidecars = sidecarRows[source] || 0;
+    let mode = 'none_visible';
+    if (finalPool === 0) mode = 'no_final_rows';
+    else if (matched === finalPool && finalPool > 0) mode = 'sidecar_only';
+    else if (matched > 0) mode = 'partial_sidecar_coverage';
+    else if ((finalInlineDescriptions[source] || 0) > 0) mode = 'inline_only';
+    summary[source] = {
+      final_rows: finalPool,
+      final_inline_description_rows: finalInlineDescriptions[source] || 0,
+      sidecar_rows: sidecars,
+      sidecar_nonempty_description_rows: sidecarNonempty[source] || 0,
+      final_rows_with_sidecar_match: matched,
+      coverage_pct: finalPool > 0 ? Math.round((matched / finalPool) * 1000) / 10 : null,
+      mode,
+    };
+  }
+
+  return {
+    generated_at: new Date().toISOString(),
+    basis: 'final_public_pool_vs_description_sidecars',
+    sources: summary,
+  };
+}
+
+
+function buildSeniorRolloutProjection(seniorJobs, seniorBySource) {
+  const projection = {
+    generated_at: new Date().toISOString(),
+    sample_basis: {
+      type: 'current_run_filtered_senior_jobs',
+      total_senior_filtered: Array.isArray(seniorJobs) ? seniorJobs.length : 0,
+    },
+    by_source: seniorBySource || {},
+    by_domain: {},
+    by_surface: {
+      ngj_main: 0,
+      software: 0,
+      data_science: 0,
+      hardware: 0,
+      healthcare: 0,
+    },
+    quality: {
+      surface_projection_exact: false,
+      surface_projection_method: 'directional_current_run_domain_location_mapping',
+      notes: 'Directional projection for current-run senior-filtered jobs. Source counts are exact; domain and surface counts use tag-engine projection on filtered jobs and should guide rollout decisions, not exact publish counts.',
+    },
+  };
+
+  if (!Array.isArray(seniorJobs) || seniorJobs.length === 0) return projection;
+
+  const mainSurfaceDomains = new Set(['software', 'data_science', 'hardware', 'ai', 'finance']);
+  for (const job of seniorJobs) {
+    const domains = tagDomains(job);
+    const normalizedDomains = domains.length > 0 ? domains : ['general'];
+    for (const domain of normalizedDomains) {
+      projection.by_domain[domain] = (projection.by_domain[domain] || 0) + 1;
+    }
+
+    const locations = tagLocations(job);
+    const isUs = locations.includes('us');
+    if (!isUs) continue;
+
+    if (normalizedDomains.some(domain => mainSurfaceDomains.has(domain))) projection.by_surface.ngj_main++;
+    if (normalizedDomains.includes('software')) projection.by_surface.software++;
+    if (normalizedDomains.includes('data_science') || normalizedDomains.includes('ai')) projection.by_surface.data_science++;
+    if (normalizedDomains.includes('hardware')) projection.by_surface.hardware++;
+    if (normalizedDomains.includes('healthcare')) projection.by_surface.healthcare++;
+  }
+
+  return projection;
+}
+
+/**
+ * TAG-DIM-1: Build G1 by-domain breakdown for DASH visibility.
+ * Categorizes US general jobs by source, company, fix category, engine version, employment type.
+ * @param {Array} jobs - Full public pool (post-merge + post-AGG-32)
+ * @returns {Object} g1_breakdown object for metadata
+ */
+function buildG1Breakdown(jobs) {
+  const usJobs = jobs.filter(j => j.tags && j.tags.locations && j.tags.locations.includes('us'));
+  const g1Jobs = usJobs.filter(j => j.tags.domains && j.tags.domains.includes('general'));
+
+  if (g1Jobs.length === 0) return null;
+
+  // By source
+  const bySource = {};
+  const sourceTotals = {};
+  for (const j of usJobs) {
+    sourceTotals[j.source] = (sourceTotals[j.source] || 0) + 1;
+  }
+  for (const j of g1Jobs) {
+    bySource[j.source] = (bySource[j.source] || 0) + 1;
+  }
+  const bySourceFormatted = {};
+  for (const [src, g1] of Object.entries(bySource)) {
+    const total = sourceTotals[src] || 0;
+    bySourceFormatted[src] = { g1, total, rate: total > 0 ? Math.round(g1 / total * 1000) / 10 : 0 };
+  }
+
+  // Top 20 companies
+  const companyCounts = {};
+  const companySource = {};
+  const companyDepts = {};
+  for (const j of g1Jobs) {
+    const c = j.company_name || 'unknown';
+    companyCounts[c] = (companyCounts[c] || 0) + 1;
+    companySource[c] = j.source;
+    companyDepts[c] = companyDepts[c] || j.departments?.length > 0;
+  }
+  const top20 = Object.entries(companyCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([company, g1]) => ({
+      company,
+      g1,
+      source: companySource[company],
+      has_departments: !!companyDepts[company],
+    }));
+
+  // Fix categories (heuristic based on source + departments)
+  let needsFamilyMapping = 0; // WD jobs with no departments
+  let familyMapGap = 0;       // WD jobs with departments but still G1
+  let noDescription = 0;      // Simplify T0 with no desc
+  let genuinelyAmbiguous = 0;  // Non-WD, non-Simplify, no domain signal
+  let other = 0;
+  for (const j of g1Jobs) {
+    if (j.source === 'workday') {
+      if (j.departments && j.departments.length > 0) {
+        familyMapGap++;
+      } else {
+        needsFamilyMapping++;
+      }
+    } else if (j.source === 'simplify') {
+      noDescription++;
+    } else {
+      // Check for domain keywords in title as signal
+      const title = (j.title || '').toLowerCase();
+      const hasSignal = /\b(engineer|developer|scientist|analyst|designer|manager|accountant|nurse|pharmacist|attorney|sales|marketing|operations|manufacturing|logistics|hardware|software|data|ai|product|finance|hr|legal)\b/i.test(title);
+      if (hasSignal) {
+        other++;
+      } else {
+        genuinelyAmbiguous++;
+      }
+    }
+  }
+
+  // Engine version distribution
+  const byVersion = {};
+  for (const j of g1Jobs) {
+    const v = j.tags.tag_engine_version || 'none';
+    byVersion['v' + v] = (byVersion['v' + v] || 0) + 1;
+  }
+
+  // Employment type distribution
+  const byEmployment = {};
+  for (const j of g1Jobs) {
+    const e = j.tags.employment || 'unknown';
+    byEmployment[e] = (byEmployment[e] || 0) + 1;
+  }
+
+  return {
+    updated: new Date().toISOString(),
+    us_total: usJobs.length,
+    us_g1: g1Jobs.length,
+    us_g1_rate: Math.round(g1Jobs.length / usJobs.length * 1000) / 10,
+    by_source: bySourceFormatted,
+    by_company_top20: top20,
+    by_fix_category: {
+      needs_family_mapping: { count: needsFamilyMapping, description: 'WD jobs with no departments — blocked on AGG-PIPE-16' },
+      family_map_gap: { count: familyMapGap, description: 'WD jobs with departments but still G1' },
+      genuinely_ambiguous: { count: genuinelyAmbiguous, description: 'Non-WD/Simplify jobs with no domain signal in title' },
+      no_description: { count: noDescription, description: 'Simplify T0 jobs — no description for L4 fallback' },
+      other: { count: other, description: 'Mixed ATS — some keyword gaps, some structural' },
+    },
+    by_engine_version: byVersion,
+    by_employment: byEmployment,
+  };
+}
+
+function generateMetadata({ startTime, jobs, uniqueCount, duplicateCount, duration, tagStats, validationMetrics, seniorFilterMetrics, seniorJobs, zeroYieldCompanies, stageTimings, pipelineTimestamps, tagDriftReport, tagPrecisionReport, keywordHealthReport, keywordOverlapReport, fpStats, fetchResults, fetcherHealth, supplementalInputs, prevRunCompletedAt = null }) {
+  const bySource = {};
+  const byEmploymentType = {};
+  const byInternship = { internship: 0, 'new-grad': 0, mid_level: 0, senior: 0 };
+  const byRemote = { remote: 0, onsite: 0 };
+  const companyCounts = {};
+  const companyDomains = {};  // DASH-4b: track domain distribution per company
+  const bySourceDomain = {};  // AGG-CROSSTAB-1: source × domain cross-tab
+  const bySourceJobType = {}; // AGG-CROSSTAB-1: source × job_type cross-tab
+  const byDomainJobType = {}; // AGG-CROSSTAB-FOLLOWUP-1: domain × job_type cross-tab
+
+  const now = Date.now();
+  const freshness = { last_1h: 0, last_6h: 0, last_24h: 0, last_48h: 0 };
+
+  for (const job of jobs) {
+    // Count by source
+    bySource[job.source] = (bySource[job.source] || 0) + 1;
+    // AGG-CROSSTAB-1: cross-dimensional breakdowns for DASH filtering
+    if (!bySourceDomain[job.source]) bySourceDomain[job.source] = {};
+    for (const d of (job.tags?.domains || [])) {
+      bySourceDomain[job.source][d] = (bySourceDomain[job.source][d] || 0) + 1;
+    }
+    if (!bySourceJobType[job.source]) bySourceJobType[job.source] = {};
+    const _jt = job.tags?.employment || 'unknown';
+    bySourceJobType[job.source][_jt] = (bySourceJobType[job.source][_jt] || 0) + 1;
+    // AGG-CROSSTAB-FOLLOWUP-1: domain × employment cross-tab (completes the CROSSTAB trio)
+    for (const d of (job.tags?.domains || [])) {
+      if (!byDomainJobType[d]) byDomainJobType[d] = {};
+      byDomainJobType[d][_jt] = (byDomainJobType[d][_jt] || 0) + 1;
+    }
+
+    // Count by employment type (AGG-DATA-13: normalize to canonical forms)
+    // AGG-PIPE-13: shared EMPLOYMENT_NORMALIZE_MAP (includes compound types)
+    const types = (job.employment_types || []).map(t => EMPLOYMENT_NORMALIZE_MAP[t] || t);
+    if (Array.isArray(types)) {
+      for (const type of types) {
+        byEmploymentType[type] = (byEmploymentType[type] || 0) + 1;
+      }
+    }
+
+    // Count by job type (use tags.employment — is_internship/is_new_grad stripped by STRIP_FIELDS)
+    if (job.tags?.employment === 'internship') {
+      byInternship.internship++;
+    } else if (job.tags?.employment === 'entry_level') {
+      byInternship['new-grad']++;
+    } else if (job.tags?.employment === 'senior' || job.tags?.employment === 'senior_level') {
+      byInternship.senior++;
+    } else {
+      byInternship.mid_level++;
+    }
+
+    // Count by remote (use tags.locations — is_remote stripped by STRIP_FIELDS)
+    if (job.tags?.locations?.includes('remote')) {
+      byRemote.remote++;
+    } else {
+      byRemote.onsite++;
+    }
+
+    // Freshness buckets
+    if (job.posted_at) {
+      const ageMs = now - new Date(job.posted_at).getTime();
+      if (ageMs <= 1 * 60 * 60 * 1000)  freshness.last_1h++;
+      if (ageMs <= 6 * 60 * 60 * 1000)  freshness.last_6h++;
+      if (ageMs <= 24 * 60 * 60 * 1000) freshness.last_24h++;
+      if (ageMs <= 48 * 60 * 60 * 1000) freshness.last_48h++;
+    }
+
+    // Company counts + domain tracking (for top-N with domain)
+    const co = job.company_name;
+    if (co) {
+      companyCounts[co] = (companyCounts[co] || 0) + 1;
+      // DASH-4b: track primary domain per company
+      const domains = (job.tags && job.tags.domains) || [];
+      if (!companyDomains[co]) companyDomains[co] = {};
+      for (const d of domains) {
+        companyDomains[co][d] = (companyDomains[co][d] || 0) + 1;
+      }
+    }
+  }
+
+  // Top 20 companies by job count
+  // DASH-4b: includes primary domain (most common domain tag for that company)
+  const top_companies = Object.entries(companyCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([company, count]) => {
+      const domains = companyDomains[company] || {};
+      const primaryDomain = Object.entries(domains).sort((a, b) => b[1] - a[1])[0];
+      return { company, count, domain: primaryDomain ? primaryDomain[0] : 'general' };
+    });
+
+  // Senior-filtered breakdown by source
+  const seniorBySource = {};
+  if (Array.isArray(seniorJobs)) {
+    for (const job of seniorJobs) {
+      const src = job.source || 'unknown';
+      seniorBySource[src] = (seniorBySource[src] || 0) + 1;
+    }
+  }
+
+  // AGG-PERSOURCE-STAGES-1: Per-source pipeline stage counts for DASH Source Journey.
+  const sourceJourney = {};
+  for (const src of new Set([
+    ...Object.keys(fetchResults || {}),
+    ...Object.keys(seniorFilterMetrics?.by_source || {}),
+    ...Object.keys(bySource),
+  ])) {
+    sourceJourney[src] = {
+      fetched: (fetchResults || {})[src] || 0,
+      senior_filtered: (seniorFilterMetrics?.by_source || {})[src] || 0,
+      final: bySource[src] || 0,
+    };
+  }
+
+  // AGG-DEADLINK-PUBLISH-1: Read link-health.json (produced by pre-metadata workflow step)
+  let linkHealth = [];
+  try {
+    const lhPath = path.join(DATA_DIR, 'link-health.json');
+    if (fs.existsSync(lhPath)) linkHealth = JSON.parse(fs.readFileSync(lhPath, 'utf8'));
+  } catch {}
+  return {
+    version: '1.0',
+    generated: new Date().toISOString(),
+    duration_ms: duration,
+
+    total_jobs: jobs.length,
+    unique_jobs: uniqueCount,
+    duplicates_removed: duplicateCount,
+
+    by_source: bySource,
+    source_journey: sourceJourney,
+    by_source_domain: bySourceDomain,
+    by_source_job_type: bySourceJobType,
+    by_domain_job_type: byDomainJobType,
+    by_employment_type: byEmploymentType,
+    by_job_type: byInternship,
+    link_health: linkHealth,
+    by_location: byRemote,
+
+    ats_stats: getATSUsageStats(),
+
+    // Validation statistics
+    validation_stats: validationMetrics,
+
+    // Senior filter statistics
+    senior_filter_stats: {
+      ...seniorFilterMetrics,
+      by_source: seniorBySource,
+      ...(fpStats || {}),
+    },
+
+    // AGG-MEASURE-1: Directional rollout projection for filtered senior jobs.
+    senior_rollout_projection: buildSeniorRolloutProjection(seniorJobs, seniorBySource),
+
+    // AGG-SOURCE-1: Source tier/value/freshness visibility for operator decisions.
+    source_visibility: buildSourceVisibilitySummary(jobs),
+
+    // AGG-SIDECAR-HEALTH-1: Producer-owned truth for sources whose downstream descriptions
+    // depend on sidecars because all_jobs strips description text.
+    description_delivery: buildDescriptionDeliverySummary(jobs, DATA_DIR),
+
+    // AGG latency markers: producer-owned timing anchors for downstream latency measurement.
+    latency_markers: buildLatencyMarkers({ startTime, duration, stageTimings, pipelineTimestamps, prevRunCompletedAt }),
+
+    // Tag statistics (Phase 1)
+    tag_stats: tagStats,
+
+    // TAG-SELF-2: Tag monitoring snapshots for metrics pipeline.
+    tag_drift: tagDriftReport ? {
+      drift_rate: tagDriftReport.drift_rate,
+      sample_size: tagDriftReport.sample_size,
+      drifted: tagDriftReport.drifted,
+      warnings: tagDriftReport.warnings,
+    } : null,
+    tag_precision: tagPrecisionReport ? {
+      domains: Object.fromEntries(
+        Object.entries(tagPrecisionReport.domains).map(([d, r]) => [d, { total: r.total, fps: r.fps, fp_rate: r.fp_rate }])
+      ),
+      warnings: tagPrecisionReport.warnings,
+    } : null,
+    keyword_health: keywordHealthReport ? Object.fromEntries(
+      Object.entries(keywordHealthReport.domains).map(([d, r]) => [d, {
+        total_jobs: r.total_jobs,
+        keyword_count: r.keyword_count,
+        keywords_with_matches: r.keywords_with_matches,
+        top_5: r.top_contributors.slice(0, 5).map(tc => ({ keyword: tc.keyword, matches: tc.matches, rate_pct: tc.rate_pct })),
+        high_volume: r.high_volume,
+      }])
+    ) : null,
+    keyword_overlap: keywordOverlapReport ? Object.fromEntries(
+      Object.entries(keywordOverlapReport.domains).filter(([, r]) => r.foreign_keyword_overlaps > 0).map(([d, r]) => [d, {
+        total_jobs: r.total_jobs,
+        overlap_count: r.foreign_keyword_overlaps,
+        top_overlaps: r.top_overlaps.slice(0, 3),
+      }])
+    ) : null,
+
+    // TAG-DIM-1: G1 by-domain breakdown for DASH visibility.
+    // Categorizes G1 jobs by source, company, fix category, engine version, and employment type.
+    g1_breakdown: buildG1Breakdown(jobs),
+
+    // Freshness — jobs posted within last N hours (entry-level pool)
+    freshness,
+
+    // Top 20 companies by job count (entry-level pool)
+    top_companies,
+
+    // GAP-6: Companies that returned 0 raw jobs this run (pre-filter).
+    // Used by pipeline-alert.js for consecutive-failure detection.
+    zero_yield_companies: zeroYieldCompanies || [],
+
+    stage_timings: stageTimings || {},
+
+    // AGG-HOTPATH-1: Sources intentionally excluded from the fast publish workflow.
+    // Alerting must distinguish "not attempted here" from "attempted and fetched 0".
+    hot_path_demoted_sources: [...HOTPATH_DEMOTED_SOURCES],
+
+    supplemental_inputs: supplementalInputs || {},
+
+    // TAG-DIM-1: Tag engine version deployed in this run.
+    // Enables zjp-metrics to surface engine_version (was null because this field was missing).
+    tag_engine_version: TAG_ENGINE_VERSION,
+
+    // A91: Per-source fetch counts from current run (before carry-forward merge).
+    // Enables alert checks to detect source fetch failures masked by carry-forward.
+    fetch_results: fetchResults || {},
+
+    // AGG-FETCH-14: Per-company fetcher health from current run.
+    // status: 'alive' (has jobs), 'zero' (fetched ok but 0 jobs), 'error' (fetch failed).
+    // Enables check-19 to classify without HTTP probing.
+    fetcher_health: fetcherHealth || {},
+
+    // AGG-LIFECYCLE-1: lifecycle_state distribution + version. Evergreen/ghost/TTL-expired jobs are
+    // now KEPT+TAGGED (fresh / carry-forward / evergreen / stale-candidate / dead) instead of dropped.
+    // Consumers replicate the pre-LIFECYCLE "dropped" set by excluding {dead, stale-candidate}.
+    lifecycle: {
+      version: LIFECYCLE_VERSION,
+      distribution: jobs.reduce((acc, j) => {
+        const s = j?.tags?.lifecycle_state || 'untagged';
+        acc[s] = (acc[s] || 0) + 1;
+        return acc;
+      }, {}),
+    },
+  };
+}
+
+/**
+ * Print execution summary
+ * @param {Array} jobs - Final job array
+ * @param {number} uniqueCount - Unique job count
+ * @param {number} duplicateCount - Duplicate count
+ * @param {number} duration - Duration in ms
+ */
+function printSummary(jobs, uniqueCount, duplicateCount, duration) {
+  console.log('📊 Execution Summary:');
+  console.log('━'.repeat(60));
+
+  // Count by job type (use tag fields — is_internship/is_new_grad/is_remote are never set)
+  const internships = jobs.filter(j => j.tags?.employment === 'internship').length;
+  const newGrad = jobs.filter(j => j.tags?.employment === 'entry_level').length;
+  const remote = jobs.filter(j => j.tags?.locations?.includes('remote')).length;
+
+  console.log(`Total jobs in output: ${jobs.length}`);
+  console.log(`  - Internships: ${internships}`);
+  console.log(`  - New Grad: ${newGrad}`);
+  console.log(`  - Remote: ${remote}`);
+  console.log('');
+  console.log(`Duplicates removed: ${duplicateCount}`);
+  console.log(`Duration: ${(duration / 1000).toFixed(1)}s`);
+}
+
+
+// Run main function
+if (require.main === module) {
+  main();
+}
+
+module.exports = { main, resolvePostedAt, mergeCarryForward, dropOrphanJobs, RETIRED_CARRY_FORWARD_SOURCES, normalizeSupplementalJobForMerge, summarizeSupplementalLaneForMerge, buildDescriptionDeliverySummary, buildUsSnapshotJobs, buildMidLevelTechFeed, buildMidLevelTechSummary, buildSeniorTechFeed, buildSeniorTechSummary, buildCanadaTechFeed, buildCanadaInternshipsFeed, buildCanadaSentinelChecks, buildCanadaAllFeed, activePublicWindowTs, applicableTtlMs, classifyAgeLifecycle, isLifecycleHardRetired, LIFECYCLE_VERSION, LIFECYCLE_EVERGREEN_THRESHOLD_DAYS, injectDescriptions, generateMetadata, buildLatencyMarkers };
