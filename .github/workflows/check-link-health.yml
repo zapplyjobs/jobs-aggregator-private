@@ -22,7 +22,7 @@ jobs:
 
     - name: Install transcrypt
       run: |
-        curl -sSL https://raw.githubusercontent.com/elasticdog/transcrypt/4728fac/transcrypt -o /tmp/transcrypt
+        curl -sSL https://raw.githubusercontent.com/elasticdog/transcrypt/5effa13/transcrypt -o /tmp/transcrypt
         chmod +x /tmp/transcrypt
         sudo mv /tmp/transcrypt /usr/local/bin/transcrypt
 
