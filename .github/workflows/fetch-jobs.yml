@@ -1047,6 +1047,19 @@ jobs:
         GH_TOKEN: ${{ secrets.GH_PAT }}
 
 
+    - name: Trigger Discord post (wave link — post current-cycle jobs, no 15-min lag)
+      if: success() && github.ref_name == 'main'
+      run: |
+        curl -sf -X POST "https://api.github.com/repos/zapplyjobs/jobs-data-2026/actions/workflows/post-to-discord.yml/dispatches" \
+          -H "Authorization: Bearer ${GH_PAT}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          -d '{"ref":"main"}' \
+          && echo "✅ Triggered Discord post (wave link)" \
+          || echo "⚠️ Discord post dispatch failed (non-blocking — Worker cron will catch up)"
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+
     - name: Display logs (always run)
       if: always()
       run: |
