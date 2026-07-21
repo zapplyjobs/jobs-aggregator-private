@@ -136,7 +136,16 @@ jobs:
                 const ok = await r2.uploadRaw(f, fs.readFileSync(fp), 'application/x-jsonlines');
                 console.log(f + ':', ok ? 'OK' : 'FAILED');
               }
-            }
+          }
+          // AGG-DESCBACKFILL-MARKER-1: write completion timestamp marker.
+          // Consumers compare desc_backfill_completed_at vs sidecar_read_at (ENR) vs sidecars_written_at (AGG main).
+          const marker = {
+            desc_backfill_completed_at: new Date().toISOString(),
+            run_id: process.env.GITHUB_RUN_ID || null,
+            sidecars_updated: ['descriptions-workday.jsonl', 'descriptions-smartrecruiters.jsonl'],
+          };
+          await r2.uploadRaw('desc-backfill-latest.json', JSON.stringify(marker, null, 2), 'application/json');
+          console.log('desc-backfill-latest.json: marker uploaded');
           }
           main().catch(e => { console.error('Upload error:', e.message); process.exit(1); });
           "
