@@ -2,6 +2,8 @@ name: Fetch All Jobs
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '*/10 * * * *'  # Backup trigger (Worker cron being debugged — INF-PIPELINE-SLOWNESS-1)
 
 # Prevent concurrent runs
 concurrency:
