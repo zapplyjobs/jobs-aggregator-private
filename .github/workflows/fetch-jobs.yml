@@ -2,8 +2,6 @@ name: Fetch All Jobs
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '*/15 * * * *'  # Backup — catches up if Worker dispatch fails
 
 # Prevent concurrent runs
 concurrency:
