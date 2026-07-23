@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 fail=0
 for f in .github/scripts/__tests__/*.test.js; do
-  if node "$f" 2>&1; then
+  if node "$f" > /dev/null 2>&1; then
     echo "✓ $(basename "$f")"
   else
     echo "✗ $(basename "$f")"
