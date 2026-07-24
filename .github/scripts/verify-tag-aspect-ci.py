@@ -116,11 +116,12 @@ def c_configuration():
     return "YELLOW", f"{found}/{len(files)} config files found in repo", "gh-api:repo-contents"
 
 def c_discoverability():
-    # PROXY: TAG guide committed in zjp-dashboard (contract + SCRIPT_REGISTRY are workspace-only).
-    guide = gh_json(["api", "repos/zapplyjobs/zjp-dashboard/contents/docs/module-guides/tag.md"])
-    if guide:
-        return "GREEN", "TAG module guide committed in zjp-dashboard (contract + SCRIPT_REGISTRY workspace-only)", "gh-api:zjp-dashboard/contents"
-    return "YELLOW", "TAG guide not found in zjp-dashboard", "gh-api:zjp-dashboard/contents"
+    # PROXY: TAG engine present in PUBLIC job-board-aggregator (guide is in PRIVATE zjp-dashboard —
+    # CI's GITHUB_TOKEN can't read it cross-repo; contract/registry are workspace-only).
+    engine = gh_json(["api", f"repos/{TAG_REPO}/contents/lib/processors/tag-engine.js"])
+    if engine:
+        return "GREEN", "tag-engine.js present in public job-board-aggregator (guide in private zjp-dashboard; contract/registry workspace-only)", "gh-api:repo-contents"
+    return "YELLOW", "tag-engine.js not found in job-board-aggregator", "gh-api:repo-contents"
 
 def c_documentation():
     # PROXY: recent commit to tag-engine.js (repo activity -> doc/code freshness).
