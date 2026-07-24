@@ -8,7 +8,7 @@ on:
 # Prevent concurrent runs
 concurrency:
   group: job-fetch
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   fetch-all:
