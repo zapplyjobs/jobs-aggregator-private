@@ -160,12 +160,20 @@ for name, fn in CHECKS.items():
         s, e, src = "RED", f"check error: {ex}", "verifier-error"
     result["aspects"][name] = {"status": s, "evidence": e, "source": src}
 
+# Infrastructure is genuinely N/A for TAG — include it WITH A REASON so the matrix cell is
+# informative (clickable with explanation), not just "omitted → generic N/A text".
+result["aspects"]["infrastructure"] = {
+    "status": "N/A",
+    "evidence": "TAG has no deploy — runs inline in AGG Step 5 (pure-function library; no Worker/server/API/R2 of its own). Infrastructure it depends on (pipeline/R2/CI) is owned + checked by AGG/INF in their aspect rows.",
+    "source": "N/A — no independent infrastructure"
+}
+
 data_str = json.dumps(result, indent=2)
 print(data_str)
 counts = {}
 for a in result["aspects"].values():
     counts[a["status"]] = counts.get(a["status"], 0) + 1
-print(f"\n=== TAG aspect-status (CI) === {counts.get('GREEN',0)}G / {counts.get('YELLOW',0)}Y / {counts.get('RED',0)}R ({len(result['aspects'])} aspects: 5 signal + 4 gh-api proxy; infrastructure N/A)", file=sys.stderr)
+print(f"\n=== TAG aspect-status (CI) === {counts.get('GREEN',0)}G / {counts.get('YELLOW',0)}Y / {counts.get('RED',0)}R / {counts.get('N/A',0)}N/A ({len(result['aspects'])} aspects: 9 checked + 1 N/A)", file=sys.stderr)
 
 if "--publish" in sys.argv:
     import boto3
