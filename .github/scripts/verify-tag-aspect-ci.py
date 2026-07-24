@@ -105,15 +105,50 @@ def c_security():
         return "YELLOW", f"{total} open, {crit} critical/high", "gh-api:dependabot"
     return "RED", f"{total} open, {crit} critical/high", "gh-api:dependabot"
 
+
+# --- CI-native proxy checks (per INF-ASPECT-CI-NATIVE-1 design: gh-api repo-state replaces workspace-fs) ---
+def c_configuration():
+    # PROXY: config files exist in repo (git-crypt encrypted; validity via ci-gate parity test).
+    files = ["lib/fetchers/company-list.json", "lib/processors/onet-unified-lookup.json", "lib/processors/wd-family-domain-map.json"]
+    found = sum(1 for f in files if gh_json(["api", f"repos/{TAG_REPO}/contents/{f}"]))
+    if found == len(files):
+        return "GREEN", f"{found}/{len(files)} config files present in repo (git-crypt encrypted; validity via ci-gate parity)", "gh-api:repo-contents"
+    return "YELLOW", f"{found}/{len(files)} config files found in repo", "gh-api:repo-contents"
+
+def c_discoverability():
+    # PROXY: TAG guide committed in zjp-dashboard (contract + SCRIPT_REGISTRY are workspace-only).
+    guide = gh_json(["api", "repos/zapplyjobs/zjp-dashboard/contents/docs/module-guides/tag.md"])
+    if guide:
+        return "GREEN", "TAG module guide committed in zjp-dashboard (contract + SCRIPT_REGISTRY workspace-only)", "gh-api:zjp-dashboard/contents"
+    return "YELLOW", "TAG guide not found in zjp-dashboard", "gh-api:zjp-dashboard/contents"
+
+def c_documentation():
+    # PROXY: recent commit to tag-engine.js (repo activity -> doc/code freshness).
+    commits = gh_json(["api", f"repos/{TAG_REPO}/commits?per_page=1&path=lib/processors/tag-engine.js"]) or []
+    if not commits:
+        return "YELLOW", "no commits found on tag-engine.js", "gh-api:commits"
+    date = commits[0].get("commit", {}).get("committer", {}).get("date", "")[:10]
+    return "GREEN", f"latest tag-engine.js commit {date} (repo-activity proxy for doc freshness)", "gh-api:commits"
+
+def c_change_mgmt():
+    # PROXY: ci-gate.yml exists (structural proxy for SDLC + change-mgmt practices).
+    gate = gh_json(["api", f"repos/{TAG_REPO}/contents/.github/workflows/ci-gate.yml"])
+    if gate:
+        return "GREEN", "ci-gate.yml present (structural proxy for SDLC + change-mgmt)", "gh-api:repo-contents"
+    return "YELLOW", "ci-gate.yml not found", "gh-api:repo-contents"
+
 CHECKS = {
     "verification": c_verification,
     "monitoring": c_monitoring,
     "data_quality": c_data_quality,
     "performance": c_performance,
     "security": c_security,
-    # fs checks OMITTED in CI — configuration (git-crypt-encrypted config files) +
-    # discoverability/documentation/change_mgmt (.GenAI_Work workspace files).
-    # Run verify-tag-aspect-status.js from the workspace for the full 9-aspect picture.
+    "configuration": c_configuration,
+    "discoverability": c_discoverability,
+    "documentation": c_documentation,
+    "change_mgmt": c_change_mgmt,
+    # infrastructure OMITTED — TAG has no deploy (runs inline in AGG Step 5); genuinely N/A.
+    # Matrix renders omitted aspects as N/A (ASPECT_STATUS_CONTRACT, verified G20).
 }
 
 result = {"module": "TAG", "generated_at": NOW.isoformat(), "aspects": {}}
@@ -129,7 +164,7 @@ print(data_str)
 counts = {}
 for a in result["aspects"].values():
     counts[a["status"]] = counts.get(a["status"], 0) + 1
-print(f"\n=== TAG aspect-status (CI) === {counts.get('GREEN',0)}G / {counts.get('YELLOW',0)}Y / {counts.get('RED',0)}R ({len(result['aspects'])} signal checks; 4 fs checks N/A in CI)", file=sys.stderr)
+print(f"\n=== TAG aspect-status (CI) === {counts.get('GREEN',0)}G / {counts.get('YELLOW',0)}Y / {counts.get('RED',0)}R ({len(result['aspects'])} aspects: 5 signal + 4 gh-api proxy; infrastructure N/A)", file=sys.stderr)
 
 if "--publish" in sys.argv:
     import boto3
