@@ -164,8 +164,8 @@ for name, fn in CHECKS.items():
 # informative (clickable with explanation), not just "omitted → generic N/A text".
 result["aspects"]["infrastructure"] = {
     "status": "N/A",
-    "evidence": "TAG has no deploy — runs inline in AGG Step 5 (pure-function library; no Worker/server/API/R2 of its own). Infrastructure it depends on (pipeline/R2/CI) is owned + checked by AGG/INF in their aspect rows.",
-    "source": "N/A — no independent infrastructure"
+    "evidence": "No deploy — runs inline in AGG Step 5 (pure-function library; no Worker/server/API of its own).",
+    "source": "N/A — no independent deploy"
 }
 
 data_str = json.dumps(result, indent=2)
