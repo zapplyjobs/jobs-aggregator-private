@@ -4,6 +4,9 @@ on:
     # Every 15 min, offset 8 min from pipeline + 3 from AGG's aspect refresh (5,20,35,50)
     - cron: '8,23,38,53 * * * *'
   workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
 jobs:
   verify:
     runs-on: ubuntu-latest

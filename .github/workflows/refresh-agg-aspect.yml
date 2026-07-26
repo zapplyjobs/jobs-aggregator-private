@@ -4,6 +4,9 @@ on:
     # Every 15 min, offset 5 min from pipeline (pipeline runs at :00,:15,:30,:45)
     - cron: '5,20,35,50 * * * *'
   workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -14,17 +17,21 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install boto3
-      - run: python3 .github/scripts/verify-agg-aspect-ci.py --publish
+      - name: Verify + publish to R2
+        run: python3 .github/scripts/verify-agg-aspect-ci.py --publish > /tmp/agg-aspect-status.json
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
-      - name: "Dual-write to Supabase Storage (Phase 5)"
+      - name: Dual-write to Supabase Storage (R2-elim Phase 5)
+        continue-on-error: true
         run: |
-          curl -sf "https://zjp-data-proxy.wild-queen-069e.workers.dev/data/agg-aspect-status.json" -o /tmp/agg-aspect-status.json
-          curl -sf -X PUT "${SUPABASE_URL}/storage/v1/object/pipeline-data/agg-aspect-status.json" -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" -H "Content-Type: application/json" --data-binary @/tmp/agg-aspect-status.json || echo "Storage upload failed (non-blocking)"
+          curl -sf -X PUT \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            --data-binary @/tmp/agg-aspect-status.json \
+            "https://xxmhgagpbxjflajoaahy.supabase.co/storage/v1/object/pipeline-data/agg-aspect-status.json"
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
