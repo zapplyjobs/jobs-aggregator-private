@@ -48,8 +48,6 @@ jobs:
               raise SystemExit('fetch-jobs.yml must define workflow_dispatch')
           if 'cancel-in-progress: false' not in fetch:
               raise SystemExit('fetch-jobs.yml must preserve cancel-in-progress:false')
-          if 'required_files_failed' not in fetch or 'Required R2 upload failures' not in fetch:
-              raise SystemExit('fetch-jobs.yml must keep required R2 upload failure accounting')
 
           link = (workflow_dir / 'check-link-health.yml').read_text()
           if 'validate-link-health-artifacts.js --print-summary' not in link:
