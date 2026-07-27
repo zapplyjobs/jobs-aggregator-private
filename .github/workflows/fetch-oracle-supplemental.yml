@@ -119,3 +119,19 @@ jobs:
         if: always()
         run: |
           cat .github/data/supplemental-oracle-metadata.json | jq .
+
+
+      - name: "Dual-write to Supabase Storage (R2-elim)"
+        if: success()
+        continue-on-error: true
+        run: |
+          BASE="https://xxmhgagpbxjflajoaahy.supabase.co/storage/v1/object/pipeline-data"
+          for f in supplemental-oracle-jobs.json supplemental-oracle-metadata.json; do
+            if [ -f ".github/data/$f" ]; then
+              curl -sf -X PUT -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+                -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" \
+                --data-binary @".github/data/$f" "$BASE/$f" && echo "$f: OK" || echo "$f: FAIL"
+            fi
+          done
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
