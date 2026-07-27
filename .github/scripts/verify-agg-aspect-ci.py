@@ -71,11 +71,39 @@ def c_monitoring():
 def c_data_quality():
     m = proxy_json("zjp-metrics.json")
     if not m: return "RED", "metrics unreadable", "proxy:metrics"
+    issues = []
+    # 1. Description retrievability (existing check)
     dq = m.get("enrichment",{}).get("description_quality",{})
     rate = dq.get("retrievable_description_pct")
-    if rate is None: return "YELLOW", "rate missing", "zjp-metrics"
-    s = bucket_high(rate, 90, 80)
-    return s, f"{rate}% retrievable — threshold ≥90%/≥80%, pool {m.get('pool',{}).get('total_jobs','?')}", "zjp-metrics.retrievable_rate"
+    if rate is not None:
+        s_desc = bucket_high(rate, 90, 80)
+        if s_desc != "GREEN": issues.append(f"desc {rate}%")
+    # 2. Pool size within range (AGG-ASPECT-DATA-HEALTH-1)
+    pool = m.get("pool",{}).get("total_jobs", 0)
+    if pool and (pool < 20000 or pool > 50000):
+        issues.append(f"pool {pool:,} out of range")
+    # 3. Data health from jobs-metadata (source contribution + freshness)
+    jm = proxy_json("jobs-metadata.json")
+    if jm:
+        sj = jm.get("source_journey", {})
+        carry_only = sum(v.get("final",0) for v in sj.values() if isinstance(v,dict) and v.get("fetched",0)==0)
+        total = jm.get("total_jobs", 1)
+        carry_pct = carry_only / total * 100 if total else 0
+        if carry_pct > 70: issues.append(f"{carry_pct:.0f}% carry-forward (sources stalled)")
+        fh = jm.get("fetcher_health", {})
+        errors = sum(1 for v in fh.values() if isinstance(v,dict) and v.get("status")=="error")
+        if errors > 200: issues.append(f"{errors} fetcher errors")
+        lc = jm.get("lifecycle",{}).get("distribution",{})
+        aging = lc.get("evergreen",0)
+        aging_pct = aging / total * 100 if total else 0
+        if aging_pct > 60: issues.append(f"{aging_pct:.0f}% aging (>10d)")
+    # Determine status from issues
+    pool_str = f"pool {pool:,}" if pool else "pool ?"
+    if not issues:
+        return "GREEN", f"{rate}% retrievable, {pool_str}, data healthy", "zjp-metrics+jobs-metadata"
+    detail = "; ".join(issues[:3])
+    severity = "RED" if any("out of range" in i or "stalled" in i for i in issues) else "YELLOW"
+    return severity, f"{detail} — {pool_str}", "zjp-metrics+jobs-metadata"
 
 def c_performance():
     m = proxy_json("zjp-metrics.json")
