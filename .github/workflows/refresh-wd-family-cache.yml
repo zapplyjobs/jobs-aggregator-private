@@ -36,6 +36,8 @@ jobs:
       contents: read          # this workflow uploads to R2, not git — no commit/push
 
     env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       NODE_OPTIONS: --max-old-space-size=4096
       WD_FAMILY_CACHE_MAX_MS: ${{ github.event.inputs.max_duration_ms || '900000' }}
       # Tenant-level concurrency (distinct Workday hosts, parallelized). 20 lets a
