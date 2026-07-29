@@ -781,30 +781,6 @@ jobs:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
-    - name: "Persist WD optimization caches to R2"
-      if: success()
-      continue-on-error: true
-      run: |
-        node -e "
-        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-        const fs = require('fs');
-        async function main() {
-          const r2 = createR2Client({ prefix: 'data/' });
-          for (const f of ['wd-totals-cache.json', 'wd-segment-cache.json']) {
-            const fp = '.github/data/' + f;
-            if (fs.existsSync(fp)) {
-              await r2.uploadRaw(f, fs.readFileSync(fp), 'application/json');
-              console.log(f + ': persisted');
-            }
-          }
-        }
-        main().catch(e => { console.error('WD cache persist error: ' + e.message); });
-        "
-      env:
-        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
 
     - name: Log total workflow time
