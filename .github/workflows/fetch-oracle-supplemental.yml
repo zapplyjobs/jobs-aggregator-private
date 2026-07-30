@@ -124,7 +124,7 @@ jobs:
 
 
       - name: "Dual-write to Supabase Storage (R2-elim)"
-        if: success()
+        if: always()  # INF-R2ELIM-CASCADE-MISS-1: must run even when fetch script fails on R2 publish (bucket deleted) — local files exist before R2 crash
         continue-on-error: true
         run: |
           BASE="https://xxmhgagpbxjflajoaahy.supabase.co/storage/v1/object/pipeline-data"
