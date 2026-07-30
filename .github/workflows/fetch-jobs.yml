@@ -834,6 +834,22 @@ jobs:
         cd $GITHUB_WORKSPACE
         node .github/scripts/generate-and-push-readmes.js
 
+    - name: "Upload fresh board-counts.json to Storage"
+      if: success() && github.ref_name == 'main'
+      continue-on-error: true
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      run: |
+        curl -sf -X PUT \
+          -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+          -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+          -H "Content-Type: application/json" \
+          --data-binary @.github/data/board-counts.json \
+          "${SUPABASE_URL}/storage/v1/object/pipeline-data/board-counts.json" \
+          && echo "✅ Uploaded fresh board-counts.json to Storage" \
+          || echo "⚠️ board-counts.json upload failed"
+
 
     - name: Trigger jobs-data public snapshot refresh
       if: success() && github.ref_name == 'main'
