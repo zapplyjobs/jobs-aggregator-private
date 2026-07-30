@@ -49,52 +49,19 @@ jobs:
       - name: Install shared dependencies
         run: cd .github/scripts/shared && npm install && cd $GITHUB_WORKSPACE/.github/scripts/aggregator && npm install
 
-      - name: Download data from R2
+      - name: Download data from Storage
         env:
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           mkdir -p /tmp/review-data
-          cd .github/scripts/shared
-          node - <<'NODE'
-          const fs = require('fs');
-          const { S3Client, GetObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
-          const client = new S3Client({
-            region: 'auto',
-            endpoint: process.env.R2_ENDPOINT,
-            credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY },
-          });
-          const bucket = process.env.R2_BUCKET_NAME;
-          // all_jobs.json + the per-source description sidecars now live on R2 (removed from the
-          // jobs-data-2026 repo during the storage cutover). Download directly from R2.
-          // Skip enriched-* / greenhouse-* chunks: 40MB+ each, never part of this review report.
-          const skip = (key) => key.includes('descriptions-enriched-') || key.includes('descriptions-greenhouse-');
-          async function download(key, dest) {
-            const r = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-            fs.writeFileSync(dest, await r.Body.transformToString());
-          }
-          (async () => {
-            console.log('Downloading all_jobs.json from R2...');
-            await download('data/all_jobs.json', '/tmp/review-data/all_jobs.json');
-            const jobs = fs.readFileSync('/tmp/review-data/all_jobs.json', 'utf8').trim().split('\n').filter(Boolean).length;
-            console.log(`  ${jobs} jobs`);
-            const sidecars = [];
-            let tok;
-            do {
-              const r = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: 'data/descriptions-', ContinuationToken: tok }));
-              (r.Contents || []).forEach(o => { if (o.Key.endsWith('.jsonl') && !skip(o.Key)) sidecars.push(o.Key); });
-              tok = r.NextContinuationToken;
-            } while (tok);
-            console.log(`Downloading ${sidecars.length} description sidecars (skipping enriched/greenhouse chunks)...`);
-            for (const key of sidecars) {
-              const name = key.split('/').pop();
-              try { await download(key, `/tmp/review-data/${name}`); console.log(`  ${name}`); }
-              catch (e) { console.log(`  ${name}: skipped (${e.message})`); }
-            }
-          })().catch(e => { console.error('FAIL: ' + e.message); process.exit(1); });
-          NODE
+          BASE="$SUPABASE_URL/storage/v1/object/pipeline-data"
+          AUTH="Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
+          curl -sf -H "$AUTH" "$BASE/all_jobs.json" -o /tmp/review-data/all_jobs.json
+          echo "  $(wc -l < /tmp/review-data/all_jobs.json) jobs"
+          SIDE=$(curl -sf -X POST -H "$AUTH" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d '{"prefix":"","search":"descriptions-","limit":1000,"offset":0}' "$SUPABASE_URL/storage/v1/object/list/pipeline-data" | python3 -c "import sys,json; [print(i['name']) for i in json.load(sys.stdin) if i['name'].endswith('.jsonl') and 'descriptions-enriched-' not in i['name'] and 'descriptions-greenhouse-' not in i['name']]")
+          echo "Downloading $(echo "$SIDE" | wc -l) sidecars..."
+          for s in $SIDE; do curl -sf -H "$AUTH" "$BASE/$s" -o "/tmp/review-data/$s" && echo "  $s" || echo "  $s: skipped"; done
 
       - name: Generate general-review.json
         run: |
@@ -105,31 +72,13 @@ jobs:
           # Sanity check
           node -e "const d = JSON.parse(require('fs').readFileSync('/tmp/review-data/general-review.json','utf8')); console.log('US General:', d.summary.us_general, '/', d.summary.us_total, '=', d.summary.us_general_rate + '%')"
 
-      - name: Upload general-review.json to R2 (INF-R2-GITCUTOVER-1)
+      - name: Upload general-review.json to Storage (INF-R2-GITCUTOVER-1)
         # Was: cross-repo push to jobs-data-2026 (kept general-review.json in public git).
-        # Now: upload to R2 directly; the zjp-data-proxy Worker serves it from there. The file
-        # is untracked from jobs-data-2026, so it no longer lives in public git.
+        # Now: upload to Supabase Storage directly; the zjp-data-proxy Worker serves it from there.
+        # The file is untracked from jobs-data-2026, so it no longer lives in public git.
         env:
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          cd .github/scripts/shared
-          node - <<'NODE'
-          const fs = require('fs');
-          const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-          const client = new S3Client({
-            region: 'auto',
-            endpoint: process.env.R2_ENDPOINT,
-            credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY },
-          });
-          const body = fs.readFileSync('/tmp/review-data/general-review.json');
-          client.send(new PutObjectCommand({
-            Bucket: process.env.R2_BUCKET_NAME,
-            Key: 'data/general-review.json',
-            Body: body,
-            ContentType: 'application/json',
-          })).then(() => console.log('✅ UPLOADED_R2:data/general-review.json (' + body.length + ' bytes)'))
-            .catch(e => { console.error('FAIL: ' + e.message); process.exit(1); });
-          NODE
+          curl -sf -X PUT -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" --data-binary @/tmp/review-data/general-review.json "$SUPABASE_URL/storage/v1/object/pipeline-data/general-review.json"
+          echo "✅ UPLOADED:storage general-review.json ($(wc -c < /tmp/review-data/general-review.json) bytes)"

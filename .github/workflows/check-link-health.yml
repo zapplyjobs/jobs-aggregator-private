@@ -49,48 +49,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Seed stale candidate history from R2
+      - name: Seed stale candidate history from Storage
         env:
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
-          async function main() {
-            const client = new S3Client({
-              region: 'auto',
-              endpoint: process.env.R2_ENDPOINT,
-              credentials: {
-                accessKeyId: process.env.R2_ACCESS_KEY_ID,
-                secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-              },
-            });
-            for (const [key, dest] of [
-              ['data/stale-job-history.json', 'stale-job-history.prev.json'],
-              ['data/jobs-metadata.json', 'jobs-metadata.json'],
-            ]) {
-              try {
-                const obj = await client.send(new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key }));
-                fs.writeFileSync(dest, await obj.Body.transformToString(), 'utf8');
-                console.log(`seeded ${dest}`);
-              } catch {
-                console.log(`no prior ${key}`);
-              }
-            }
-          }
-          main().catch(err => { console.error(err.message); process.exit(1); });
-          NODE
+          curl -sf -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" "$SUPABASE_URL/storage/v1/object/pipeline-data/stale-job-history.json" -o stale-job-history.prev.json 2>/dev/null && echo "seeded stale-job-history.prev" || echo "no prior stale-job-history"
+          curl -sf -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" "$SUPABASE_URL/storage/v1/object/pipeline-data/jobs-metadata.json" -o jobs-metadata.json 2>/dev/null && echo "seeded jobs-metadata" || echo "no prior jobs-metadata"
 
       - name: Run AGG link health sample
         id: link-health
         env:
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           # AGG-DEADNESS-1: check-link-health.js exits 1 when dead jobs are found (dead-alert signal).
           # The Simplify age-bypass now reliably detects the persistently-410 BAE class, so dead>0 is
@@ -109,39 +80,15 @@ jobs:
           echo "validated=true" >> "$GITHUB_OUTPUT"
           exit $CHECK_EXIT
 
-      - name: Upload stale candidate outputs to R2
+      - name: Upload stale candidate outputs to Storage
         if: steps.link-health.outputs.validated == 'true'
         env:
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-          async function main() {
-            const client = new S3Client({
-              region: 'auto',
-              endpoint: process.env.R2_ENDPOINT,
-              credentials: {
-                accessKeyId: process.env.R2_ACCESS_KEY_ID,
-                secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-              },
-            });
-            for (const file of ['agg-link-health.json', 'stale-job-candidates.json', 'stale-job-history.json', 'stale-job-tombstones.json', 'link-verification-sample.json', 'source-confidence-sample.json']) {
-              if (!fs.existsSync(file)) continue;
-              await client.send(new PutObjectCommand({
-                Bucket: process.env.R2_BUCKET_NAME,
-                Key: `data/${file}`,
-                Body: fs.readFileSync(file, 'utf8'),
-                ContentType: 'application/json',
-              }));
-              console.log(`uploaded ${file}`);
-            }
-          }
-          main().catch(err => { console.error(err.message); process.exit(1); });
-          NODE
+          for f in agg-link-health.json stale-job-candidates.json stale-job-history.json stale-job-tombstones.json link-verification-sample.json source-confidence-sample.json; do
+            [ -f "$f" ] && curl -sf -X PUT -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" --data-binary @"$f" "$SUPABASE_URL/storage/v1/object/pipeline-data/$f" && echo "uploaded $f" || echo "skip $f"
+          done
 
       - name: Upload report artifact
         if: always()
