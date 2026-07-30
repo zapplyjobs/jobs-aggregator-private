@@ -808,6 +808,19 @@ jobs:
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
 
+    - name: Download enriched_jobs.json from Storage (for README visa/skills)
+      if: success() && github.ref_name == 'main'
+      continue-on-error: true
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      run: |
+        curl -sf -o .github/data/enriched_jobs.json \
+          "${SUPABASE_URL}/storage/v1/object/pipeline-data/enriched_jobs.json" \
+          -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+          && echo "✅ Downloaded enriched_jobs.json for README enrichment" \
+          || echo "⚠️ enriched_jobs.json download failed — READMEs will lack visa/skills"
+
     - name: Generate + push consumer board READMEs
       if: success() && github.ref_name == 'main'
       continue-on-error: true
