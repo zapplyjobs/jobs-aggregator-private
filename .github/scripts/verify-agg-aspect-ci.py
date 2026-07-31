@@ -78,9 +78,9 @@ def c_data_quality():
     if rate is not None:
         s_desc = bucket_high(rate, 90, 80)
         if s_desc != "GREEN": issues.append(f"desc {rate}%")
-    # 2. Pool size within range (AGG-ASPECT-DATA-HEALTH-1)
+    # 2. Pool size within range (AGG-ASPECT-DATA-HEALTH-1; recalibrated 2026-07-31: was 20K-50K -> 35K-65K to match AGG_CONTRACT + the post-WD-recovery steady-state pool ~54K, verified clean via AGG-GEMINI-DEDUP-1)
     pool = m.get("pool",{}).get("total_jobs", 0)
-    if pool and (pool < 20000 or pool > 50000):
+    if pool and (pool < 35000 or pool > 65000):
         issues.append(f"pool {pool:,} out of range")
     # 3. Data health from jobs-metadata (source contribution + freshness)
     jm = proxy_json("jobs-metadata.json")
