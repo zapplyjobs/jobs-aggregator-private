@@ -108,10 +108,14 @@ def c_data_quality():
 def c_performance():
     m = proxy_json("zjp-metrics.json")
     if not m: return "RED", "metrics unreadable", "proxy:metrics"
-    rt = m.get("pipeline",{}).get("aggregator_runtime_minutes")
-    if rt is None: return "YELLOW", "runtime missing", "zjp-metrics"
+    # AGG-PERF-METRIC-FIX-1: use pipeline_internal_minutes (sum of stage_timings from
+    # index.js step instrumentation) instead of aggregator_runtime_minutes, which queries
+    # ALL workflow runs (line 220 of generate-zjp-metrics.js) and picks up quick workflows
+    # (gate checks ~10s, aspect refreshes ~20s) as the aggregator's runtime.
+    rt = m.get("pipeline",{}).get("pipeline_internal_minutes")
+    if rt is None: return "YELLOW", "runtime missing", "zjp-metrics.pipeline_internal"
     s = bucket_low(rt, 5, 8)
-    return s, f"{rt:.1f} min — target <5, alert <8", "zjp-metrics.runtime"
+    return s, f"{rt:.1f} min (script internal) — target <5, alert <8", "zjp-metrics.pipeline_internal"
 
 def c_infrastructure():
     m = proxy_json("zjp-metrics.json")
