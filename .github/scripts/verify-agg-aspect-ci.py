@@ -68,6 +68,10 @@ def c_monitoring():
     elif age <= 1440: return "YELLOW", f"metrics {age:.0f}min old (stale)", "zjp-metrics.alerts"
     else: return "RED", f"metrics {age:.0f}min old", "zjp-metrics.alerts"
 
+# AGG-DATAQUALITY-STRUCTURAL-EXCLUDE-1: demoted hot-path sources with permanent T0
+# (API rate-limits / no description API). Excluded from desc coverage to distinguish
+# structural floor from actionable regression in healthy sources.
+STRUCTURAL_DESC_SOURCES = {'oracle', 'microsoft', 'bytedance', 'apple', 'google'}
 def c_data_quality():
     m = proxy_json("zjp-metrics.json")
     if not m: return "RED", "metrics unreadable", "proxy:metrics"
@@ -77,7 +81,20 @@ def c_data_quality():
     rate = dq.get("retrievable_description_pct")
     if rate is not None:
         s_desc = bucket_high(rate, 90, 80)
-        if s_desc != "GREEN": issues.append(f"desc {rate}%")
+        if s_desc != "GREEN":
+            # AGG-DATAQUALITY-STRUCTURAL-EXCLUDE-1: compute adjusted rate excluding structural T0
+            jm_dq = proxy_json("jobs-metadata.json") or {}
+            bs = jm_dq.get("by_source", {})
+            total = sum(bs.values()) or 1
+            structural = sum(bs.get(s, 0) for s in STRUCTURAL_DESC_SOURCES)
+            if structural > 0 and total > structural:
+                adjusted = min(rate * total / (total - structural), 100.0)
+                if bucket_high(adjusted, 90, 80) == "GREEN":
+                    pass  # YELLOW is structural-only — don't flag as an issue
+                else:
+                    issues.append(f"desc {rate}% (excl. structural {structural:,} T0: ~{adjusted:.0f}%)")
+            else:
+                issues.append(f"desc {rate}%")
     # 2. Pool size within range (AGG-ASPECT-DATA-HEALTH-1; recalibrated 2026-07-31: was 20K-50K -> 35K-65K to match AGG_CONTRACT + the post-WD-recovery steady-state pool ~54K, verified clean via AGG-GEMINI-DEDUP-1)
     pool = m.get("pool",{}).get("total_jobs", 0)
     if pool and (pool < 35000 or pool > 65000):
