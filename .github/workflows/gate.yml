@@ -30,10 +30,15 @@ jobs:
           echo "Y" | transcrypt --cipher aes-256-cbc --password "$TRANSCRYPT_PASSWORD" --force
           git checkout -- .
           git submodule foreach --recursive '
-            echo "Y" | transcrypt --cipher aes-256-cbc --password "'"$TRANSCRYPT_PASSWORD"'" --force 2>/dev/null || true
-            rm -f "$(git rev-parse --git-dir)/index" 2>/dev/null || true
-            git checkout HEAD -- . 2>/dev/null || true
-          ' || true
+            if grep -q "filter=crypt" .gitattributes 2>/dev/null; then
+              echo "Unlocking transcrypt in $name..."
+              echo "Y" | transcrypt --cipher aes-256-cbc --password "'"$TRANSCRYPT_PASSWORD"'" --force
+              git checkout -- .
+              echo "✓ $name unlocked"
+            else
+              echo "Skipping $name (no transcrypt)"
+            fi
+          '
         env:
           TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
 
