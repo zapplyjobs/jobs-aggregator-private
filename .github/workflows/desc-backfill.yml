@@ -121,8 +121,19 @@ jobs:
           }).catch(e => { console.error('SR fetch error:', e.message); });
           "
 
+      - name: "Verify sidecar integrity (AGG-SIDECAR-ATOMIC-WRITE-1)"
+        run: |
+          WD_LINES=$(wc -l < .github/data/descriptions-workday.jsonl 2>/dev/null || echo 0)
+          if [ "$WD_LINES" -lt 500 ]; then
+            echo "⚠️ WD sidecar has only $WD_LINES lines (expected 5000+). Possible seed-download failure."
+            echo "Skipping upload to prevent data loss — existing Storage sidecar preserved."
+            echo "SKIP_UPLOAD=true" >> $GITHUB_ENV
+          else
+            echo "✅ WD sidecar OK: $WD_LINES lines"
+          fi
+
       - name: "Upload sidecars to Supabase Storage"
-        if: success()
+        if: success() && env.SKIP_UPLOAD != 'true'
         continue-on-error: true
         run: node .github/scripts/upload-to-storage.js --bucket pipeline-data --data-dir .github/data --include-wd-sr
         env:
