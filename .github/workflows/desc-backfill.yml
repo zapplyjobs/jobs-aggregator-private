@@ -128,3 +128,20 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: "Write sidecar completion marker (AGG-DESCBACKFILL-MARKER-1)"
+        if: success()
+        run: |
+          WD_LINES=$(wc -l < .github/data/descriptions-workday.jsonl 2>/dev/null || echo 0)
+          SR_LINES=$(wc -l < .github/data/descriptions-smartrecruiters.jsonl 2>/dev/null || echo 0)
+          COMPLETED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "{\"sidecars_written_at\": \"${COMPLETED_AT}\", \"wd_entries\": ${WD_LINES}, \"sr_entries\": ${SR_LINES}, \"status\": \"complete\"}" > /tmp/desc-backfill-complete.json
+          curl -sf -X PUT \
+            "${SUPABASE_URL}/storage/v1/object/pipeline-data/desc-backfill-complete.json" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -T /tmp/desc-backfill-complete.json || true
+          echo "Marker: sidecars complete at ${COMPLETED_AT} (WD=${WD_LINES}, SR=${SR_LINES})"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
