@@ -781,6 +781,22 @@ jobs:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
+    - name: "Write main-pipeline sidecar marker (AGG-DESCBACKFILL-MARKER-1)"
+      if: success()
+      run: |
+        ORACLE_LINES=$(wc -l < .github/data/descriptions-oracle.jsonl 2>/dev/null || echo 0)
+        COMPLETED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        echo "{\"sidecars_written_at\": \"${COMPLETED_AT}\", \"oracle_entries\": ${ORACLE_LINES}, \"status\": \"complete\"}" > /tmp/fetch-jobs-sidecar-complete.json
+        curl -sf -X PUT \
+          "${SUPABASE_URL}/storage/v1/object/pipeline-data/fetch-jobs-sidecar-complete.json" \
+          -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+          -H "Content-Type: application/json" \
+          -T /tmp/fetch-jobs-sidecar-complete.json || true
+        echo "Marker: oracle sidecar complete at ${COMPLETED_AT} (${ORACLE_LINES} entries)"
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
 
 
     - name: Log total workflow time
