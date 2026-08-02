@@ -3,7 +3,7 @@ name: Fetch All Jobs
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/10 * * * *'  # Primary trigger (INF trigger architecture rebuild 2026-07-25: GH schedule primary, CF Worker backup)
+    - cron: '*/15 * * * *'  # Primary trigger — 15-min cadence (INF-TRIGGER-CADENCE-15-1): full cycle ~10min fits within window; cancel-in-progress:false lets overruns complete naturally
 
 # Prevent concurrent runs
 concurrency:
