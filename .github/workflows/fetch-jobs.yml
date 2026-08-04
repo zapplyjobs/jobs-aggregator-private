@@ -79,23 +79,31 @@ jobs:
         mkdir -p .github/logs .github/data
         date -u +%s > .github/data/workflow-start.txt
 
-    - name: "Seed all_jobs + dedupe + board-counts from Supabase Storage"
+    - name: "Seed all_jobs + dedupe + board-counts from R2 (canonical — AGG-R2PRIMARY-SEED)"
       run: |
-        STORAGE_BASE="https://xxmhgagpbxjflajoaahy.supabase.co/storage/v1/object/pipeline-data"
-        echo "📥 Seeding previous all_jobs.json from Storage..."
-        curl -sf "$STORAGE_BASE/all_jobs.json" -o .github/data/all_jobs.json && \
-          echo "✅ Seed OK: $(wc -l < .github/data/all_jobs.json) jobs" || {
-          echo "❌ Storage seed failed for all_jobs.json"
-          exit 1
+        echo "📥 Seeding previous all_jobs + dedupe + board-counts from R2 (canonical)..."
+        node -e "
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        const fs = require('fs');
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          try {
+            await r2.downloadToFile('all_jobs.json', '.github/data/all_jobs.json');
+            const lines = fs.readFileSync('.github/data/all_jobs.json','utf8').trim().split('\n').length;
+            console.log('✅ Seed OK: ' + lines + ' jobs (R2)');
+          } catch(e) { console.error('❌ R2 seed failed for all_jobs: ' + e.message); process.exit(1); }
+          try { await r2.downloadToFile('dedupe-store.json', '.github/data/dedupe-store.json'); console.log('✅ dedupe-store (R2)'); }
+          catch(e) { console.log('⚠️ dedupe-store: not found in R2 (first run)'); }
+          try { await r2.downloadToFile('board-counts.json', '.github/data/board-counts.json'); console.log('✅ board-counts (R2)'); }
+          catch(e) { console.log('⚠️ board-counts: not found in R2 (first run)'); }
         }
-        # Dedupe store (persist across runs)
-        curl -sf "$STORAGE_BASE/dedupe-store.json" -o .github/data/dedupe-store.json && \
-          echo "✅ dedupe-store: $(wc -c < .github/data/dedupe-store.json) bytes" || \
-          echo "⚠️ dedupe-store: not found (first run)"
-        # Board counts (count-drop monitoring)
-        curl -sf "$STORAGE_BASE/board-counts.json" -o .github/data/board-counts.json && \
-          echo "✅ board-counts: $(wc -c < .github/data/board-counts.json) bytes" || \
-          echo "⚠️ board-counts: not found (first run)"
+        main().catch(e => { console.error('Seed error: ' + e.message); process.exit(1); });
+        "
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
     - name: "Seed descriptions-enriched from R2 (private R2 only)"
       run: |
@@ -128,13 +136,23 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-    - name: "Seed pipeline-cycle-state.json from Storage"
+    - name: "Seed pipeline-cycle-state.json from R2 (canonical)"
       run: |
-        STORAGE_BASE="https://xxmhgagpbxjflajoaahy.supabase.co/storage/v1/object/pipeline-data"
-        echo "📥 Seeding pipeline-cycle-state.json (prior run completion timestamp)..."
-        curl -sf "$STORAGE_BASE/pipeline-cycle-state.json" -o .github/data/pipeline-cycle-state.json && \
-          echo "✅ Seeded pipeline-cycle-state.json" || \
-          echo "⚠️ No pipeline-cycle-state.json in Storage — first run after deploy"
+        echo "📥 Seeding pipeline-cycle-state.json from R2..."
+        node -e "
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          await r2.downloadToFile('pipeline-cycle-state.json', '.github/data/pipeline-cycle-state.json');
+          console.log('✅ Seeded pipeline-cycle-state.json (R2)');
+        }
+        main().catch(() => console.log('⚠️ No pipeline-cycle-state.json in R2 — first run'));
+        "
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
     - name: "Seed descriptions-jsearch.jsonl from R2 (private R2 only)"
       run: |
