@@ -176,11 +176,15 @@ for a in result["aspects"].values():
 print(f"\n=== TAG aspect-status (CI) === {counts.get('GREEN',0)}G / {counts.get('YELLOW',0)}Y / {counts.get('RED',0)}R / {counts.get('N/A',0)}N/A ({len(result['aspects'])} aspects: 9 checked + 1 N/A)", file=sys.stderr)
 
 if "--publish" in sys.argv:
-    import boto3
-    s3 = boto3.client("s3", region_name="auto",
-        endpoint_url=os.environ["R2_ENDPOINT"],
-        aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
-        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"])
-    s3.put_object(Bucket=os.environ["R2_BUCKET_NAME"],
-                  Key="data/tag-aspect-status.json", Body=data_str, ContentType="application/json")
-    print("published R2: data/tag-aspect-status.json", file=sys.stderr)
+    try:
+        import boto3
+        s3 = boto3.client("s3", region_name="auto",
+            endpoint_url=os.environ["R2_ENDPOINT"],
+            aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+            aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"])
+        s3.put_object(Bucket=os.environ["R2_BUCKET_NAME"],
+                      Key="data/tag-aspect-status.json", Body=data_str, ContentType="application/json")
+        print("published R2: data/tag-aspect-status.json", file=sys.stderr)
+    except Exception as e:
+        # Non-fatal: an R2 hiccup must NOT skip the Storage mirror step below.
+        print(f"R2 publish FAILED (non-fatal; Storage mirror still runs): {e}", file=sys.stderr)
