@@ -17,10 +17,14 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install boto3
-      - name: Verify aspect-status
-        run: python3 .github/scripts/verify-agg-aspect-ci.py > /tmp/agg-aspect-status.json
+      - name: Verify + publish aspect-status (R2-primary: --publish writes R2 via boto3; Storage mirrored below — mirrors refresh-tag-aspect.yml)
+        run: python3 .github/scripts/verify-agg-aspect-ci.py --publish > /tmp/agg-aspect-status.json
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
       - name: Dual-write to Supabase Storage (R2-elim Phase 5)
         continue-on-error: true
         run: |
