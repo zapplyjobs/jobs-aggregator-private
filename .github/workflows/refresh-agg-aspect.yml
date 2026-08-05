@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install boto3
-      - name: Verify + publish aspect-status (R2-primary: --publish writes R2 via boto3; Storage mirrored below — mirrors refresh-tag-aspect.yml)
+      - name: Verify + publish aspect-status (R2-primary via --publish boto3; Storage mirrored below, mirrors refresh-tag-aspect.yml)
         run: python3 .github/scripts/verify-agg-aspect-ci.py --publish > /tmp/agg-aspect-status.json
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
