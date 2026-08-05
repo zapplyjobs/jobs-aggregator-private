@@ -186,5 +186,7 @@ if "--publish" in sys.argv:
                       Key="data/tag-aspect-status.json", Body=data_str, ContentType="application/json")
         print("published R2: data/tag-aspect-status.json", file=sys.stderr)
     except Exception as e:
-        # Non-fatal: an R2 hiccup must NOT skip the Storage mirror step below.
-        print(f"R2 publish FAILED (non-fatal; Storage mirror still runs): {e}", file=sys.stderr)
+        # JSON already printed to stdout (above) — Storage mirror below still gets it via continue-on-error.
+        # But EXIT 1 so the workflow step shows a visible ⚠ (not silent success). Aligns with INF's visibility initiative.
+        print(f"R2 publish FAILED: {e}", file=sys.stderr)
+        sys.exit(1)

@@ -18,6 +18,7 @@ jobs:
           python-version: '3.12'
       - run: pip install boto3
       - name: Verify + publish aspect-status (R2-primary --publish writes R2 via boto3; Storage mirrored below)
+        continue-on-error: true   # R2 failure shows warning but Storage mirror below still runs
         run: python3 .github/scripts/verify-tag-aspect-ci.py --publish > /tmp/tag-aspect-status.json
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
