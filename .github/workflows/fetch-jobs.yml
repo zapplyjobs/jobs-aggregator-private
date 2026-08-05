@@ -891,6 +891,7 @@ jobs:
 
     - name: Trigger jobs-data public snapshot refresh
       if: success() && github.ref_name == 'main'
+      continue-on-error: true
       run: |
         curl -sf -X POST "https://api.github.com/repos/zapplyjobs/jobs-data-2026/actions/workflows/refresh-zjp-public-snapshot.yml/dispatches" \
           -H "Authorization: Bearer ${GH_PAT}" \
@@ -904,6 +905,7 @@ jobs:
 
     - name: Trigger metrics collection (wave link, reliable vs cron)
       if: success() && github.ref_name == 'main'
+      continue-on-error: true
       run: |
         curl -sf -X POST "https://api.github.com/repos/zapplyjobs/jobs-data-2026/actions/workflows/collect-metrics.yml/dispatches" \
           -H "Authorization: Bearer ${GH_PAT}" \
