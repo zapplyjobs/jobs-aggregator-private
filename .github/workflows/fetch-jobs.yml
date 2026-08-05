@@ -7,7 +7,7 @@ on:
 
 # Prevent concurrent runs
 concurrency:
-  group: job-fetch
+  group: job-fetch-v2  # AGG-GHOST-RUN-CADENCE-BLOCK-1: renamed to escape 10 ghost queued runs (uncancellable HTTP 500, stuck >24h from Aug-4 outage) blocking the old "job-fetch" group
   cancel-in-progress: false
 
 jobs:
