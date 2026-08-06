@@ -74,15 +74,23 @@ def c_monitoring():
     return "RED", f"metrics {age_min:.0f}min old or tag fields missing", "zjp-metrics"
 
 def c_data_quality():
-    # TAG data_quality = classification coverage (US G1), NOT retrievable-rate (AGG-scoped)
+    # TAG data_quality = classification coverage: aggregate G1 + tech-scope G1 (the real signal).
+    # Aggregate = all US non-senior general rate (broad). Tech-scope = US non-senior tech-classified
+    # general rate (description-dependent, the actual quality pressure — target <5% long-term,
+    # but ENR-blocked; 18-20% is healthy post-recovery, >25% = regression).
     m = proxy_json("zjp-metrics.json")
     if not m:
         return "RED", "metrics unreadable", "proxy:metrics"
-    g1 = (m.get("pool", {}).get("g1_us", {}) or {}).get("us_general_rate_pct")
-    if g1 is None:
+    g1us = (m.get("pool", {}).get("g1_us", {}) or {}).get("us_general_rate_pct")
+    ts_g1 = (m.get("pool", {}).get("g1_us", {}) or {}).get("tech_scope_general_rate_pct")
+    if g1us is None:
         return "YELLOW", "US G1 rate missing", "zjp-metrics.pool.g1_us"
-    s = bucket_low(g1, 15, 20)
-    return s, f"US G1 {g1}% — threshold <15/<20 (TAG data_quality = classification coverage)", "zjp-metrics.pool.g1_us.us_general_rate_pct"
+    s_agg = bucket_low(g1us, 15, 20)
+    if ts_g1 is not None:
+        s_ts = bucket_low(ts_g1, 20, 25)
+        s = s_ts if s_ts != "GREEN" else s_agg  # report the WORST of the two
+        return s, f"aggregate G1 {g1us}% ({s_agg}); tech-scope G1 {ts_g1}% ({s_ts}) — tech-scope is the real quality signal (desc-dependent, <5% target long-term)", "zjp-metrics.pool.g1_us"
+    return s_agg, f"US G1 {g1us}% (tech-scope missing)", "zjp-metrics.pool.g1_us.us_general_rate_pct"
 
 def c_performance():
     m = proxy_json("zjp-metrics.json")
