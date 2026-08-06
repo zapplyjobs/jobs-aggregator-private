@@ -116,11 +116,17 @@ def c_security():
 
 # --- CI-native proxy checks (per INF-ASPECT-CI-NATIVE-1 design: gh-api repo-state replaces workspace-fs) ---
 def c_configuration():
-    # PROXY: config files exist in repo (git-crypt encrypted; validity via ci-gate parity test).
+    # TWO-LAYER: (1) config files exist (structural), (2) metadata software count > 0 (runtime — proves keyword layer loaded config).
     files = ["lib/fetchers/company-list.json", "lib/processors/onet-unified-lookup.json", "lib/processors/wd-family-domain-map.json"]
     found = sum(1 for f in files if gh_json(["api", f"repos/{TAG_REPO}/contents/{f}"]))
     if found == len(files):
-        return "GREEN", f"{found}/{len(files)} config files present in repo (git-crypt encrypted; validity via ci-gate parity)", "gh-api:repo-contents"
+        # Runtime check: if metadata has software domain > 0, the keyword layer ran → config loaded successfully.
+        m = proxy_json("jobs-metadata.json")
+        if m:
+            sw = ((m.get("tag_stats") or {}).get("domains") or {}).get("software", 0)
+            if sw == 0:
+                return "YELLOW", f"{found}/{len(files)} files present BUT software=0 — config may have failed to load", "gh-api + proxy:metadata"
+        return "GREEN", f"{found}/{len(files)} files present + keyword layer active", "gh-api + proxy:metadata"
     return "YELLOW", f"{found}/{len(files)} config files found in repo", "gh-api:repo-contents"
 
 def c_discoverability():
@@ -132,12 +138,16 @@ def c_discoverability():
     return "YELLOW", "tag-engine.js not found in job-board-aggregator", "gh-api:repo-contents"
 
 def c_documentation():
-    # PROXY: recent commit to tag-engine.js (repo activity -> doc/code freshness).
-    commits = gh_json(["api", f"repos/{TAG_REPO}/commits?per_page=1&path=lib/processors/tag-engine.js"]) or []
-    if not commits:
-        return "YELLOW", "no commits found on tag-engine.js", "gh-api:commits"
-    date = commits[0].get("commit", {}).get("committer", {}).get("date", "")[:10]
-    return "GREEN", f"latest tag-engine.js commit {date} (repo-activity proxy for doc freshness)", "gh-api:commits"
+    # Check MODULE GUIDE freshness (actual doc artifact, not code commit date which measures code activity).
+    guide = gh_json(["api", "repos/zapplyjobs/zjp-dashboard/commits?per_page=1&path=docs/module-guides/tag.md"]) or []
+    if not guide:
+        return "YELLOW", "module guide tag.md not found in zjp-dashboard", "gh-api:zjp-dashboard"
+    date_raw = guide[0].get("commit", {}).get("committer", {}).get("date", "")
+    if date_raw:
+        age = (NOW - datetime.datetime.fromisoformat(date_raw.replace("Z", "+00:00"))).days
+        s = bucket_low(age, 60, 90)
+        return s, f"module guide tag.md last updated {date_raw[:10]} ({age}d old)", "gh-api:zjp-dashboard/commits"
+    return "YELLOW", "module guide commit date unreadable", "gh-api:zjp-dashboard"
 
 def c_change_mgmt():
     # PROXY: ci-gate.yml exists (structural proxy for SDLC + change-mgmt practices).
