@@ -64,7 +64,13 @@ def c_monitoring():
             age = (NOW - datetime.datetime.fromisoformat(gen.replace("Z","+00:00"))).total_seconds()/60
         except: pass
     nf = len(alerts.get("failures", []))
-    if age <= 60: return "GREEN", f"metrics {age:.0f}min old ({nf} alerts)", "zjp-metrics.alerts"
+    nw = alerts.get("warning_count", len(alerts.get("warnings", [])))
+    # AGG-ASPECT-MONITOR-ALERTGATE-1: a firing FAILURE means monitoring is NOT GREEN,
+    # regardless of metric freshness (fixes H-AGG-4 green-while-alerting). YELLOW =
+    # the monitoring system works but a real issue is alerting (not RED = system broken).
+    if nf > 0:
+        return "YELLOW", f"{nf} active failure(s) — metrics {age:.0f}min old", "zjp-metrics.alerts"
+    if age <= 60: return "GREEN", f"metrics {age:.0f}min old ({nw} warnings)", "zjp-metrics.alerts"
     elif age <= 1440: return "YELLOW", f"metrics {age:.0f}min old (stale)", "zjp-metrics.alerts"
     else: return "RED", f"metrics {age:.0f}min old", "zjp-metrics.alerts"
 
