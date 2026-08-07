@@ -1,0 +1,112 @@
+name: Push Consumer READMEs
+
+# Wave-linked from jobs-data-2026/enrich-jobs.yml AFTER enrichment completes, so the
+# 8 consumer boards get FRESH enrichment (visa/skills) instead of previous-cycle.
+# INF-CONSUMER-PUSH-ENRICH-RACE-1. Phase 1 (additive): fetch-jobs.yml's stale pre-enrich
+# push still runs as a fallback; Phase 2 removes it once this is verified.
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [push-consumer-readmes]
+
+concurrency:
+  group: push-consumer-readmes
+  cancel-in-progress: false
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+      with:
+        ref: main
+        fetch-depth: 1
+        submodules: recursive
+        token: ${{ secrets.GH_PAT }}
+
+    - name: Install transcrypt
+      run: |
+        curl -sSL https://raw.githubusercontent.com/elasticdog/transcrypt/5effa13/transcrypt -o /tmp/transcrypt
+        chmod +x /tmp/transcrypt
+        sudo mv /tmp/transcrypt /usr/local/bin/transcrypt
+
+    - name: Unlock encrypted files
+      run: |
+        echo "Y" | transcrypt --cipher aes-256-cbc --password "$TRANSCRYPT_PASSWORD" --force
+        git checkout -- .
+        git submodule foreach --recursive '
+          echo "Y" | transcrypt --cipher aes-256-cbc --password "'"$TRANSCRYPT_PASSWORD"'" --force 2>/dev/null || true
+          rm -f "$(git rev-parse --gitdir)/index" 2>/dev/null || true
+          git checkout HEAD -- . 2>/dev/null || true
+        ' || true
+      env:
+        TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
+
+    - name: Fix submodule index
+      run: |
+        git submodule sync --recursive
+        git submodule update --init --force --recursive
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '22'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Create data directory
+      run: mkdir -p .github/data
+
+    - name: Download fresh all_jobs + enriched_jobs from R2
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      run: |
+        node -e "
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          await r2.downloadToFile('all_jobs.json', '.github/data/all_jobs.json');
+          console.log('✅ Downloaded all_jobs.json');
+          await r2.downloadToFile('enriched_jobs.json', '.github/data/enriched_jobs.json');
+          console.log('✅ Downloaded enriched_jobs.json (fresh, post-enrichment)');
+        }
+        main().catch(e => { console.error('❌ R2 download failed:', e.message); process.exit(1); });
+        "
+
+    - name: Generate + push consumer board READMEs
+      continue-on-error: true
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+        GH_TOKEN: ${{ secrets.GH_PAT }}
+        DISCORD_TEAM_TOKEN: ${{ secrets.DISCORD_TEAM_TOKEN }}
+        DISCORD_PIPELINE_ALERT_CHANNEL_ID: ${{ secrets.DISCORD_PIPELINE_ALERT_CHANNEL_ID }}
+      run: |
+        cd .github/scripts/consumer && npm install --silent
+        cd $GITHUB_WORKSPACE
+        node .github/scripts/generate-and-push-readmes.js
+
+    - name: Upload fresh board-counts.json to Storage
+      continue-on-error: true
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      run: |
+        curl -sf -X PUT \
+          -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+          -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+          -H "Content-Type: application/json" \
+          --data-binary @.github/data/board-counts.json \
+          "${SUPABASE_URL}/storage/v1/object/pipeline-data/board-counts.json" \
+          && echo "✅ Uploaded fresh board-counts.json" \
+          || echo "⚠️ board-counts.json upload failed (non-critical)"
