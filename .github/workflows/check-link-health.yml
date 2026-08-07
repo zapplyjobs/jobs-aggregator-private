@@ -90,6 +90,35 @@ jobs:
             [ -f "$f" ] && curl -sf -X PUT -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" --data-binary @"$f" "$SUPABASE_URL/storage/v1/object/pipeline-data/$f" && echo "uploaded $f" || echo "skip $f"
           done
 
+      - name: Upload stale candidate outputs to R2 (canonical — AGG-R2PRIMARY-NONBRIDGE-GAPS-1)
+        if: steps.link-health.outputs.validated == 'true'
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          node << 'EOF'
+          const fs = require('fs');
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          const r2 = createR2Client({ prefix: 'data/' });
+          const files = [
+            ['agg-link-health.json', 'application/json'],
+            ['stale-job-candidates.json', 'application/json'],
+            ['stale-job-history.json', 'application/json'],
+            ['stale-job-tombstones.json', 'application/json'],
+            ['link-verification-sample.json', 'application/json'],
+            ['source-confidence-sample.json', 'application/json'],
+          ];
+          (async () => {
+            for (const [name, ct] of files) {
+              if (!fs.existsSync(name)) { console.log('R2 skip ' + name + ' (not found)'); continue; }
+              try { await r2.uploadRaw(name, fs.readFileSync(name), ct); console.log('R2 uploaded ' + name); }
+              catch (e) { console.log('R2 FAIL ' + name + ': ' + e.message); }
+            }
+          })();
+          EOF
+
       - name: Upload report artifact
         if: always()
         uses: actions/upload-artifact@v4
