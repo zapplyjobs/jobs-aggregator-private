@@ -847,54 +847,12 @@ jobs:
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
 
-    - name: Download enriched_jobs.json from R2 (for README visa/skills — egress fix)
-      if: success() && github.ref_name == 'main'
-      continue-on-error: true
-      env:
-        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
-      run: |
-        node -e "
-        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-        async function main() {
-          const r2 = createR2Client({ prefix: 'data/' });
-          await r2.downloadToFile('enriched_jobs.json', '.github/data/enriched_jobs.json');
-          console.log('✅ Downloaded enriched_jobs.json from R2');
-        }
-        main().catch(() => console.log('⚠️ enriched_jobs.json R2 download failed — READMEs will lack visa/skills'));
-        "
-
-    - name: Generate + push consumer board READMEs
-      if: success() && github.ref_name == 'main'
-      continue-on-error: true
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-        GH_TOKEN: ${{ secrets.GH_PAT }}
-        DISCORD_TEAM_TOKEN: ${{ secrets.DISCORD_TEAM_TOKEN }}
-        DISCORD_PIPELINE_ALERT_CHANNEL_ID: ${{ secrets.DISCORD_PIPELINE_ALERT_CHANNEL_ID }}
-      run: |
-        cd .github/scripts/consumer && npm install --silent
-        cd $GITHUB_WORKSPACE
-        node .github/scripts/generate-and-push-readmes.js
-
-    - name: "Upload fresh board-counts.json to Storage"
-      if: success() && github.ref_name == 'main'
-      continue-on-error: true
-      env:
-        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      run: |
-        curl -sf -X PUT \
-          -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-          -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-          -H "Content-Type: application/json" \
-          --data-binary @.github/data/board-counts.json \
-          "${SUPABASE_URL}/storage/v1/object/pipeline-data/board-counts.json" \
-          && echo "✅ Uploaded fresh board-counts.json to Storage" \
-          || echo "⚠️ board-counts.json upload failed"
-
+    # Consumer README push REMOVED from fetch-jobs — moved to push-consumer-readmes.yml,
+    # wave-linked from jobs-data-2026/enrich-jobs.yml AFTER enrichment completes
+    # (INF-CONSUMER-PUSH-ENRICH-RACE-1). Fetching here used PREVIOUS-cycle enriched_jobs
+    # (enrich takes ~5min, this ran seconds after dispatching it) -> consumers got stale
+    # visa/skills. board-counts upload moved with it. Monitoring: check-03 (consumer-failed)
+    # alerts if the post-enrich push misses + consumer repos go stale.
 
     - name: Trigger jobs-data public snapshot refresh
       if: success() && github.ref_name == 'main'
