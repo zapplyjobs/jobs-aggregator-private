@@ -93,31 +93,17 @@ jobs:
       - name: Upload stale candidate outputs to R2 (canonical — AGG-R2PRIMARY-NONBRIDGE-GAPS-1)
         if: steps.link-health.outputs.validated == 'true'
         env:
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
         run: |
-          node << 'EOF'
-          const fs = require('fs');
-          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-          const r2 = createR2Client({ prefix: 'data/' });
-          const files = [
-            ['agg-link-health.json', 'application/json'],
-            ['stale-job-candidates.json', 'application/json'],
-            ['stale-job-history.json', 'application/json'],
-            ['stale-job-tombstones.json', 'application/json'],
-            ['link-verification-sample.json', 'application/json'],
-            ['source-confidence-sample.json', 'application/json'],
-          ];
-          (async () => {
-            for (const [name, ct] of files) {
-              if (!fs.existsSync(name)) { console.log('R2 skip ' + name + ' (not found)'); continue; }
-              try { await r2.uploadRaw(name, fs.readFileSync(name), ct); console.log('R2 uploaded ' + name); }
-              catch (e) { console.log('R2 FAIL ' + name + ': ' + e.message); }
-            }
-          })();
-          EOF
+          # aws-cli (preinstalled) + R2 S3-compatibility — no submodule needed (the node r2-client lives in the aggregator submodule, not checked out here).
+          for f in agg-link-health.json stale-job-candidates.json stale-job-history.json stale-job-tombstones.json link-verification-sample.json source-confidence-sample.json; do
+            if [ -f "$f" ]; then
+              aws s3 cp "$f" "s3://${R2_BUCKET_NAME}/data/$f" --endpoint-url "${R2_ENDPOINT}" --region auto && echo "R2 uploaded $f" || echo "R2 FAIL $f"
+            fi
+          done
 
       - name: Upload report artifact
         if: always()
