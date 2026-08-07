@@ -80,6 +80,11 @@ jobs:
           console.log('✅ Downloaded all_jobs.json');
           await r2.downloadToFile('enriched_jobs.json', '.github/data/enriched_jobs.json');
           console.log('✅ Downloaded enriched_jobs.json (fresh, post-enrichment)');
+          // Canada boards use separate feed files (feedKey), not all_jobs.json — must fetch them
+          await r2.downloadToFile('canada-jobs.jsonl', '.github/data/canada-jobs.jsonl');
+          console.log('✅ Downloaded canada-jobs.jsonl');
+          await r2.downloadToFile('canada-tech-internships.jsonl', '.github/data/canada-tech-internships.jsonl');
+          console.log('✅ Downloaded canada-tech-internships.jsonl');
         }
         main().catch(e => { console.error('❌ R2 download failed:', e.message); process.exit(1); });
         "
