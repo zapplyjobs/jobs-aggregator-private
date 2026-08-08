@@ -21,7 +21,7 @@ jobs:
         continue-on-error: true   # R2 failure shows warning but Storage mirror below still runs
         run: python3 .github/scripts/verify-tag-aspect-ci.py --publish > /tmp/tag-aspect-status.json
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}   # B90: GH_PAT for cross-repo access (zjp-dashboard is private; GITHUB_TOKEN can't reach it → false YELLOW "not found")
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
