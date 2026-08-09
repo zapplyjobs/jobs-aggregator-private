@@ -36,7 +36,7 @@ def gh_runconclusion(repo, workflow=None, limit=5):
 def proxy_json(path):
     try:
         url = f"{PROXY}/{path}"
-        out = subprocess.check_output(["curl", "-sf", url], text=True, timeout=15)
+        out = subprocess.check_output(["curl", "-sf", "-H", f"X-Proxy-Token: {os.environ.get('DATA_PROXY_TOKEN', '')}", url], text=True, timeout=15)
         return json.loads(out) if out.strip() else None
     except Exception:
         return None
