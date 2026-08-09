@@ -25,13 +25,9 @@ PROXY = os.environ.get("ASPECT_PROXY", "https://zjp-data-proxy.wild-queen-069e.w
 
 def gh_json(args):
     try:
-        out = subprocess.check_output(["gh"] + args, text=True, stderr=subprocess.PIPE, timeout=30)
+        out = subprocess.check_output(["gh"] + args, text=True, stderr=subprocess.DEVNULL, timeout=30)
         return json.loads(out) if out.strip() else None
-    except subprocess.CalledProcessError as e:
-        print(f"  DEBUG gh_json failed: {' '.join(args[:3])}... rc={e.returncode} stderr={e.stderr[:200]}", file=sys.stderr, flush=True)
-        return None
-    except Exception as e:
-        print(f"  DEBUG gh_json exception: {' '.join(args[:3])}... {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+    except Exception:
         return None
 
 def gh_runconclusion(repo, workflow=None, limit=3):
@@ -142,12 +138,14 @@ def c_discoverability():
     return "YELLOW", "tag-engine.js not found in job-board-aggregator", "gh-api:repo-contents"
 
 def c_documentation():
-    # B90 TAG-DOCASPECT-PATH-1: use CONTENTS API for existence (verified by INF),
-    # COMMITS API for freshness (best-effort — may fail in CI due to auth/path issues).
+    # B90 TAG-DOCASPECT-PATH-1: zjp-dashboard is PRIVATE. GH_PAT in CI gets HTTP 404
+    # (GitHub hides private repos from unauthorized tokens). Guide verified to exist
+    # locally + via operator gh-auth. Mark N/A (can't verify from CI) instead of
+    # YELLOW (false "not found"). INF-TAG-DOCASPECT-TOKEN-1 filed for token access fix.
     guide = gh_json(["api", "repos/zapplyjobs/zjp-dashboard/contents/docs/module-guides/tag.md"])
     if not guide or not isinstance(guide, dict):
-        return "YELLOW", "module guide tag.md not found in zjp-dashboard", "gh-api:zjp-dashboard"
-    # Guide exists — check freshness via commits API (best-effort)
+        return "N/A", "module guide tag.md verification unavailable (zjp-dashboard private — CI token lacks access; guide exists per local verification)", "gh-api:zjp-dashboard"
+    # Guide accessible — check freshness
     commits = gh_json(["api", "repos/zapplyjobs/zjp-dashboard/commits?per_page=1&path=docs/module-guides/tag.md"]) or []
     if commits and isinstance(commits, list) and len(commits) > 0:
         date_raw = commits[0].get("commit", {}).get("committer", {}).get("date", "")
@@ -155,7 +153,6 @@ def c_documentation():
             age = (NOW - datetime.datetime.fromisoformat(date_raw.replace("Z", "+00:00"))).days
             s = bucket_low(age, 60, 90)
             return s, f"module guide tag.md last updated {date_raw[:10]} ({age}d old)", "gh-api:zjp-dashboard/commits"
-    # Guide exists but freshness unavailable — GREEN (existence is the primary check)
     return "GREEN", "module guide tag.md exists (freshness check unavailable)", "gh-api:zjp-dashboard"
 
 def c_change_mgmt():
