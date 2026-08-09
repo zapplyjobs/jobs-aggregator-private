@@ -25,9 +25,13 @@ PROXY = os.environ.get("ASPECT_PROXY", "https://zjp-data-proxy.wild-queen-069e.w
 
 def gh_json(args):
     try:
-        out = subprocess.check_output(["gh"] + args, text=True, stderr=subprocess.DEVNULL, timeout=30)
+        out = subprocess.check_output(["gh"] + args, text=True, stderr=subprocess.PIPE, timeout=30)
         return json.loads(out) if out.strip() else None
-    except Exception:
+    except subprocess.CalledProcessError as e:
+        print(f"  DEBUG gh_json failed: {' '.join(args[:3])}... rc={e.returncode} stderr={e.stderr[:200]}", flush=True)
+        return None
+    except Exception as e:
+        print(f"  DEBUG gh_json exception: {' '.join(args[:3])}... {type(e).__name__}: {e}", flush=True)
         return None
 
 def gh_runconclusion(repo, workflow=None, limit=3):
