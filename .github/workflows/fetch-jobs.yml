@@ -24,6 +24,7 @@ jobs:
       SKIP_WD_DESC_BACKFILL: '1'  # AGG-DESC-ASYNC-1: WD desc backfill moved to separate workflow
       SKIP_SR_DESC_BACKFILL: '1'  # AGG-DESC-ASYNC-1: SR desc backfill moved to separate workflow
       WD_FETCH_PROXY: https://wd-fetch-proxy.wild-queen-069e.workers.dev  # AGG-WD-PROXY-WIRE-1: bypass GHA Cloudflare IP-block
+      DATA_PROXY_TOKEN: ${{ secrets.DATA_PROXY_TOKEN }}  # AGG-WD-PROXY-AUTH-HEADER-1: auth token for wd-fetch-proxy
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}  # AGG-R2ELIM-READMIGRATION-1: Storage-first reads via r2-client.js
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
