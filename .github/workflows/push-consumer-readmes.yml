@@ -172,3 +172,16 @@ jobs:
         }
         main().catch(e => { console.error('⚠️ publish-status.json R2 upload failed:', e.message); });
         "
+
+    - name: Trigger collect-metrics (wave link — fresh board-counts in zjp-metrics)
+      if: success() && github.ref_name == 'main'
+      run: |
+        curl -sf -X POST "https://api.github.com/repos/zapplyjobs/jobs-data-2026/actions/workflows/collect-metrics.yml/dispatches" \
+          -H "Authorization: Bearer ${GH_PAT}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          -d '{"ref":"main"}' \
+          && echo "✅ Triggered collect-metrics (post board-counts upload — INF-BOARDCOUNTS-STALE-IN-METRICS-1)" \
+          || echo "⚠️ collect-metrics dispatch failed (non-critical)"
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
