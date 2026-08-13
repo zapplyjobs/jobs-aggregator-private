@@ -3,7 +3,7 @@ name: Cleanup Stale Runs
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '0 * * * *'  # INF-CRON-CLEANUP: reduced from */5 (was consuming ~8,640 min/month on private repo, 2.8x the 3,000 included budget). Hourly is sufficient — stale runs are cosmetic, STALE_MINUTES=45 means the cleanup window is still tight.
 
 permissions: {}
 
