@@ -19,7 +19,7 @@ jobs:
       contents: write
 
     env:
-      NODE_OPTIONS: --max-old-space-size=6144
+      NODE_OPTIONS: --max-old-space-size=6656  # INF-PIPELINE-OOM: raised from 6144 (pool grew to 60K+ jobs, 6GB heap OOM at 2026-08-13). 6656 leaves ~350MB for OS on the 7GB runner. AGG advisory filed for streaming/chunked memory optimization.
       SKIP_WD_FAMILY_CACHE_BUILD: 1
       SKIP_WD_DESC_BACKFILL: '1'  # AGG-DESC-ASYNC-1: WD desc backfill moved to separate workflow
       SKIP_SR_DESC_BACKFILL: '1'  # AGG-DESC-ASYNC-1: SR desc backfill moved to separate workflow
