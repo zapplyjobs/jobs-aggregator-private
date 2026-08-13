@@ -74,10 +74,9 @@ def c_monitoring():
     return "RED", f"metrics {age_min:.0f}min old or tag fields missing", "zjp-metrics"
 
 def c_data_quality():
-    # Aggregate = all US non-senior general rate (broad). Tech-scope = US non-senior tech-classified
-    # general rate. Threshold ≤20% GREEN / 21-25% YELLOW / >25% RED — accounts for the structural
-    # floor (~18-20% legitimately non-tech-at-tech jobs; remainder = small classifiable FN tail,
-    # actively addressed: AI Tutor v100, IT FPs v99). NOT primarily description-dependent.
+    # Aggregate = all US non-senior general rate (broad). Tech-scope = tech-signal-filtered G1
+    # (v101): counts only general jobs whose title matches TECH_KEYWORD_RE — isolates actual
+    # recall (FN candidates) from legitimately non-tech-at-tech. Threshold ≤5% GREEN / 6-10% YELLOW / >10% RED.
     m = proxy_json("zjp-metrics.json")
     if not m:
         return "RED", "metrics unreadable", "proxy:metrics"
@@ -87,9 +86,9 @@ def c_data_quality():
         return "YELLOW", "US G1 rate missing", "zjp-metrics.pool.g1_us"
     s_agg = bucket_low(g1us, 15, 20)
     if ts_g1 is not None:
-        s_ts = bucket_low(ts_g1, 20, 25)
+        s_ts = bucket_low(ts_g1, 5, 10)
         s = s_ts if s_ts != "GREEN" else s_agg  # report the WORST of the two
-        return s, f"aggregate G1 {g1us}% ({s_agg}); tech-scope G1 {ts_g1}% ({s_ts}, threshold ≤20% GREEN / 21-25% YELLOW) — structural floor ~18-20% (non-tech-at-tech) + classifiable FN tail (actively addressed)", "zjp-metrics.pool.g1_us"
+        return s, f"aggregate G1 {g1us}% ({s_agg}); tech-signal G1 {ts_g1}% ({s_ts}, threshold ≤5% GREEN / 6-10% YELLOW) — general-with-tech-keyword / (tech + tech-signal general); isolates actual FN candidates", "zjp-metrics.pool.g1_us"
     return s_agg, f"US G1 {g1us}% (tech-scope missing)", "zjp-metrics.pool.g1_us.us_general_rate_pct"
 
 def c_performance():
