@@ -412,20 +412,33 @@ jobs:
         echo "📥 Seeding WD description cache (AGG-FETCH-11)..."
         node -e "
         const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        const fs = require('fs');
         async function main() {
           const r2 = createR2Client({ prefix: 'data/' });
           const result = await r2.downloadToFile('descriptions-workday.jsonl', '.github/data/descriptions-workday.jsonl');
           if (result) {
             console.log('R2_OK:' + Math.round(result.size/1024) + 'KB');
-          } else {
-            console.log('⚠️ R2 returned null or empty — starting fresh');
-            process.exit(1);
+            return;
           }
+          // AGG-WD-SIDECAR-LIFECYCLE-1: the canonical WD sidecar may be chunked
+          // (descriptions-workday-1..N.jsonl, 40MB standard). Concat all chunks into the
+          // local single file — same pattern as the desc-backfill seed step.
+          console.log('single descriptions-workday.jsonl absent — trying chunks...');
+          fs.writeFileSync('.github/data/descriptions-workday.jsonl', '');
+          let got = 0;
+          for (let i = 1; i <= 24; i++) {
+            const chunk = await r2.downloadToFile('descriptions-workday-' + i + '.jsonl', '/tmp/wd-chunk-' + i + '.jsonl');
+            if (!chunk) break;
+            fs.appendFileSync('.github/data/descriptions-workday.jsonl', fs.readFileSync('/tmp/wd-chunk-' + i + '.jsonl'));
+            got++;
+          }
+          if (got === 0) { console.log('⚠️ No WD sidecar (single or chunks) in R2 — starting fresh'); process.exit(1); }
+          console.log('R2_OK: ' + got + ' chunk(s) concatenated');
         }
         main().catch(e => { console.error('R2 seed error: ' + e.message); process.exit(1); });
         " && \
           echo "✅ R2 seed OK: $(wc -l < .github/data/descriptions-workday.jsonl) descriptions" || \
-          echo "⚠️ No descriptions-workday.jsonl in private R2 — starting fresh (first run will build it)"
+          echo "⚠️ No descriptions-workday sidecar in private R2 — starting fresh (first run will build it)"
       env:
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}

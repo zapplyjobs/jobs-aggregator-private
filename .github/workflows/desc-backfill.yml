@@ -104,6 +104,17 @@ jobs:
           const path = require('path');
           const { fetchWorkdayDescriptions } = require('./.github/scripts/aggregator/lib/fetchers/workday-descriptions');
           const DATA_DIR = '.github/data';
+          // AGG-WD-SIDECAR-LIFECYCLE-1: full-pool id set enables sidecar pool prune + guards
+          // against prune-to-empty (missing all_jobs => no prune, never wipe).
+          const allJobsPath = path.join(DATA_DIR, 'all_jobs.json');
+          const poolIds = new Set();
+          if (fs.existsSync(allJobsPath)) {
+            for (const line of fs.readFileSync(allJobsPath, 'utf8').trim().split('\n')) {
+              if (!line) continue;
+              try { const j = JSON.parse(line); if (j && j.id) poolIds.add(j.id); } catch {}
+            }
+          }
+          console.log('Pool ids for sidecar prune:', poolIds.size);
           const queuePath = path.join(DATA_DIR, 'wd-desc-queue.jsonl');
           if (!fs.existsSync(queuePath)) { console.log('No WD queue — skipping WD backfill'); process.exit(0); }
           const queueLines = fs.readFileSync(queuePath, 'utf8').trim().split('\n').filter(Boolean);
@@ -113,10 +124,9 @@ jobs:
           });
           console.log('WD queue:', wdJobs.length, 'jobs pending');
           const start = Date.now();
-          fetchWorkdayDescriptions(wdJobs, DATA_DIR).then(desc => {
+          fetchWorkdayDescriptions(wdJobs, DATA_DIR, { poolIds }).then(desc => {
             console.log('WD done:', desc.size, 'cached (' + Math.round((Date.now()-start)/1000) + 's)');
-          }).catch(e => { console.error('WD fetch error:', e.message); });
-          "
+          }).catch(e => { console.error('WD fetch error:', e.message); process.exitCode = 1; });
 
       - name: Fetch SR descriptions
         run: |
@@ -130,16 +140,23 @@ jobs:
           const srJobs = fs.readFileSync(allJobsPath, 'utf8').trim().split('\n').filter(Boolean)
             .map(line => { try { return JSON.parse(line); } catch { return null; } })
             .filter(j => j && j.source === 'smartrecruiters' && j.company_slug);
-          console.log('SR jobs:', srJobs.length, 'total');
+          // AGG-WD-SIDECAR-LIFECYCLE-1: same full-pool id set for the SR sidecar prune.
+          const poolIds = new Set();
+          for (const line of fs.readFileSync(allJobsPath, 'utf8').trim().split('\n')) {
+            if (!line) continue;
+            try { const j = JSON.parse(line); if (j && j.id) poolIds.add(j.id); } catch {}
+          }
           const start = Date.now();
-          fetchSRDescriptions(srJobs, DATA_DIR).then(desc => {
+          fetchSRDescriptions(srJobs, DATA_DIR, { poolIds }).then(desc => {
             console.log('SR done:', desc.size, 'cached (' + Math.round((Date.now()-start)/1000) + 's)');
-          }).catch(e => { console.error('SR fetch error:', e.message); });
+          }).catch(e => { console.error('SR fetch error:', e.message); process.exitCode = 1; });
           "
 
-      - name: "Verify sidecar integrity (AGG-SIDECAR-ATOMIC-WRITE-1)"
+      - name: "Verify sidecar integrity (AGG-SIDECAR-ATOMIC-WRITE-1 + AGG-WD-SIDECAR-LIFECYCLE-1)"
         run: |
-          WD_LINES=$(wc -l < .github/data/descriptions-workday.jsonl 2>/dev/null || echo 0)
+          # AGG-WD-SIDECAR-LIFECYCLE-1: the WD sidecar may now be chunked
+          # (descriptions-workday-1..N.jsonl) — sum lines across all WD files.
+          WD_LINES=$(cat .github/data/descriptions-workday*.jsonl 2>/dev/null | wc -l)
           if [ "$WD_LINES" -lt 500 ]; then
             echo "⚠️ WD sidecar has only $WD_LINES lines (expected 5000+). Possible seed-download failure."
             echo "Skipping upload to prevent data loss — existing Storage sidecar preserved."
@@ -149,6 +166,7 @@ jobs:
           fi
 
       - name: "Upload sidecars to Supabase Storage"
+        id: upload
         if: success() && env.SKIP_UPLOAD != 'true'
         continue-on-error: true
         run: node .github/scripts/upload-to-storage.js --bucket pipeline-data --data-dir .github/data --include-wd-sr
@@ -160,10 +178,47 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
+      - name: "Prune superseded R2 sidecar objects (AGG-WD-SIDECAR-LIFECYCLE-1)"
+        if: success() && env.SKIP_UPLOAD != 'true' && steps.upload.outcome == 'success'
+        continue-on-error: true
+        run: |
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          (async () => {
+            const r2 = createR2Client({ prefix: 'data/' });
+            const DATA_DIR = '.github/data';
+            const local = new Set(fs.readdirSync(DATA_DIR));
+            const toDelete = [];
+            // Deterministic sweep: canonical WD objects are descriptions-workday[-N].jsonl.
+            // Any indexed chunk not present locally (e.g. orphaned 1-byte remnants from the
+            // Storage-chunk era, or a chunk-count shrink) is superseded and must not persist.
+            for (let i = 1; i <= 24; i++) {
+              const name = 'descriptions-workday-' + i + '.jsonl';
+              if (!local.has(name)) toDelete.push(name);
+            }
+            // Chunked present locally => the single-file object is also superseded.
+            const hasWdChunks = [...local].some(f => /^descriptions-workday-\d+\.jsonl$/.test(f));
+            if (hasWdChunks && !local.has('descriptions-workday.jsonl')) toDelete.push('descriptions-workday.jsonl');
+            if (toDelete.length === 0) { console.log('R2 sidecar prune: nothing superseded'); return; }
+            console.log('R2 sidecar prune candidates:', toDelete.join(', '));
+            try {
+              await r2.deleteObjects(toDelete);
+              console.log('R2 sidecar prune: deleted ' + toDelete.length + ' superseded object(s)');
+            } catch (e) { console.log('R2 sidecar prune failed (non-fatal): ' + e.message); }
+          })();
+          "
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
       - name: "Write sidecar completion marker (AGG-DESCBACKFILL-MARKER-1)"
         if: success()
         run: |
-          WD_LINES=$(wc -l < .github/data/descriptions-workday.jsonl 2>/dev/null || echo 0)
+          WD_LINES=$(cat .github/data/descriptions-workday*.jsonl 2>/dev/null | wc -l)
           SR_LINES=$(wc -l < .github/data/descriptions-smartrecruiters.jsonl 2>/dev/null || echo 0)
           COMPLETED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "{\"sidecars_written_at\": \"${COMPLETED_AT}\", \"wd_entries\": ${WD_LINES}, \"sr_entries\": ${SR_LINES}, \"status\": \"complete\"}" > /tmp/desc-backfill-complete.json
