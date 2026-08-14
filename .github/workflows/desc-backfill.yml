@@ -77,13 +77,22 @@ jobs:
             await dl('all_jobs.json', '.github/data/all_jobs.json');
             await dl('wd-desc-queue.jsonl', '.github/data/wd-desc-queue.jsonl');
             // WD sidecar (may be chunked in R2 as -1.jsonl, -2.jsonl, etc.)
+            // AGG-WD-SIDECAR-LIFECYCLE-1 FIX: r2.downloadToFile returns NULL on a missing
+            // key (it does NOT throw), so the old try/catch chunk fallback was dead code —
+            // a missing single logged success and seeded 0 lines (observed 2026-08-14
+            // 19:46Z: seeded 0, wrote 2,500, clobbered the 8,111-entry chunks). Check the
+            // RESULT; fall back to chunks only when the single is genuinely absent.
             fs.writeFileSync('.github/data/descriptions-workday.jsonl', '');
-            try {
-              await r2.downloadToFile('descriptions-workday.jsonl', '.github/data/descriptions-workday.jsonl');
-              console.log('✅ descriptions-workday: single file (R2)');
-            } catch {
-              for (let i = 1; i <= 5; i++) {
-                try { await r2.downloadToFile('descriptions-workday-' + i + '.jsonl', '/tmp/wd-' + i + '.jsonl'); fs.appendFileSync('.github/data/descriptions-workday.jsonl', fs.readFileSync('/tmp/wd-' + i + '.jsonl')); console.log('  WD chunk ' + i + ' (R2)'); } catch { break; }
+            const single = await r2.downloadToFile('descriptions-workday.jsonl', '.github/data/descriptions-workday.jsonl');
+            if (single) {
+              console.log('✅ descriptions-workday: single file (R2, ' + single.size + ' bytes)');
+            } else {
+              console.log('single descriptions-workday.jsonl absent — concatenating chunks');
+              for (let i = 1; i <= 24; i++) {
+                const c = await r2.downloadToFile('descriptions-workday-' + i + '.jsonl', '/tmp/wd-' + i + '.jsonl');
+                if (!c) break;
+                fs.appendFileSync('.github/data/descriptions-workday.jsonl', fs.readFileSync('/tmp/wd-' + i + '.jsonl'));
+                console.log('  WD chunk ' + i + ' (R2, ' + c.size + ' bytes)');
               }
             }
             console.log('descriptions-workday: ' + fs.readFileSync('.github/data/descriptions-workday.jsonl','utf8').trim().split('\n').filter(Boolean).length + ' lines');
