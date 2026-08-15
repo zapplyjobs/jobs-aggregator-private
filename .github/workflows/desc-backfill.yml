@@ -13,6 +13,17 @@ on:
     - cron: '*/10 * * * *'
   workflow_dispatch:
 
+# AGG-DESCBACKFILL-CONCURRENCY-1 (INF wave-audit R5): dual-triggered (CF Worker
+# SUPPLEMENTAL dispatch + GHA cron fallback); the Worker's hasActiveWorkflowRun guard
+# only prevents Worker-vs-Worker overlap. A cron+Worker pair could race: both drain the
+# queue (wasting scarce WD-proxy quota) and — worse under the compacted full-file
+# rewrite — last-writer-wins can DROP the other run's fetched entries. Queue, don't
+# cancel (matches nightly-qa/collect-metrics): a long backfill finishes, the next tick
+# runs after.
+concurrency:
+  group: desc-backfill-v1
+  cancel-in-progress: false
+
 permissions:
   contents: read
 

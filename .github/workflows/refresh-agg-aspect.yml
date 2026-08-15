@@ -1,7 +1,14 @@
 name: Refresh AGG Aspect Status
 on:
   schedule:
-    # Every 15 min, offset 5 min from pipeline (pipeline runs at :00,:15,:30,:45)
+    # AGG-ASPECTCRON-STALE-OFFSETS-1 (INF wave-audit, 2026-08-15): the original comment
+    # assumed the wave starts at :00/:15/:30/:45, but the CF Worker fires */5 so wave
+    # start drifts across every 5-min mark — a :20 aspect run may read pre-wave state.
+    # DECISION (option a, documented acceptance): aspect snapshots are mid-wave tolerant
+    # — every aspect carries its own freshness evidence (metric ages, run timestamps,
+    # generated_at) so a pre-wave read is visible as such, not silently stale. Fixed
+    # offsets retained over wave-linking to keep the aspect path independent of pipeline
+    # dispatch health (the monitor must not depend on the thing it monitors).
     - cron: '5,20,35,50 * * * *'
   workflow_dispatch:
 permissions:
