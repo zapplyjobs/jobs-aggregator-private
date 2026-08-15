@@ -101,10 +101,22 @@ def c_data_quality():
                     issues.append(f"desc {rate}% (excl. structural {structural:,} T0: ~{adjusted:.0f}%)")
             else:
                 issues.append(f"desc {rate}%")
-    # 2. Pool size within range (AGG-ASPECT-DATA-HEALTH-1; recalibrated 2026-07-31: was 20K-50K -> 35K-65K to match AGG_CONTRACT + the post-WD-recovery steady-state pool ~54K, verified clean via AGG-GEMINI-DEDUP-1)
+    # 2. Pool health: catastrophic FLOOR + day-over-day RATE anomaly (AGG-ASPECT-POOLRANGE-STALE-1).
+    # The absolute ceiling (20K-50K -> 35K-65K) was recalibrated twice in 6 weeks and re-fired
+    # RED on every legitimate growth event (WD recovery, tenant waves, preservation fixes —
+    # pool 81K on 2026-08-15, verified clean: 0 dup IDs/URLs, dup-content <5%). Legitimate
+    # growth is not a defect. What IS a defect: catastrophic loss (floor) and anomalous
+    # single-day swings (rate, aligns with contract P-5 'drops >20% warrant investigation';
+    # 40% chosen so routine growth + oscillation stays quiet while real anomalies surface).
     pool = m.get("pool",{}).get("total_jobs", 0)
-    if pool and (pool < 35000 or pool > 65000):
-        issues.append(f"pool {pool:,} out of range")
+    if pool and pool < 20000:
+        issues.append(f"pool {pool:,} below catastrophic floor 20K")
+    pool_trend = (m.get("trends", {}) or {}).get("pool_total") or []
+    if pool and len(pool_trend) >= 2 and pool_trend[-2]:
+        prev = pool_trend[-2]
+        delta_pct = abs(pool - prev) / prev * 100
+        if delta_pct > 40:
+            issues.append(f"pool {pool:,} moved {delta_pct:.0f}% vs prior day ({prev:,}) — investigate")
     # 3. Data health from jobs-metadata (source contribution + freshness)
     jm = proxy_json("jobs-metadata.json")
     if jm:
