@@ -118,10 +118,15 @@ jobs:
           const allJobsPath = path.join(DATA_DIR, 'all_jobs.json');
           const poolIds = new Set();
           if (fs.existsSync(allJobsPath)) {
-            for (const line of fs.readFileSync(allJobsPath, 'utf8').trim().split('\n')) {
-              if (!line) continue;
+            // AGG-STRING-CAP-READS: stream per line — the full-string read crosses
+            // V8's ~536M-char cap on the oversized all_jobs (2026-08-15).
+            const readline = require('readline');
+            const rl = readline.createInterface({ input: fs.createReadStream(allJobsPath, 'utf8'), crlfDelay: Infinity });
+            for await (const line of rl) {
+              if (!line.trim()) continue;
               try { const j = JSON.parse(line); if (j && j.id) poolIds.add(j.id); } catch {}
             }
+            rl.close();
           }
           console.log('Pool ids for sidecar prune:', poolIds.size);
           const queuePath = path.join(DATA_DIR, 'wd-desc-queue.jsonl');
@@ -147,15 +152,21 @@ jobs:
           const DATA_DIR = '.github/data';
           const allJobsPath = path.join(DATA_DIR, 'all_jobs.json');
           if (!fs.existsSync(allJobsPath)) { console.log('No all_jobs.json — skipping SR backfill'); process.exit(0); }
-          const srJobs = fs.readFileSync(allJobsPath, 'utf8').trim().split('\n').filter(Boolean)
-            .map(line => { try { return JSON.parse(line); } catch { return null; } })
-            .filter(j => j && j.source === 'smartrecruiters' && j.company_slug);
-          // AGG-WD-SIDECAR-LIFECYCLE-1: same full-pool id set for the SR sidecar prune.
+          // AGG-STRING-CAP-READS + AGG-WD-SIDECAR-LIFECYCLE-1: one streaming pass
+          // builds srJobs and the full-pool id set (full-string reads cross V8's cap).
+          const srJobs = [];
           const poolIds = new Set();
-          for (const line of fs.readFileSync(allJobsPath, 'utf8').trim().split('\n')) {
-            if (!line) continue;
-            try { const j = JSON.parse(line); if (j && j.id) poolIds.add(j.id); } catch {}
+          const readline = require('readline');
+          const _rl = readline.createInterface({ input: fs.createReadStream(allJobsPath, 'utf8'), crlfDelay: Infinity });
+          for await (const line of _rl) {
+            if (!line.trim()) continue;
+            try {
+              const j = JSON.parse(line);
+              if (j && j.id) poolIds.add(j.id);
+              if (j && j.source === 'smartrecruiters' && j.company_slug) srJobs.push(j);
+            } catch {}
           }
+          _rl.close();
           const start = Date.now();
           fetchSRDescriptions(srJobs, DATA_DIR, { poolIds }).then(desc => {
             console.log('SR done:', desc.size, 'cached (' + Math.round((Date.now()-start)/1000) + 's)');

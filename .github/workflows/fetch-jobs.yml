@@ -102,7 +102,13 @@ jobs:
           const r2 = createR2Client({ prefix: 'data/' });
           try {
             await r2.downloadToFile('all_jobs.json', '.github/data/all_jobs.json');
-            const lines = fs.readFileSync('.github/data/all_jobs.json','utf8').trim().split('\n').length;
+            // AGG-STRING-CAP-READS: count lines by stream — the single-string read
+            // crossed V8's ~536M-char cap at the 588MB all_jobs (2026-08-15).
+            const readline = require('readline');
+            let lines = 0;
+            const rl = readline.createInterface({ input: fs.createReadStream('.github/data/all_jobs.json', 'utf8'), crlfDelay: Infinity });
+            for await (const l of rl) { if (l.trim()) lines++; }
+            rl.close();
             console.log('✅ Seed OK: ' + lines + ' jobs (R2)');
           } catch(e) { console.error('❌ R2 seed failed for all_jobs: ' + e.message); process.exit(1); }
           try { await r2.downloadToFile('dedupe-store.json', '.github/data/dedupe-store.json'); console.log('✅ dedupe-store (R2)'); }
