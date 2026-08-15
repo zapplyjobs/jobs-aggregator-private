@@ -69,7 +69,15 @@ def c_monitoring():
     # regardless of metric freshness (fixes H-AGG-4 green-while-alerting). YELLOW =
     # the monitoring system works but a real issue is alerting (not RED = system broken).
     if nf > 0:
-        return "YELLOW", f"{nf} active failure(s) — metrics {age:.0f}min old", "zjp-metrics.alerts"
+        # AGG-MONITOR-EVIDENCE-ATTRLABEL-1 (2026-08-15): name the firing failures in the
+        # evidence — "1 active failure(s)" hid WHOSE failure it was, so foreign-owned alerts
+        # (inf/security Dependabot, ENR oracle) made this aspect permanently yellow and
+        # readers learned to skip it (the standing-noise-becomes-invisible class; the
+        # desc-backfill 7.5h silent outage sat behind exactly this). Attribution is by
+        # the alert text until INF adds an owner field (INF-ALERT-OWNER-ATTRIBUTION-1).
+        texts = [f.replace("**", "")[:90] for f in alerts.get("failures", [])[:3]]
+        listing = " | ".join(texts)
+        return "YELLOW", f"{nf} active failure(s) — metrics {age:.0f}min old — {listing}", "zjp-metrics.alerts"
     if age <= 60: return "GREEN", f"metrics {age:.0f}min old ({nw} warnings)", "zjp-metrics.alerts"
     elif age <= 1440: return "YELLOW", f"metrics {age:.0f}min old (stale)", "zjp-metrics.alerts"
     else: return "RED", f"metrics {age:.0f}min old", "zjp-metrics.alerts"
