@@ -113,35 +113,38 @@ jobs:
           const path = require('path');
           const { fetchWorkdayDescriptions } = require('./.github/scripts/aggregator/lib/fetchers/workday-descriptions');
           const DATA_DIR = '.github/data';
-          // AGG-WD-SIDECAR-LIFECYCLE-1: full-pool id set enables sidecar pool prune + guards
-          // against prune-to-empty (missing all_jobs => no prune, never wipe).
           const allJobsPath = path.join(DATA_DIR, 'all_jobs.json');
-          const poolIds = new Set();
-          if (fs.existsSync(allJobsPath)) {
-            // AGG-STRING-CAP-READS: stream per line — the full-string read crosses
-            // V8's ~536M-char cap on the oversized all_jobs (2026-08-15).
-            const readline = require('readline');
-            const rl = readline.createInterface({ input: fs.createReadStream(allJobsPath, 'utf8'), crlfDelay: Infinity });
-            for await (const line of rl) {
-              if (!line.trim()) continue;
-              try { const j = JSON.parse(line); if (j && j.id) poolIds.add(j.id); } catch {}
+          // AGG-WD-SIDECAR-LIFECYCLE-1 + AGG-STRING-CAP-READS + AUDIT FIX 2026-08-15:
+          // everything inside async main() — node -e is CommonJS and ANY top-level await
+          // (including for-await, and including awaiting an IIFE) is a runtime module-format
+          // error that node --check cannot catch. This shape matches the working seed steps.
+          async function main() {
+            const poolIds = new Set();
+            if (fs.existsSync(allJobsPath)) {
+              const readline = require('readline');
+              const rl = readline.createInterface({ input: fs.createReadStream(allJobsPath, 'utf8'), crlfDelay: Infinity });
+              for await (const line of rl) {
+                if (!line.trim()) continue;
+                try { const j = JSON.parse(line); if (j && j.id) poolIds.add(j.id); } catch {}
+              }
+              rl.close();
             }
-            rl.close();
-          }
-          console.log('Pool ids for sidecar prune:', poolIds.size);
-          const queuePath = path.join(DATA_DIR, 'wd-desc-queue.jsonl');
-          if (!fs.existsSync(queuePath)) { console.log('No WD queue — skipping WD backfill'); process.exit(0); }
-          const queueLines = fs.readFileSync(queuePath, 'utf8').trim().split('\n').filter(Boolean);
-          const wdJobs = queueLines.map(line => {
-            const q = JSON.parse(line);
-            return { id: q.id, location: q.location || '', _raw: { externalPath: q.externalPath, baseUrl: q.baseUrl, site: q.site } };
-          });
-          console.log('WD queue:', wdJobs.length, 'jobs pending');
-          const start = Date.now();
-          fetchWorkdayDescriptions(wdJobs, DATA_DIR, { poolIds }).then(desc => {
+            console.log('Pool ids for sidecar prune:', poolIds.size);
+            const queuePath = path.join(DATA_DIR, 'wd-desc-queue.jsonl');
+            if (!fs.existsSync(queuePath)) { console.log('No WD queue — skipping WD backfill'); return; }
+            const queueLines = fs.readFileSync(queuePath, 'utf8').trim().split('\n').filter(Boolean);
+            const wdJobs = queueLines.map(line => {
+              const q = JSON.parse(line);
+              return { id: q.id, location: q.location || '', _raw: { externalPath: q.externalPath, baseUrl: q.baseUrl, site: q.site } };
+            });
+            console.log('WD queue:', wdJobs.length, 'jobs pending');
+            const start = Date.now();
+            const desc = await fetchWorkdayDescriptions(wdJobs, DATA_DIR, { poolIds });
             console.log('WD done:', desc.size, 'cached (' + Math.round((Date.now()-start)/1000) + 's)');
-          }).catch(e => { console.error('WD fetch error:', e.message); process.exitCode = 1; });
+          }
+          main().catch(e => { console.error('WD error:', e.message); process.exitCode = 1; });
           "
+
 
       - name: Fetch SR descriptions
         run: |
@@ -151,18 +154,16 @@ jobs:
           const { fetchSRDescriptions } = require('./.github/scripts/aggregator/lib/fetchers/smartrecruiters-descriptions');
           const DATA_DIR = '.github/data';
           const allJobsPath = path.join(DATA_DIR, 'all_jobs.json');
-          if (!fs.existsSync(allJobsPath)) { console.log('No all_jobs.json — skipping SR backfill'); process.exit(0); }
-          // AGG-STRING-CAP-READS + AGG-WD-SIDECAR-LIFECYCLE-1: one streaming pass
-          // builds srJobs and the full-pool id set (full-string reads cross V8's cap).
-          // AUDIT FIX 2026-08-15: wrapped in an async IIFE — node -e scripts are CommonJS
-          // and top-level for-await is invalid there (this exact bug silently killed every
-          // desc-backfill run for ~7.5h; bash -n cannot catch it, only JS syntax-check does).
-          const [srJobs, poolIds] = await (async () => {
+          // AUDIT FIX 2026-08-15: everything inside async main() — no top-level await in
+          // node -e (CommonJS). One streaming pass builds srJobs + the full-pool id set
+          // (AGG-STRING-CAP-READS + AGG-WD-SIDECAR-LIFECYCLE-1).
+          async function main() {
+            if (!fs.existsSync(allJobsPath)) { console.log('No all_jobs.json — skipping SR backfill'); return; }
             const srJobs = [];
             const poolIds = new Set();
             const readline = require('readline');
-            const _rl = readline.createInterface({ input: fs.createReadStream(allJobsPath, 'utf8'), crlfDelay: Infinity });
-            for await (const line of _rl) {
+            const rl = readline.createInterface({ input: fs.createReadStream(allJobsPath, 'utf8'), crlfDelay: Infinity });
+            for await (const line of rl) {
               if (!line.trim()) continue;
               try {
                 const j = JSON.parse(line);
@@ -170,13 +171,13 @@ jobs:
                 if (j && j.source === 'smartrecruiters' && j.company_slug) srJobs.push(j);
               } catch {}
             }
-            _rl.close();
-            return [srJobs, poolIds];
-          })();
-          const start = Date.now();
-          fetchSRDescriptions(srJobs, DATA_DIR, { poolIds }).then(desc => {
+            rl.close();
+            console.log('SR jobs:', srJobs.length, 'total');
+            const start = Date.now();
+            const desc = await fetchSRDescriptions(srJobs, DATA_DIR, { poolIds });
             console.log('SR done:', desc.size, 'cached (' + Math.round((Date.now()-start)/1000) + 's)');
-          }).catch(e => { console.error('SR fetch error:', e.message); process.exitCode = 1; });
+          }
+          main().catch(e => { console.error('SR error:', e.message); process.exitCode = 1; });
           "
 
       - name: "Verify sidecar integrity (AGG-SIDECAR-ATOMIC-WRITE-1 + AGG-WD-SIDECAR-LIFECYCLE-1)"
