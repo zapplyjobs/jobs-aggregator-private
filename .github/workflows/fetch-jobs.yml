@@ -19,7 +19,7 @@ jobs:
       contents: write
 
     env:
-      NODE_OPTIONS: --max-old-space-size=6656  # INF-PIPELINE-OOM: raised from 6144 (pool grew to 60K+ jobs, 6GB heap OOM at 2026-08-13). 6656 leaves ~350MB for OS on the 7GB runner. AGG advisory filed for streaming/chunked memory optimization.
+      NODE_OPTIONS: --max-old-space-size=14000  # AGG-FETCH-OOM-MEMORY-OPTIMIZATION-1 Phase 0 (operator-approved session, 2026-08-15): raised from 6656. The old comment's '7GB runner' premise was WRONG — this repo is PUBLIC and ubuntu-latest runners give 16GB/4vCPU free (verified: repo visibility + runs-on + GitHub docs). 14000 leaves ~2GB for OS/runner agent. This is a BRIDGE, not the fix: peak memory scales with pool size (~90KB/job, 74K pool measured ~6.6GB); the durable fix (stream writes, release fat set) is phased in the task record + projects/zjp/research/AGG_FETCH_MEMORY_ARCHITECTURE_2026_08_14.md.
       SKIP_WD_FAMILY_CACHE_BUILD: 1
       SKIP_WD_DESC_BACKFILL: '1'  # AGG-DESC-ASYNC-1: WD desc backfill moved to separate workflow
       SKIP_SR_DESC_BACKFILL: '1'  # AGG-DESC-ASYNC-1: SR desc backfill moved to separate workflow
