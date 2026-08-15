@@ -154,19 +154,25 @@ jobs:
           if (!fs.existsSync(allJobsPath)) { console.log('No all_jobs.json — skipping SR backfill'); process.exit(0); }
           // AGG-STRING-CAP-READS + AGG-WD-SIDECAR-LIFECYCLE-1: one streaming pass
           // builds srJobs and the full-pool id set (full-string reads cross V8's cap).
-          const srJobs = [];
-          const poolIds = new Set();
-          const readline = require('readline');
-          const _rl = readline.createInterface({ input: fs.createReadStream(allJobsPath, 'utf8'), crlfDelay: Infinity });
-          for await (const line of _rl) {
-            if (!line.trim()) continue;
-            try {
-              const j = JSON.parse(line);
-              if (j && j.id) poolIds.add(j.id);
-              if (j && j.source === 'smartrecruiters' && j.company_slug) srJobs.push(j);
-            } catch {}
-          }
-          _rl.close();
+          // AUDIT FIX 2026-08-15: wrapped in an async IIFE — node -e scripts are CommonJS
+          // and top-level for-await is invalid there (this exact bug silently killed every
+          // desc-backfill run for ~7.5h; bash -n cannot catch it, only JS syntax-check does).
+          const [srJobs, poolIds] = await (async () => {
+            const srJobs = [];
+            const poolIds = new Set();
+            const readline = require('readline');
+            const _rl = readline.createInterface({ input: fs.createReadStream(allJobsPath, 'utf8'), crlfDelay: Infinity });
+            for await (const line of _rl) {
+              if (!line.trim()) continue;
+              try {
+                const j = JSON.parse(line);
+                if (j && j.id) poolIds.add(j.id);
+                if (j && j.source === 'smartrecruiters' && j.company_slug) srJobs.push(j);
+              } catch {}
+            }
+            _rl.close();
+            return [srJobs, poolIds];
+          })();
           const start = Date.now();
           fetchSRDescriptions(srJobs, DATA_DIR, { poolIds }).then(desc => {
             console.log('SR done:', desc.size, 'cached (' + Math.round((Date.now()-start)/1000) + 's)');
