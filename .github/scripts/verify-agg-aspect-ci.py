@@ -53,6 +53,20 @@ def c_verification():
     s = "GREEN" if latest.get("conclusion") == "success" else "RED"
     return s, f"last {latest.get('conclusion')} ({latest['createdAt'][:10]}), {len(fails)} fail/3", "gh-api:CI"
 
+def _split_failures_by_ownership(alerts):
+    # AGG-ALERTOWNER-CONFIRM-1 (2026-08-16): split failure_details into own/foreign
+    # by owner membership — dual-owner comma-lists (e.g. 45 "ENR,AGG") count as OWN.
+    # unattributed = failure strings with no matching detail: fail-safe, we cannot
+    # claim GREEN over failures we cannot attribute (owner field live since INF
+    # 1ff986a/3e53995; verified on R2 2026-08-16).
+    details = alerts.get("failure_details") or []
+    def _is_own(d):
+        return "AGG" in [o.strip() for o in str(d.get("owner") or "").split(",")]
+    own = [d for d in details if _is_own(d)]
+    foreign = [d for d in details if not _is_own(d)]
+    unattributed = max(0, len(alerts.get("failures", [])) - len(details))
+    return own, foreign, unattributed
+
 def c_monitoring():
     m = proxy_json("zjp-metrics.json")
     if not m: return "RED", "metrics unreadable", "proxy:metrics"
@@ -63,24 +77,23 @@ def c_monitoring():
         try:
             age = (NOW - datetime.datetime.fromisoformat(gen.replace("Z","+00:00"))).total_seconds()/60
         except: pass
-    nf = len(alerts.get("failures", []))
     nw = alerts.get("warning_count", len(alerts.get("warnings", [])))
-    # AGG-ASPECT-MONITOR-ALERTGATE-1: a firing FAILURE means monitoring is NOT GREEN,
-    # regardless of metric freshness (fixes H-AGG-4 green-while-alerting). YELLOW =
-    # the monitoring system works but a real issue is alerting (not RED = system broken).
-    if nf > 0:
-        # AGG-MONITOR-EVIDENCE-ATTRLABEL-1 (2026-08-15): name the firing failures in the
-        # evidence — "1 active failure(s)" hid WHOSE failure it was, so foreign-owned alerts
-        # (inf/security Dependabot, ENR oracle) made this aspect permanently yellow and
-        # readers learned to skip it (the standing-noise-becomes-invisible class; the
-        # desc-backfill 7.5h silent outage sat behind exactly this). Attribution is by
-        # the alert text until INF adds an owner field (INF-ALERT-OWNER-ATTRIBUTION-1).
-        texts = [f.replace("**", "")[:90] for f in alerts.get("failures", [])[:3]]
-        listing = " | ".join(texts)
-        return "YELLOW", f"{nf} active failure(s) — metrics {age:.0f}min old — {listing}", "zjp-metrics.alerts"
-    if age <= 60: return "GREEN", f"metrics {age:.0f}min old ({nw} warnings)", "zjp-metrics.alerts"
-    elif age <= 1440: return "YELLOW", f"metrics {age:.0f}min old (stale)", "zjp-metrics.alerts"
-    else: return "RED", f"metrics {age:.0f}min old", "zjp-metrics.alerts"
+    own, foreign, unattributed = _split_failures_by_ownership(alerts)
+    # AGG-ASPECT-MONITOR-ALERTGATE-1 (H-AGG-4 green-while-alerting fix) +
+    # AGG-ALERTOWNER-CONFIRM-1: gate on OWN failures only. Foreign failures render
+    # as evidence, never as AGG status — the A219 global counter made every foreign
+    # alert AGG's permanent yellow (standing-noise-becomes-invisible class; the
+    # desc-backfill 7.5h silent outage sat behind exactly this). YELLOW = monitoring
+    # works but a real OWN issue is alerting; RED = monitoring broken.
+    if own:
+        listing = " | ".join(f"#{d.get('id')} {str(d.get('name'))[:40]} (owner {d.get('owner')})" for d in own[:3])
+        return "YELLOW", f"{len(own)} OWN failure(s) — metrics {age:.0f}min old — {listing}", "zjp-metrics.alerts.owner"
+    if unattributed:
+        return "YELLOW", f"{unattributed} unattributed failure(s) (no owner detail) — metrics {age:.0f}min old", "zjp-metrics.alerts.owner"
+    ev = f", {len(foreign)} foreign failure(s) (evidence)" if foreign else ""
+    if age <= 60: return "GREEN", f"0 own failures — metrics {age:.0f}min old ({nw} warnings{ev})", "zjp-metrics.alerts.owner"
+    elif age <= 1440: return "YELLOW", f"metrics {age:.0f}min old (stale{ev})", "zjp-metrics.alerts.owner"
+    else: return "RED", f"metrics {age:.0f}min old", "zjp-metrics.alerts.owner"
 
 # AGG-DATAQUALITY-STRUCTURAL-EXCLUDE-1: demoted hot-path sources with permanent T0
 # (API rate-limits / no description API). Excluded from desc coverage to distinguish
