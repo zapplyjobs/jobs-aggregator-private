@@ -67,10 +67,25 @@ def c_monitoring():
             age_min = (NOW - datetime.datetime.fromisoformat(gen.replace("Z", "+00:00"))).total_seconds() / 60
         except Exception:
             pass
+    # TAG-ALERTOWNER-CONFIRM-1 / INF-ALERT-OWNER-ATTRIBUTION-1: own-failures-only.
+    # Alert rows carry `owner` (comma-list for dual); TAG counts only rows whose owner
+    # includes TAG (failure -> RED, warning -> YELLOW); foreign rows are evidence, not failures.
+    alerts = m.get("alerts") or {}
+    def owner_has_tag(row):
+        return isinstance(row, dict) and "TAG" in [o.strip() for o in str(row.get("owner", "")).split(",")]
+    own_fail = [r for r in (alerts.get("failure_details") or []) if owner_has_tag(r)]
+    own_warn = [r for r in (alerts.get("warning_details") or []) if owner_has_tag(r)]
+    foreign = len(alerts.get("failure_details") or []) + len(alerts.get("warning_details") or []) - len(own_fail) - len(own_warn)
+    if own_fail:
+        ids = ",".join(str(r.get("id")) for r in own_fail)
+        return "RED", f"TAG-owned alert failure(s) active: check {ids}; metrics {age_min:.0f}min old", "zjp-metrics.alerts (owner=TAG)"
+    if own_warn:
+        ids = ",".join(str(r.get("id")) for r in own_warn)
+        return "YELLOW", f"TAG-owned alert warning(s) active: check {ids}; metrics {age_min:.0f}min old", "zjp-metrics.alerts (owner=TAG)"
     if has_tag and age_min <= 60:
-        return "GREEN", f"tag-monitor output present (g1_us); metrics {age_min:.0f}min old", "zjp-metrics.pool.g1_us"
+        return "GREEN", f"tag-monitor output present (g1_us); metrics {age_min:.0f}min old; 0 TAG-owned alert rows ({foreign} foreign-owned ignored as evidence)", "zjp-metrics.pool.g1_us + .alerts.owner"
     if has_tag and age_min <= 1440:
-        return "YELLOW", f"tag-monitor output present; metrics {age_min:.0f}min old (stale)", "zjp-metrics.pool.g1_us"
+        return "YELLOW", f"tag-monitor output present; metrics {age_min:.0f}min old (stale); 0 TAG-owned alert rows", "zjp-metrics.pool.g1_us"
     return "RED", f"metrics {age_min:.0f}min old or tag fields missing", "zjp-metrics"
 
 def c_data_quality():
