@@ -94,11 +94,13 @@ jobs:
         node <<'EOF'
         const fs = require('fs');
         const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-        const marker = fs.readFileSync('/tmp/fetch-jobs-sidecar-complete.json');
-        const r2 = createR2Client({ prefix: 'data/' });
-        r2.uploadRaw('fetch-jobs-sidecar-complete.json', marker, 'application/json')
-          .then(ok => { if (!ok) throw new Error('R2 marker upload returned false'); })
-          .catch(err => { console.error(err.message); process.exit(1); });
+        async function main() {
+          const marker = fs.readFileSync('/tmp/fetch-jobs-sidecar-complete.json');
+          const r2 = createR2Client({ prefix: 'data/' });
+          const ok = await r2.uploadRaw('fetch-jobs-sidecar-complete.json', marker, 'application/json');
+          if (!ok) throw new Error('R2 marker upload returned false');
+        }
+        main().catch(err => { console.error(err.message); process.exit(1); });
         EOF
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -878,11 +880,13 @@ jobs:
         node <<'EOF'
         const fs = require('fs');
         const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-        const marker = fs.readFileSync('/tmp/fetch-jobs-sidecar-complete.json');
-        const r2 = createR2Client({ prefix: 'data/' });
-        r2.uploadRaw('fetch-jobs-sidecar-complete.json', marker, 'application/json')
-          .then(ok => { if (!ok) throw new Error('R2 marker upload returned false'); })
-          .catch(err => { console.error(err.message); process.exit(1); });
+        async function main() {
+          const marker = fs.readFileSync('/tmp/fetch-jobs-sidecar-complete.json');
+          const r2 = createR2Client({ prefix: 'data/' });
+          const ok = await r2.uploadRaw('fetch-jobs-sidecar-complete.json', marker, 'application/json');
+          if (!ok) throw new Error('R2 marker upload returned false');
+        }
+        main().catch(err => { console.error(err.message); process.exit(1); });
         EOF
         echo "Marker: ${STATUS} at ${COMPLETED_AT} (${ORACLE_LINES} Oracle entries)"
       env:
