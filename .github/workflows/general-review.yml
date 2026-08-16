@@ -88,3 +88,13 @@ jobs:
         run: |
           curl -sf -X PUT -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" --data-binary @/tmp/review-data/general-review.json "$SUPABASE_URL/storage/v1/object/pipeline-data/general-review.json"
           echo "✅ UPLOADED:storage general-review.json ($(wc -c < /tmp/review-data/general-review.json) bytes)"
+      - name: Upload general-review.json to R2 canonical (AGG-GENERALREVIEW-HOME-1)
+        # INF-R2-STALERELIC-CLUSTER-1 single-homing: R2 data/ is the canonical home; Storage is backup.
+        # The 2026-08-04 frozen R2 relic existed because this producer stopped dual-writing after re-enable.
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          node -e "const fs=require('fs');const {createR2Client}=require('./.github/scripts/aggregator/lib/storage/r2-client'); const r2=createR2Client({prefix:'data/'}); const body=fs.readFileSync('/tmp/review-data/general-review.json'); r2.uploadRaw('general-review.json', body, 'application/json').then(()=>console.log('R2 dual-write OK: general-review.json')).catch(e=>{console.error('R2 upload FAILED:',e.message);process.exit(1);})"
