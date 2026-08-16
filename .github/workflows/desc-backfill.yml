@@ -72,6 +72,33 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+      - name: "Mark sidecar generation in progress (AGG-DESCBACKFILL-MARKER-1)"
+        run: |
+          MARKER='{"status":"in_progress","run_id":"'"${GITHUB_RUN_ID}"'","started_at":"'"$(date -u +"%Y-%m-%dT%H:%M:%SZ")"'"}'
+          printf '%s' "$MARKER" > /tmp/desc-backfill-complete.json
+          curl -sf -X PUT \
+            "${SUPABASE_URL}/storage/v1/object/pipeline-data/desc-backfill-complete.json" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/desc-backfill-complete.json
+          node <<'EOF'
+          const fs = require('fs');
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          const marker = fs.readFileSync('/tmp/desc-backfill-complete.json');
+          const r2 = createR2Client({ prefix: 'data/' });
+          r2.uploadRaw('desc-backfill-complete.json', marker, 'application/json')
+            .then(ok => { if (!ok) throw new Error('R2 marker upload returned false'); })
+            .catch(err => { console.error(err.message); process.exit(1); });
+          EOF
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
+      
 
       - name: Seed sidecars + queue + all_jobs from R2 (canonical — post-recovery audit R2-1)
         run: |
@@ -255,18 +282,33 @@ jobs:
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
       - name: "Write sidecar completion marker (AGG-DESCBACKFILL-MARKER-1)"
-        if: success()
+        if: always()
         run: |
+          STATUS=complete
+          if [ "${{ steps.upload.outcome }}" != "success" ] || [ "${SKIP_UPLOAD:-}" = "true" ]; then STATUS=failed; fi
           WD_LINES=$(cat .github/data/descriptions-workday*.jsonl 2>/dev/null | wc -l)
           SR_LINES=$(wc -l < .github/data/descriptions-smartrecruiters.jsonl 2>/dev/null || echo 0)
           COMPLETED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          echo "{\"sidecars_written_at\": \"${COMPLETED_AT}\", \"wd_entries\": ${WD_LINES}, \"sr_entries\": ${SR_LINES}, \"status\": \"complete\"}" > /tmp/desc-backfill-complete.json
+          echo "{\"sidecars_written_at\":\"${COMPLETED_AT}\",\"wd_entries\":${WD_LINES},\"sr_entries\":${SR_LINES},\"status\":\"${STATUS}\",\"run_id\":\"${GITHUB_RUN_ID}\"}" > /tmp/desc-backfill-complete.json
           curl -sf -X PUT \
             "${SUPABASE_URL}/storage/v1/object/pipeline-data/desc-backfill-complete.json" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/json" \
-            -T /tmp/desc-backfill-complete.json || true
-          echo "Marker: sidecars complete at ${COMPLETED_AT} (WD=${WD_LINES}, SR=${SR_LINES})"
+            --data-binary @/tmp/desc-backfill-complete.json
+          node <<'EOF'
+          const fs = require('fs');
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          const marker = fs.readFileSync('/tmp/desc-backfill-complete.json');
+          const r2 = createR2Client({ prefix: 'data/' });
+          r2.uploadRaw('desc-backfill-complete.json', marker, 'application/json')
+            .then(ok => { if (!ok) throw new Error('R2 marker upload returned false'); })
+            .catch(err => { console.error(err.message); process.exit(1); });
+          EOF
+          echo "Marker: ${STATUS} at ${COMPLETED_AT} (WD=${WD_LINES}, SR=${SR_LINES})"
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}

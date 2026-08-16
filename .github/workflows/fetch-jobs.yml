@@ -82,6 +82,32 @@ jobs:
 
     - name: Install dependencies
       run: npm ci
+    - name: "Mark Oracle sidecar generation in progress (AGG-DESCBACKFILL-MARKER-1)"
+      run: |
+        MARKER='{"status":"in_progress","run_id":"'"${GITHUB_RUN_ID}"'","started_at":"'"$(date -u +"%Y-%m-%dT%H:%M:%SZ")"'"}'
+        printf '%s' "$MARKER" > /tmp/fetch-jobs-sidecar-complete.json
+        curl -sf -X PUT \
+          "${SUPABASE_URL}/storage/v1/object/pipeline-data/fetch-jobs-sidecar-complete.json" \
+          -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+          -H "Content-Type: application/json" \
+          --data-binary @/tmp/fetch-jobs-sidecar-complete.json
+        node <<'EOF'
+        const fs = require('fs');
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        const marker = fs.readFileSync('/tmp/fetch-jobs-sidecar-complete.json');
+        const r2 = createR2Client({ prefix: 'data/' });
+        r2.uploadRaw('fetch-jobs-sidecar-complete.json', marker, 'application/json')
+          .then(ok => { if (!ok) throw new Error('R2 marker upload returned false'); })
+          .catch(err => { console.error(err.message); process.exit(1); });
+        EOF
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
 
     - name: Run tag-engine tests (non-blocking — tag-engine.js is git-crypt encrypted)
       continue-on-error: true
@@ -824,6 +850,7 @@ jobs:
 
 
     - name: "Upload pipeline data to Supabase Storage"
+      id: upload_pipeline_data
       if: success()
       continue-on-error: true
       run: node .github/scripts/upload-to-storage.js --bucket pipeline-data --data-dir .github/data
@@ -836,21 +863,35 @@ jobs:
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
     - name: "Write main-pipeline sidecar marker (AGG-DESCBACKFILL-MARKER-1)"
-      if: success()
+      if: always()
       run: |
+        STATUS=complete
+        if [ "${{ steps.upload_pipeline_data.outcome }}" != "success" ]; then STATUS=failed; fi
         ORACLE_LINES=$(wc -l < .github/data/descriptions-oracle.jsonl 2>/dev/null || echo 0)
         COMPLETED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        echo "{\"sidecars_written_at\": \"${COMPLETED_AT}\", \"oracle_entries\": ${ORACLE_LINES}, \"status\": \"complete\"}" > /tmp/fetch-jobs-sidecar-complete.json
+        echo "{\"sidecars_written_at\":\"${COMPLETED_AT}\",\"oracle_entries\":${ORACLE_LINES},\"status\":\"${STATUS}\",\"run_id\":\"${GITHUB_RUN_ID}\"}" > /tmp/fetch-jobs-sidecar-complete.json
         curl -sf -X PUT \
           "${SUPABASE_URL}/storage/v1/object/pipeline-data/fetch-jobs-sidecar-complete.json" \
           -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
           -H "Content-Type: application/json" \
-          -T /tmp/fetch-jobs-sidecar-complete.json || true
-        echo "Marker: oracle sidecar complete at ${COMPLETED_AT} (${ORACLE_LINES} entries)"
+          --data-binary @/tmp/fetch-jobs-sidecar-complete.json
+        node <<'EOF'
+        const fs = require('fs');
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        const marker = fs.readFileSync('/tmp/fetch-jobs-sidecar-complete.json');
+        const r2 = createR2Client({ prefix: 'data/' });
+        r2.uploadRaw('fetch-jobs-sidecar-complete.json', marker, 'application/json')
+          .then(ok => { if (!ok) throw new Error('R2 marker upload returned false'); })
+          .catch(err => { console.error(err.message); process.exit(1); });
+        EOF
+        echo "Marker: ${STATUS} at ${COMPLETED_AT} (${ORACLE_LINES} Oracle entries)"
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
 
     - name: Log total workflow time
