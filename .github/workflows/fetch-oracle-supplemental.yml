@@ -76,7 +76,7 @@ jobs:
           async function main() {
             const r2 = createR2Client({ prefix: 'data/' });
             await downloadMaybe(r2, 'descriptions-oracle.jsonl', '.github/data/descriptions-oracle.jsonl');
-            await downloadMaybe(r2, 'us_jobs.json', '.github/data/us_jobs.json');
+            await downloadMaybe(r2, 'supplemental-oracle-metadata.json', '.github/data/supplemental-oracle-metadata.json'); // AGG-ORACLE-SIDECAR-BIMODAL-1: prior total for the partial-list guard
           }
           main().catch(() => process.exit(1));
           " && echo "✅ Seeded Oracle cache/snapshot" || echo "⚠️ Oracle R2 seed incomplete"
