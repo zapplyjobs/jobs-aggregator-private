@@ -472,16 +472,19 @@ jobs:
               const result = await r2.downloadToFile(file, path.join('.github/data', file));
               if (result) ok++;
             } catch {}
-          // AGG-SUPPLANE-TORNREAD-1(a): the jobs + metadata objects upload separately; a read
+          }
+          // AGG-SUPPLANE-TORNREAD-1(a): jobs + metadata upload as separate R2 objects; a read
           // landing between the two uploads sees new rows + old count, and the pipeline's
           // jobs_fetched_mismatch guard would skip the ENTIRE lane for a cycle (observed
-          // 2026-08-16 15:55Z, self-healed next cycle). Re-download a mismatched lane's
-          // PAIR once after a short wait; a still-mismatched pair is a real producer problem
-          // and flows to the existing loud skip.
+          // 2026-08-16 15:55Z). Re-download a mismatched lane's PAIR once after a short wait;
+          // still-mismatched is a real producer problem and flows to the existing loud skip.
+          // NOTE: NO template literals in this script — backticks inside the double-quoted
+          // node -e string undergo bash command substitution (the 0ef5290 lesson).
           const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
           const lanePairs = [['supplemental-oracle-jobs.json','supplemental-oracle-metadata.json'],['supplemental-custom-jobs.json','supplemental-custom-metadata.json']];
           const readJson = (f) => JSON.parse(require('fs').readFileSync(path.join('.github/data', f), 'utf8'));
-          for (const [jobsFile, metaFile] of lanePairs) {
+          for (const pair of lanePairs) {
+            const jobsFile = pair[0], metaFile = pair[1];
             try {
               const validate = () => {
                 const rows = readJson(jobsFile);
@@ -490,12 +493,12 @@ jobs:
               };
               let expected = validate();
               if (expected !== null) {
-                console.log(`TORN-READ suspected on ${jobsFile} (metadata says ${expected}); waiting 20s and re-downloading the pair`);
+                console.log('TORN-READ suspected on ' + jobsFile + ' (metadata says ' + expected + '); waiting 20s and re-downloading the pair');
                 await sleep(20000);
                 await r2.downloadToFile(jobsFile, path.join('.github/data', jobsFile));
                 await r2.downloadToFile(metaFile, path.join('.github/data', metaFile));
                 expected = validate();
-                console.log(expected === null ? `PAIR-CONSISTENT after retry: ${jobsFile}` : `STILL-MISMATCHED after retry: ${jobsFile} (${expected}) — lane will be skipped loudly`);
+                console.log(expected === null ? 'PAIR-CONSISTENT after retry: ' + jobsFile : 'STILL-MISMATCHED after retry: ' + jobsFile + ' (' + expected + ') - lane will be skipped loudly');
               }
             } catch (e) { /* validation is best-effort; the pipeline guard remains the backstop */ }
           }
