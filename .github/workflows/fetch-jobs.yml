@@ -455,58 +455,7 @@ jobs:
     - name: "Seed supplemental lane artifacts from R2"
       run: |
         echo "📥 Seeding supplemental lane artifacts..."
-        node -e "
-        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-        const path = require('path');
-        async function main() {
-          const r2 = createR2Client({ prefix: 'data/' });
-          const files = [
-            'supplemental-oracle-jobs.json',
-            'supplemental-oracle-metadata.json',
-            'supplemental-custom-jobs.json',
-            'supplemental-custom-metadata.json',
-          ];
-          let ok = 0;
-          for (const file of files) {
-            try {
-              const result = await r2.downloadToFile(file, path.join('.github/data', file));
-              if (result) ok++;
-            } catch {}
-          }
-          // AGG-SUPPLANE-TORNREAD-1(a): jobs + metadata upload as separate R2 objects; a read
-          // landing between the two uploads sees new rows + old count, and the pipeline's
-          // jobs_fetched_mismatch guard would skip the ENTIRE lane for a cycle (observed
-          // 2026-08-16 15:55Z). Re-download a mismatched lane's PAIR once after a short wait;
-          // still-mismatched is a real producer problem and flows to the existing loud skip.
-          // NOTE: NO template literals in this script — backticks inside the double-quoted
-          // node -e string undergo bash command substitution (the 0ef5290 lesson).
-          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-          const lanePairs = [['supplemental-oracle-jobs.json','supplemental-oracle-metadata.json'],['supplemental-custom-jobs.json','supplemental-custom-metadata.json']];
-          const readJson = (f) => JSON.parse(require('fs').readFileSync(path.join('.github/data', f), 'utf8'));
-          for (const pair of lanePairs) {
-            const jobsFile = pair[0], metaFile = pair[1];
-            try {
-              const validate = () => {
-                const rows = readJson(jobsFile);
-                const meta = readJson(metaFile);
-                return Number.isFinite(meta.jobs_fetched) && meta.jobs_fetched !== rows.length ? meta.jobs_fetched : null;
-              };
-              let expected = validate();
-              if (expected !== null) {
-                console.log('TORN-READ suspected on ' + jobsFile + ' (metadata says ' + expected + '); waiting 20s and re-downloading the pair');
-                await sleep(20000);
-                await r2.downloadToFile(jobsFile, path.join('.github/data', jobsFile));
-                await r2.downloadToFile(metaFile, path.join('.github/data', metaFile));
-                expected = validate();
-                console.log(expected === null ? 'PAIR-CONSISTENT after retry: ' + jobsFile : 'STILL-MISMATCHED after retry: ' + jobsFile + ' (' + expected + ') - lane will be skipped loudly');
-              }
-            } catch (e) { /* validation is best-effort; the pipeline guard remains the backstop */ }
-          }
-          console.log('SEEDED:' + ok);
-          if (ok === 0) process.exit(1);
-        }
-        main().catch(() => process.exit(1));
-        " && echo "✅ Supplemental artifacts seeded from R2" || echo "⚠️ No supplemental artifacts available yet"
+        node .github/scripts/seed-supplemental-lane.js && echo "✅ Supplemental artifacts seeded from R2" || echo "⚠️ No supplemental artifacts available yet"
       env:
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
