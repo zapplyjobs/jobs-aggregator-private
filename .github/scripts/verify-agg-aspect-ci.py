@@ -62,10 +62,20 @@ def _split_failures_by_ownership(alerts):
     details = alerts.get("failure_details") or []
     def _is_own(d):
         return "AGG" in [o.strip() for o in str(d.get("owner") or "").split(",")]
-    own = [d for d in details if _is_own(d)]
+    # AGG-ASPECT-SELFALERT-DEADLOCK-1 (2026-08-19, TAG B98 advisory): check-40's owner
+    # is DYNAMIC (modules whose aspects are RED right now), so counting an AGG-owned
+    # check-40 row here makes monitoring self-perpetuating — any prior AGG aspect RED
+    # fires check-40 owner=AGG, c_monitoring goes YELLOW over it, and the loop never
+    # clears even after the underlying aspect heals. Same exclusion TAG ships (9ec7729,
+    # mirroring ENR's isSelfAspectAlert): the meta-alarm about our own aspects is not
+    # an independent monitoring failure; the underlying aspects gate themselves.
+    def _is_self_aspect(d):
+        return d.get("id") == 40 or d.get("name") == "aspect-status RED"
+    own = [d for d in details if _is_own(d) and not _is_self_aspect(d)]
     foreign = [d for d in details if not _is_own(d)]
+    self_excluded = sum(1 for d in details if _is_own(d) and _is_self_aspect(d))
     unattributed = max(0, len(alerts.get("failures", [])) - len(details))
-    return own, foreign, unattributed
+    return own, foreign, unattributed, self_excluded
 
 def c_monitoring():
     m = proxy_json("zjp-metrics.json")
@@ -78,7 +88,8 @@ def c_monitoring():
             age = (NOW - datetime.datetime.fromisoformat(gen.replace("Z","+00:00"))).total_seconds()/60
         except: pass
     nw = alerts.get("warning_count", len(alerts.get("warnings", [])))
-    own, foreign, unattributed = _split_failures_by_ownership(alerts)
+    own, foreign, unattributed, self_excluded = _split_failures_by_ownership(alerts)
+    self_note = f"; {self_excluded} self-aspect check-40 alert(s) excluded" if self_excluded else ""
     # AGG-ASPECT-MONITOR-ALERTGATE-1 (H-AGG-4 green-while-alerting fix) +
     # AGG-ALERTOWNER-CONFIRM-1: gate on OWN failures only. Foreign failures render
     # as evidence, never as AGG status — the A219 global counter made every foreign
@@ -91,7 +102,7 @@ def c_monitoring():
     if unattributed:
         return "YELLOW", f"{unattributed} unattributed failure(s) (no owner detail) — metrics {age:.0f}min old", "zjp-metrics.alerts.owner"
     ev = f", {len(foreign)} foreign failure(s) (evidence)" if foreign else ""
-    if age <= 60: return "GREEN", f"0 own failures — metrics {age:.0f}min old ({nw} warnings{ev})", "zjp-metrics.alerts.owner"
+    if age <= 60: return "GREEN", f"0 own failures — metrics {age:.0f}min old ({nw} warnings{ev}{self_note})", "zjp-metrics.alerts.owner"
     elif age <= 1440: return "YELLOW", f"metrics {age:.0f}min old (stale{ev})", "zjp-metrics.alerts.owner"
     else: return "RED", f"metrics {age:.0f}min old", "zjp-metrics.alerts.owner"
 
