@@ -73,9 +73,19 @@ def c_monitoring():
     alerts = m.get("alerts") or {}
     def owner_has_tag(row):
         return isinstance(row, dict) and "TAG" in [o.strip() for o in str(row.get("owner", "")).split(",")]
-    own_fail = [r for r in (alerts.get("failure_details") or []) if owner_has_tag(r)]
-    own_warn = [r for r in (alerts.get("warning_details") or []) if owner_has_tag(r)]
-    foreign = len(alerts.get("failure_details") or []) + len(alerts.get("warning_details") or []) - len(own_fail) - len(own_warn)
+    # TAG-CIGATE-IDENT-1 (2026-08-19): check 40's owner is DYNAMIC (the modules whose
+    # aspects are RED right now), so counting a TAG-owned check-40 row here makes
+    # monitoring RED self-perpetuating after any prior RED snapshot. Same exclusion ENR
+    # ships (publish-aspect-status.js isSelfAspectAlert): the meta-alarm about our own
+    # aspects is not an independent TAG monitor failure; the underlying aspects gate
+    # themselves (verification/data_quality/etc. compute independently).
+    def is_self_aspect_alert(row):
+        return isinstance(row, dict) and (row.get("id") == 40 or row.get("name") == "aspect-status RED")
+    own_fail = [r for r in (alerts.get("failure_details") or []) if owner_has_tag(r) and not is_self_aspect_alert(r)]
+    own_warn = [r for r in (alerts.get("warning_details") or []) if owner_has_tag(r) and not is_self_aspect_alert(r)]
+    self_excluded = sum(1 for r in (alerts.get("failure_details") or []) + (alerts.get("warning_details") or []) if owner_has_tag(r) and is_self_aspect_alert(r))
+    self_note = f"; {self_excluded} self-aspect alert(s) excluded" if self_excluded else ""
+    foreign = len(alerts.get("failure_details") or []) + len(alerts.get("warning_details") or []) - len(own_fail) - len(own_warn) - self_excluded
     if own_fail:
         ids = ",".join(str(r.get("id")) for r in own_fail)
         return "RED", f"TAG-owned alert failure(s) active: check {ids}; metrics {age_min:.0f}min old", "zjp-metrics.alerts (owner=TAG)"
@@ -83,7 +93,7 @@ def c_monitoring():
         ids = ",".join(str(r.get("id")) for r in own_warn)
         return "YELLOW", f"TAG-owned alert warning(s) active: check {ids}; metrics {age_min:.0f}min old", "zjp-metrics.alerts (owner=TAG)"
     if has_tag and age_min <= 60:
-        return "GREEN", f"tag-monitor output present (g1_us); metrics {age_min:.0f}min old; 0 TAG-owned alert rows ({foreign} foreign-owned ignored as evidence)", "zjp-metrics.pool.g1_us + .alerts.owner"
+        return "GREEN", f"tag-monitor output present (g1_us); metrics {age_min:.0f}min old; 0 TAG-owned alert rows ({foreign} foreign-owned ignored as evidence){self_note}", "zjp-metrics.pool.g1_us + .alerts.owner"
     if has_tag and age_min <= 1440:
         return "YELLOW", f"tag-monitor output present; metrics {age_min:.0f}min old (stale); 0 TAG-owned alert rows", "zjp-metrics.pool.g1_us"
     return "RED", f"metrics {age_min:.0f}min old or tag fields missing", "zjp-metrics"
