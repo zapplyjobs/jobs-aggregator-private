@@ -122,6 +122,9 @@ jobs:
           console.log('✅ Downloaded canada-jobs.jsonl');
           await r2.downloadToFile('canada-tech-internships.jsonl', '.github/data/canada-tech-internships.jsonl');
           console.log('✅ Downloaded canada-tech-internships.jsonl');
+          // Canada LMIA visa markers (OUT-CAVISA-SURFACING-1) — id-keyed from ENR's lane
+          try { await r2.downloadToFile('canada-jobs-enriched.json', '.github/data/canada-jobs-enriched.json'); console.log('✅ Downloaded canada-jobs-enriched.json'); }
+          catch (e) { console.log('ℹ️ canada-jobs-enriched.json not on R2 yet — Canada visa column renders blank'); }
         }
         main().catch(e => { console.error('❌ R2 download failed:', e.message); process.exit(1); });
         "
