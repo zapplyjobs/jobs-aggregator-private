@@ -1,159 +1,69 @@
-[
-  {
-    "board": "canada_internships_2027",
-    "repo": "Canada-Internships-2027",
-    "title": "Canada Internships 2027",
-    "filters": {
-      "locations": [
-        "canada"
-      ]
-    },
-    "feedKey": "canada-tech-internships.jsonl",
-    "has_categories": true,
-    "has_companies": true
-  },
-  {
-    "board": "canada_jobs_2027",
-    "repo": "Canada-Jobs-2027",
-    "title": "Canada Jobs 2027",
-    "filters": {
-      "locations": [
-        "canada"
-      ]
-    },
-    "feedKey": "canada-jobs.jsonl",
-    "has_categories": true,
-    "has_companies": true
-  },
-  {
-    "board": "internships_2027",
-    "repo": "Internships-2027",
-    "title": "Internships 2027",
-    "filters": {
-      "locations": [
-        "us"
-      ],
-      "employment": "internship"
-    },
-    "feedKey": "N/A",
-    "has_categories": true,
-    "has_companies": true
-  },
-  {
-    "board": "new_grad_data_science_jobs_2027",
-    "repo": "New-Grad-Data-Science-Jobs-2027",
-    "title": "Data Science Jobs 2027",
-    "filters": {
-      "domains": [
-        "data_science"
-      ],
-      "locations": [
-        "us"
-      ]
-    },
-    "feedKey": "N/A",
-    "has_categories": true,
-    "has_companies": false
-  },
-  {
-    "board": "new_grad_hardware_engineering_jobs_2027",
-    "repo": "New-Grad-Hardware-Engineering-Jobs-2027",
-    "title": "Hardware Engineering Jobs 2027",
-    "filters": {
-      "domains": [
-        "hardware"
-      ],
-      "locations": [
-        "us"
-      ]
-    },
-    "feedKey": "N/A",
-    "has_categories": true,
-    "has_companies": false
-  },
-  {
-    "board": "new_grad_healthcare_jobs_2027",
-    "repo": "New-Grad-Healthcare-Jobs-2027",
-    "title": "Healthcare Jobs 2027",
-    "filters": {
-      "domains": [
-        "healthcare"
-      ],
-      "locations": [
-        "us"
-      ]
-    },
-    "feedKey": "N/A",
-    "has_categories": true,
-    "has_companies": false
-  },
-  {
-    "board": "new_grad_it_jobs_2027",
-    "repo": "New-Grad-IT-Jobs-2027",
-    "title": "IT Jobs 2027",
-    "filters": {
-      "domains": [
-        "it"
-      ],
-      "locations": [
-        "us"
-      ]
-    },
-    "feedKey": "N/A",
-    "has_categories": true,
-    "has_companies": false
-  },
-  {
-    "board": "new_grad_jobs_2027",
-    "repo": "New-Grad-Jobs-2027",
-    "title": "New Grad Jobs 2027",
-    "filters": {
-      "locations": [
-        "us"
-      ],
-      "exclude_domains": [
-        "it"
-      ]
-    },
-    "feedKey": "N/A",
-    "has_categories": true,
-    "has_companies": true
-  },
-  {
-    "board": "new_grad_software_engineering_jobs_2027",
-    "repo": "New-Grad-Software-Engineering-Jobs-2027",
-    "title": "Software Engineering Jobs 2027",
-    "filters": {
-      "locations": [
-        "us"
-      ],
-      "domains": [
-        "software"
-      ],
-      "exclude_domains": [
-        "it"
-      ]
-    },
-    "feedKey": "N/A",
-    "has_categories": true,
-    "has_companies": false
-  },
-  {
-    "board": "awesome_ml_internships",
-    "repo": "awesome-ML-internships",
-    "title": "AI & Machine Learning Internships 2027",
-    "filters": {
-      "locations": [
-        "us"
-      ],
-      "employment": "internship",
-      "domains": [
-        "ai",
-        "data_science"
-      ]
-    },
-    "feedKey": "N/A",
-    "has_categories": true,
-    "has_companies": false
-  }
-]
+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
