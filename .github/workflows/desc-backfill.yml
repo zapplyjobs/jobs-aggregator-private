@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
-      NODE_OPTIONS: --max-old-space-size=2048
+      NODE_OPTIONS: --max-old-space-size=6144
       WD_FETCH_PROXY: https://wd-fetch-proxy.wild-queen-069e.workers.dev  # AGG-WD-PROXY-DESC-1: route WD description fetches through proxy — ROOT CAUSE of chronic Missing Queue (desc-backfill was fetching DIRECTLY from GHA → 64% waste on WD 403s; proxy uses CF edge IP, proven to bypass the block for the listing API)
       DATA_PROXY_TOKEN: ${{ secrets.DATA_PROXY_TOKEN }}  # AGG-WD-PROXY-AUTH-HEADER-1: auth token for wd-fetch-proxy
     steps:
