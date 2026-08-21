@@ -53,7 +53,8 @@ jobs:
             "https://xxmhgagpbxjflajoaahy.supabase.co/storage/v1/object/pipeline-data/company-research-log.csv"
 
       - name: Download previous snapshot from R2 (history build-forward)
-        continue-on-error: true
+        # FAIL LOUD on read failure: extractor would otherwise silently restart history
+        # from 1 point (audit finding 2026-08-21 — history preservation > run success)
         run: |
           pip install boto3 -q
           python3 -c "import boto3, os; s3 = boto3.client('s3', region_name='auto', endpoint_url=os.environ['R2_ENDPOINT'], aws_access_key_id=os.environ['R2_ACCESS_KEY_ID'], aws_secret_access_key=os.environ['R2_SECRET_ACCESS_KEY']); s3.download_file(os.environ['R2_BUCKET_NAME'], 'data/competitor_snapshot.json', 'competitor_snapshot_prev.json'); print('previous snapshot downloaded')" || echo "no previous snapshot (first run — history starts today)"
