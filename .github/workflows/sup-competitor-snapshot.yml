@@ -1,0 +1,87 @@
+name: SUP Competitor Snapshot
+on:
+  schedule:
+    # Daily 09:40Z (after collect-metrics ~09:10Z wave) — SUP-COMPETITOR-SNAPSHOT-PRODUCER-1
+    - cron: '40 9 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (submodules incl. shared tools + aggregator company-list)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Install transcrypt
+        run: |
+          curl -sSL https://raw.githubusercontent.com/elasticdog/transcrypt/5effa13/transcrypt -o /tmp/transcrypt
+          chmod +x /tmp/transcrypt
+          sudo mv /tmp/transcrypt /usr/local/bin/transcrypt
+
+      - name: Unlock encrypted files
+        run: |
+          echo "Y" | transcrypt --cipher aes-256-cbc --password "$TRANSCRYPT_PASSWORD" --force
+          git checkout -- .
+          git submodule foreach --recursive '
+            echo "Y" | transcrypt --cipher aes-256-cbc --password "'"$TRANSCRYPT_PASSWORD"'" --force 2>/dev/null || true
+            rm -f "$(git rev-parse --git-dir)/index" 2>/dev/null || true
+            git checkout HEAD -- . 2>/dev/null || true
+          ' || true
+        env:
+          TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Download CSV from Storage (decay-monitor pattern)
+        run: |
+          curl -sf -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -o company-research-log.csv \
+            "https://xxmhgagpbxjflajoaahy.supabase.co/storage/v1/object/pipeline-data/company-research-log.csv"
+
+      - name: Run benchmark + extractor
+        run: |
+          node .github/scripts/shared/tools/internship-benchmark.js \
+            --write --write-companions \
+            --company-list .github/scripts/aggregator/lib/fetchers/company-list.json \
+            --csv company-research-log.csv
+          node .github/scripts/shared/tools/sup-competitor-snapshot.js --out competitor_snapshot.json
+
+      - name: Upload snapshot to R2
+        run: |
+          pip install boto3 -q
+          python3 - <<'PYEOF'
+          import boto3, os
+          s3 = boto3.client('s3',
+              endpoint_url=os.environ['R2_ENDPOINT'],
+              aws_access_key_id=os.environ['R2_ACCESS_KEY_ID'],
+              aws_secret_access_key=os.environ['R2_SECRET_ACCESS_KEY'])
+          s3.put_object(Bucket=os.environ['R2_BUCKET_NAME'], Key='data/competitor_snapshot.json',
+                        Body=open('competitor_snapshot.json','rb').read(),
+                        ContentType='application/json')
+          print('uploaded data/competitor_snapshot.json to R2')
+          PYEOF
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
+      - name: Dual-write to Supabase Storage (R2-primary; mirror for Storage readers)
+        continue-on-error: true
+        run: |
+          curl -sf -X PUT \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            --data-binary @competitor_snapshot.json \
+            "https://xxmhgagpbxjflajoaahy.supabase.co/storage/v1/object/pipeline-data/competitor_snapshot.json"
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
