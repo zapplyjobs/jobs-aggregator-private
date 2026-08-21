@@ -52,13 +52,24 @@ jobs:
             -o company-research-log.csv \
             "https://xxmhgagpbxjflajoaahy.supabase.co/storage/v1/object/pipeline-data/company-research-log.csv"
 
+      - name: Download previous snapshot from R2 (history build-forward)
+        continue-on-error: true
+        run: |
+          pip install boto3 -q
+          python3 -c "import boto3, os; s3 = boto3.client('s3', region_name='auto', endpoint_url=os.environ['R2_ENDPOINT'], aws_access_key_id=os.environ['R2_ACCESS_KEY_ID'], aws_secret_access_key=os.environ['R2_SECRET_ACCESS_KEY']); s3.download_file(os.environ['R2_BUCKET_NAME'], 'data/competitor_snapshot.json', 'competitor_snapshot_prev.json'); print('previous snapshot downloaded')" || echo "no previous snapshot (first run — history starts today)"
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
       - name: Run benchmark + extractor
         run: |
           node .github/scripts/shared/tools/internship-benchmark.js \
             --write --write-companions \
             --company-list .github/scripts/aggregator/lib/fetchers/company-list.json \
             --csv company-research-log.csv
-          node .github/scripts/shared/tools/sup-competitor-snapshot.js --out competitor_snapshot.json
+          node .github/scripts/shared/tools/sup-competitor-snapshot.js --out competitor_snapshot.json --previous competitor_snapshot_prev.json
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
