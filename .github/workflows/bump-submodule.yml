@@ -153,7 +153,7 @@ jobs:
             done
             if [ "$conclusion" != "success" ]; then
               echo "    gated: gate conclusion='${conclusion:-timeout}' (expected success); abandoning $repo"
-              gh api "repos/$repo/git/refs/$bref" --method DELETE --silent 2>/dev/null || true
+              gh api "repos/$repo/git/refs/heads/$branch" --method DELETE --silent 2>/dev/null || true
               return 1
             fi
             local update
@@ -161,11 +161,11 @@ jobs:
                         | gh api "repos/$repo/git/refs/heads/main" --method PATCH --input - --jq '.object.sha' 2>/dev/null) \
                && [ -n "$update" ]; then
               echo "    gated: main -> ${update:0:12}"
-              gh api "repos/$repo/git/refs/$bref" --method DELETE --silent 2>/dev/null || true
+              gh api "repos/$repo/git/refs/heads/$branch" --method DELETE --silent 2>/dev/null || true
               echo "$update"; return 0
             fi
             echo "    gated: main fast-forward still rejected for $repo"
-            gh api "repos/$repo/git/refs/$bref" --method DELETE --silent 2>/dev/null || true
+            gh api "repos/$repo/git/refs/heads/$branch" --method DELETE --silent 2>/dev/null || true
             return 1
           }
 
