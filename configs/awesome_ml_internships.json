@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "repoPrefix": "ml",
+  "refTag": "gh-awesome-ml-internships",
+  "headingImageAlt": "AI and Machine Learning Internships 2027",
+  "title": "AI & Machine Learning Internships 2027",
+  "tagline": "",
+  "jobCountBadgeLabel": "AI & ML Internships",
+  "descriptionLine1": "🚀 Live AI, machine learning, and data science internships for students, refreshed through the Zapply job pipeline.",
+  "descriptionLine2": "",
+  "noteType": "TIP",
+  "noteText": "Roles are sourced from active company postings. Always confirm eligibility, deadlines, and application details on the employer's official career page.",
+  "jobsSectionHeader": "Fresh AI & ML Internships 2027",
+  "features": {
+    "internships": false,
+    "moreResources": true,
+    "listingsBanner": false
+  },
+  "defaultCategory": "other_internships",
+  "filters": {
+    "locations": [
+      "us"
+    ],
+    "employment": "internship",
+    "domains": [
+      "ai",
+      "data_science"
+    ]
+  },
+  "activeWindowDays": 120,
+  "repo": "awesome-ML-internships",
+  "boardName": "awesome_ml_internships",
+  "categories": {
+    "machine_learning": {
+      "title": "Machine Learning & AI Engineering",
+      "emoji": "🤖",
+      "keywords": [
+        "machine learning",
+        "ml engineer",
+        "mlops",
+        "deep learning",
+        "computer vision",
+        "natural language",
+        "nlp",
+        "llm",
+        "artificial intelligence",
+        "ai engineer",
+        "applied scientist",
+        "research scientist",
+        "reinforcement learning",
+        "robotics"
+      ]
+    },
+    "data_science": {
+      "title": "Data Science & Analytics",
+      "emoji": "📊",
+      "keywords": [
+        "data scientist",
+        "data science",
+        "analytics",
+        "statistician",
+        "quantitative"
+      ]
+    },
+    "ai_product_research": {
+      "title": "AI Product & Research",
+      "emoji": "🔬",
+      "keywords": [
+        "ai product",
+        "ai research",
+        "research intern",
+        "ai strategy",
+        "ai operations"
+      ]
+    },
+    "other_internships": {
+      "title": "Other AI & ML Internships",
+      "emoji": "✨",
+      "keywords": []
+    }
+  }
+}
