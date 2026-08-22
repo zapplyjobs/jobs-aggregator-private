@@ -12,7 +12,7 @@ concurrency:
 jobs:
   fetch-custom-supplemental:
     runs-on: ubuntu-latest
-    timeout-minutes: 15  # Google concurrency=3 (~3min) + Microsoft (~2min) + Apple (~30s) + ByteDance (~2s)
+    timeout-minutes: 15  # Google (~3min) + Microsoft (~2min) + Apple (~30s) + ByteDance (~2s) + Qualcomm (~4min: 75 search pages + capped details)
     permissions:
       contents: read
 
@@ -68,7 +68,7 @@ jobs:
 
       - name: Seed description sidecars from R2
         run: |
-          for sidecar in google microsoft apple; do
+          for sidecar in google microsoft apple qualcomm; do
             node -e "
             const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
             async function main() {
@@ -128,7 +128,7 @@ jobs:
           assert contract.get('merge_mode') == 'separate_artifact'
           assert contract.get('visibility') == 'snapshot_only'
           declared = set(meta.get('sources', {}).keys())
-          assert declared <= {'google','microsoft','apple','bytedance','amazon'}, f"unexpected sources: {declared}"
+          assert declared <= {'google','microsoft','apple','bytedance','amazon','qualcomm'}, f"unexpected sources: {declared}"
           print('jobs', len(jobs))
           print('sources', meta['sources'])
           PY
