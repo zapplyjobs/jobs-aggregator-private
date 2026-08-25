@@ -19,6 +19,8 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 1
+          submodules: recursive
+          token: ${{ secrets.GH_PAT }}
 
       - name: Install transcrypt
         run: |
@@ -62,6 +64,10 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
         run: |
           # AGG-DEADNESS-1: check-link-health.js exits 1 when dead jobs are found (dead-alert signal).
           # The Simplify age-bypass now reliably detects the persistently-410 BAE class, so dead>0 is
