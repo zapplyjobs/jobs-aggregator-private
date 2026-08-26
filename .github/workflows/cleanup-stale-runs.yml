@@ -33,8 +33,10 @@ jobs:
         ];
 
         const STALE_MINUTES = 45;
+        // INF-QUEUED-ZOMBIE-RESIDUAL-1 (2026-08-25): protected workflows get a LONGER
+        // threshold (6h = 10x any legitimate queue wait) instead of blanket immunity.
+        const PROTECTED_STALE_MINUTES = 360;
         const PROTECTED_WORKFLOWS = new Set(['Fetch All Jobs', 'Enrich Jobs']);
-        const cutoff = Date.now() - STALE_MINUTES * 60 * 1000;
 
         function apiFetch(path) {
           return new Promise((resolve, reject) => {
@@ -80,9 +82,10 @@ jobs:
 
         async function cancelRun(repo, runId) {
           const code = await apiCall('POST', '/repos/' + repo + '/actions/runs/' + runId + '/cancel');
-          if (code === 500) {
-            // Zombie run — cancel API returns 500 for runs stuck in queued/in_progress
-            // that GitHub can't actually cancel. Try deleting instead.
+          if (code === 500 || code === 403 || code === 409) {
+            // Zombie entries: cancel returns 500 (uncancellable), 403/409 (stuck state).
+            // Delete is the remedy for the backlog class. (403 added 2026-08-25 after
+            // the first drain run showed 7-day-old queued runs failing cancel with 403.)
             const delCode = await apiCall('DELETE', '/repos/' + repo + '/actions/runs/' + runId);
             return delCode === 204 ? 'deleted' : 'failed:' + delCode;
           }
@@ -103,8 +106,9 @@ jobs:
                   if (created < Date.now() - thresholdMin * 60 * 1000) {
                     const code = await cancelRun(repo, run.id);
                     const tag = PROTECTED_WORKFLOWS.has(run.name) ? 'STALE-PROTECTED' : 'STALE';
+                    const ok = code === 202 || code === 'deleted';
                     console.log(tag + ': ' + repo + ' run #' + run.id + ' (' + run.name + ') ' + ageMinutes + ' min old — cancel: ' + code);
-                    cancelled++;
+                    if (ok) cancelled++; else console.log('  WARN: not counted (failed to clear run ' + run.id + ')');
                   }
                 }
               } catch(e) {
