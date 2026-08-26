@@ -969,51 +969,38 @@ jobs:
           }'
         fi
 
-    - name: Push archive to jobs-archive-private
+    - name: Upload archive to R2 (forward-only; jobs-archive-private git repo frozen)
       if: success()
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
       run: |
         ARCHIVE_DIR=".github/data/archive"
         if [ ! -d "$ARCHIVE_DIR" ] || [ -z "$(ls -A $ARCHIVE_DIR 2>/dev/null)" ]; then
-          echo "ℹ️ No archive files to push"
+          echo "ℹ️ No archive files to upload"
           exit 0
         fi
-
-        echo "📤 Pushing archive files to jobs-archive-private..."
-        git clone --depth=1 "https://x-access-token:${GH_PAT}@github.com/zapplyjobs/jobs-archive-private.git" /tmp/jobs-archive-private
-
-        # Copy all weekly archive files
-        mkdir -p /tmp/jobs-archive-private/data
-        cp $ARCHIVE_DIR/*.jsonl /tmp/jobs-archive-private/data/ 2>/dev/null || true
-
-        cd /tmp/jobs-archive-private
-        git config user.email "bot@zapplyjobs.com"
-        git config user.name "Data Bot"
-        git add data/
-
-        if [ -n "$(git status --porcelain)" ]; then
-          WEEK=$(ls data/*.jsonl 2>/dev/null | tail -1 | xargs basename 2>/dev/null || echo "unknown")
-          git commit -m "archive: update ${WEEK} - $(date -u +%Y-%m-%d)"
-          PUSHED=false
-          for i in 1 2 3; do
-            if git pull --rebase origin main && git push origin main; then
-              PUSHED=true
-              break
-            fi
-            echo "Archive push attempt $i failed, retrying in 5s..."
-            sleep 5
-          done
-          if [ "$PUSHED" != "true" ]; then
-            echo "::error::Archive push failed after 3 attempts"
-            exit 1
-          fi
-          echo "✅ Archive pushed to jobs-archive-private"
-        else
-          echo "ℹ️ No new archive data to push"
-        fi
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-        GH_TOKEN: ${{ secrets.GH_PAT }}
-
+        # INF-REPO-CONTENT-GATE-1 rider (operator-approved forward-only switch, 2026-08-26):
+        # new weekly archives go to R2 data/archives/ (R2 is the designed home for bulk data,
+        # free egress); the 1.2GB git repo is FROZEN as the historical record (no rewrite).
+        # Readers: projects/zjp/scripts/archive-analysis.sh reads R2-first for new weeks.
+        node -e "
+        const fs = require('fs');
+        const path = require('path');
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        (async () => {
+          const r2 = createR2Client({ prefix: 'data/archives/' });
+          const files = fs.readdirSync(process.argv[1]).filter(f => f.endsWith('.jsonl'));
+          for (const f of files) {
+            const body = fs.readFileSync(path.join(process.argv[1], f));
+            await r2.uploadRaw(f, body, 'application/x-ndjson');
+            console.log('ARCHIVED_R2:' + f + ' (' + body.length + 'B)');
+          }
+          console.log('archive upload complete: ' + files.length + ' file(s)');
+        })().catch(e => { console.error('archive upload failed: ' + e.message); process.exit(1); });
+        " "$ARCHIVE_DIR"
 
     - name: Freshness SLA alert
       if: always()
