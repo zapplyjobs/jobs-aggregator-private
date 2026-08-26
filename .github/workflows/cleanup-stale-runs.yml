@@ -97,15 +97,13 @@ jobs:
                 const result = await apiFetch('/repos/' + repo + '/actions/runs?status=' + status + '&per_page=10');
                 const runs = result.workflow_runs || [];
                 for (const run of runs) {
-                  if (PROTECTED_WORKFLOWS.has(run.name)) {
-                    console.log('SKIP: ' + repo + ' run #' + run.id + ' (' + run.name + ') — protected workflow');
-                    continue;
-                  }
                   const created = new Date(run.created_at).getTime();
                   const ageMinutes = Math.round((Date.now() - created) / 60000);
-                  if (created < cutoff) {
+                  const thresholdMin = PROTECTED_WORKFLOWS.has(run.name) ? PROTECTED_STALE_MINUTES : STALE_MINUTES;
+                  if (created < Date.now() - thresholdMin * 60 * 1000) {
                     const code = await cancelRun(repo, run.id);
-                    console.log('STALE: ' + repo + ' run #' + run.id + ' (' + run.name + ') running ' + ageMinutes + ' min — cancel: ' + code);
+                    const tag = PROTECTED_WORKFLOWS.has(run.name) ? 'STALE-PROTECTED' : 'STALE';
+                    console.log(tag + ': ' + repo + ' run #' + run.id + ' (' + run.name + ') ' + ageMinutes + ' min old — cancel: ' + code);
                     cancelled++;
                   }
                 }
