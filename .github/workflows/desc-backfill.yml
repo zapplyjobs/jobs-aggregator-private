@@ -76,11 +76,8 @@ jobs:
         run: |
           MARKER='{"status":"in_progress","run_id":"'"${GITHUB_RUN_ID}"'","started_at":"'"$(date -u +"%Y-%m-%dT%H:%M:%SZ")"'"}'
           printf '%s' "$MARKER" > /tmp/desc-backfill-complete.json
-          curl -sf -X PUT \
-            "${SUPABASE_URL}/storage/v1/object/pipeline-data/desc-backfill-complete.json" \
-            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-            -H "Content-Type: application/json" \
-            --data-binary @/tmp/desc-backfill-complete.json
+          # AGG-MARKER-STORAGE-RETRY-1: R2 first (fatal — the only marker reader path);
+          # Storage backup second, bounded retry, non-fatal.
           node <<'EOF'
           const fs = require('fs');
           const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
@@ -92,6 +89,12 @@ jobs:
           }
           main().catch(err => { console.error(err.message); process.exit(1); });
           EOF
+          curl -sf --retry 3 --retry-delay 15 --retry-all-errors -X PUT \
+            "${SUPABASE_URL}/storage/v1/object/pipeline-data/desc-backfill-complete.json" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/desc-backfill-complete.json \
+            || echo "⚠️ Storage marker backup failed (non-fatal — R2 canonical marker written; AGG-MARKER-STORAGE-RETRY-1)"
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -292,11 +295,8 @@ jobs:
           SR_LINES=$(wc -l < .github/data/descriptions-smartrecruiters.jsonl 2>/dev/null || echo 0)
           COMPLETED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "{\"sidecars_written_at\":\"${COMPLETED_AT}\",\"wd_entries\":${WD_LINES},\"sr_entries\":${SR_LINES},\"status\":\"${STATUS}\",\"run_id\":\"${GITHUB_RUN_ID}\"}" > /tmp/desc-backfill-complete.json
-          curl -sf -X PUT \
-            "${SUPABASE_URL}/storage/v1/object/pipeline-data/desc-backfill-complete.json" \
-            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-            -H "Content-Type: application/json" \
-            --data-binary @/tmp/desc-backfill-complete.json
+          # AGG-MARKER-STORAGE-RETRY-1: R2 first (fatal — ENR agg-snapshot-gate reads R2);
+          # Storage backup second, bounded retry, non-fatal.
           node <<'EOF'
           const fs = require('fs');
           const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
@@ -308,6 +308,12 @@ jobs:
           }
           main().catch(err => { console.error(err.message); process.exit(1); });
           EOF
+          curl -sf --retry 3 --retry-delay 15 --retry-all-errors -X PUT \
+            "${SUPABASE_URL}/storage/v1/object/pipeline-data/desc-backfill-complete.json" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/desc-backfill-complete.json \
+            || echo "⚠️ Storage marker backup failed (non-fatal — R2 canonical marker written; AGG-MARKER-STORAGE-RETRY-1)"
           echo "Marker: ${STATUS} at ${COMPLETED_AT} (WD=${WD_LINES}, SR=${SR_LINES})"
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
