@@ -805,11 +805,11 @@ jobs:
       run: |
         MARKER='{"status":"in_progress","run_id":"'"${GITHUB_RUN_ID}"'","started_at":"'"$(date -u +"%Y-%m-%dT%H:%M:%SZ")"'"}'
         printf '%s' "$MARKER" > /tmp/fetch-jobs-sidecar-complete.json
-        curl -sf -X PUT \
-          "${SUPABASE_URL}/storage/v1/object/pipeline-data/fetch-jobs-sidecar-complete.json" \
-          -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-          -H "Content-Type: application/json" \
-          --data-binary @/tmp/fetch-jobs-sidecar-complete.json
+        # AGG-MARKER-STORAGE-RETRY-1: R2 marker FIRST and fatal — R2 is canonical and the
+        # ONLY reader path (ENR agg-snapshot-gate reads R2). Storage is a backup copy with
+        # zero marker readers: bounded retry, non-fatal, so a Supabase relapse can no longer
+        # fail the run (observed 3x 2026-08-28: exit-22 marker-only failures while the
+        # canonical R2 publish had already succeeded) nor skip the R2 marker ENR waits on.
         node <<'EOF'
         const fs = require('fs');
         const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
@@ -821,6 +821,12 @@ jobs:
         }
         main().catch(err => { console.error(err.message); process.exit(1); });
         EOF
+        curl -sf --retry 3 --retry-delay 15 --retry-all-errors -X PUT \
+          "${SUPABASE_URL}/storage/v1/object/pipeline-data/fetch-jobs-sidecar-complete.json" \
+          -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+          -H "Content-Type: application/json" \
+          --data-binary @/tmp/fetch-jobs-sidecar-complete.json \
+          || echo "⚠️ Storage marker backup failed (non-fatal — R2 canonical marker written; AGG-MARKER-STORAGE-RETRY-1)"
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -850,11 +856,8 @@ jobs:
         ORACLE_LINES=$(wc -l < .github/data/descriptions-oracle.jsonl 2>/dev/null || echo 0)
         COMPLETED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
         echo "{\"sidecars_written_at\":\"${COMPLETED_AT}\",\"oracle_entries\":${ORACLE_LINES},\"status\":\"${STATUS}\",\"run_id\":\"${GITHUB_RUN_ID}\"}" > /tmp/fetch-jobs-sidecar-complete.json
-        curl -sf -X PUT \
-          "${SUPABASE_URL}/storage/v1/object/pipeline-data/fetch-jobs-sidecar-complete.json" \
-          -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-          -H "Content-Type: application/json" \
-          --data-binary @/tmp/fetch-jobs-sidecar-complete.json
+        # AGG-MARKER-STORAGE-RETRY-1: R2 first (fatal, only reader path) — Storage backup
+        # second (bounded retry, non-fatal). See in_progress marker step for full rationale.
         node <<'EOF'
         const fs = require('fs');
         const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
@@ -866,6 +869,12 @@ jobs:
         }
         main().catch(err => { console.error(err.message); process.exit(1); });
         EOF
+        curl -sf --retry 3 --retry-delay 15 --retry-all-errors -X PUT \
+          "${SUPABASE_URL}/storage/v1/object/pipeline-data/fetch-jobs-sidecar-complete.json" \
+          -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+          -H "Content-Type: application/json" \
+          --data-binary @/tmp/fetch-jobs-sidecar-complete.json \
+          || echo "⚠️ Storage marker backup failed (non-fatal — R2 canonical marker written; AGG-MARKER-STORAGE-RETRY-1)"
         echo "Marker: ${STATUS} at ${COMPLETED_AT} (${ORACLE_LINES} Oracle entries)"
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
