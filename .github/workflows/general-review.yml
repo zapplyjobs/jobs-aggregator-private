@@ -49,10 +49,8 @@ jobs:
       - name: Install shared dependencies
         run: cd .github/scripts/shared && npm install && cd $GITHUB_WORKSPACE/.github/scripts/aggregator && npm install
 
-      - name: Download data (R2 for all_jobs, Storage for sidecars)
+      - name: Download all_jobs + sidecars from R2
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
@@ -62,12 +60,12 @@ jobs:
           # AGG-GENERAL-REVIEW-R2-MIGRATION-1: all_jobs.json from R2 canonical (Storage >50MB upload silently fails)
           node -e "const {createR2Client}=require('./.github/scripts/aggregator/lib/storage/r2-client'); const r2=createR2Client({prefix:'data/'}); r2.downloadToFile('all_jobs.json','/tmp/review-data/all_jobs.json').then(r=>console.log('R2 all_jobs:',r?'OK '+r.size+' bytes':'FAILED')).catch(e=>{console.error(e.message);process.exit(1)})"
           echo "  $(wc -l < /tmp/review-data/all_jobs.json) jobs"
-          # Sidecars from Storage (small files, upload works)
-          BASE="$SUPABASE_URL/storage/v1/object/pipeline-data"
-          AUTH="Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
-          SIDE=$(curl -sf -X POST -H "$AUTH" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d '{"prefix":"","search":"descriptions-","limit":1000,"offset":0}' "$SUPABASE_URL/storage/v1/object/list/pipeline-data" | python3 -c "import sys,json; [print(i['name']) for i in json.load(sys.stdin) if i['name'].endswith('.jsonl') and 'descriptions-enriched-' not in i['name'] and 'descriptions-greenhouse-' not in i['name']]")
-          echo "Downloading $(echo "$SIDE" | wc -l) sidecars..."
-          for s in $SIDE; do curl -sf -H "$AUTH" "$BASE/$s" -o "/tmp/review-data/$s" && echo "  $s" || echo "  $s: skipped"; done
+          # AGG-GENERALREVIEW-DESCSIDECARS-1: sidecars from R2 too — Storage retired the legacy per-source
+          # files (only ENR enriched shards remain there), so the old Storage filter downloaded 0 sidecars and
+          # every company's Desc% rendered 0%. R2 data/ holds the full sidecar universe (per-source + enriched
+          # shards, ~900MB); prepare-general-review.js's id-keyed map makes overlap harmless (last-wins).
+          node -e "const {createR2Client}=require('./.github/scripts/aggregator/lib/storage/r2-client'); const r2=createR2Client({prefix:'data/'}); r2.list('descriptions-').then(async items=>{ let ok=0; for(const it of items){ const name=(it.Key||it.key||it.name).replace(/^data\//,''); const r=await r2.downloadToFile(name,'/tmp/review-data/'+name); if(r)ok++; else console.log('FAILED:',name); } console.log('Sidecars downloaded from R2:',ok,'of',items.length); if(ok===0){console.error('No sidecars downloaded — refusing to generate a zero-coverage review');process.exit(1);} }).catch(e=>{console.error(e.message);process.exit(1)})"
+          echo "  $(ls /tmp/review-data/descriptions-*.jsonl 2>/dev/null | wc -l) sidecar files"
 
       - name: Generate general-review.json
         run: |
