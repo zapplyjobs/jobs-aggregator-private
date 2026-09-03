@@ -125,6 +125,10 @@ jobs:
           // Canada LMIA visa markers (OUT-CAVISA-SURFACING-1) — id-keyed from ENR's lane
           try { await r2.downloadToFile('canada-jobs-enriched.json', '.github/data/canada-jobs-enriched.json'); console.log('✅ Downloaded canada-jobs-enriched.json'); }
           catch (e) { console.log('ℹ️ canada-jobs-enriched.json not on R2 yet — Canada visa column renders blank'); }
+          // Company visa-posture priors (OUT-POSTURE-ARTIFACT-AVAILABLE-1) — slug-keyed
+          // SUP artifact; loader degrades to no-posture when missing/unreadable/stale
+          try { await r2.downloadToFile('sup-company-posture.json', '.github/data/sup-company-posture.json'); console.log('✅ Downloaded sup-company-posture.json'); }
+          catch (e) { console.log('ℹ️ sup-company-posture.json not on R2 — READMEs render without posture tiers'); }
         }
         main().catch(e => { console.error('❌ R2 download failed:', e.message); process.exit(1); });
         "
