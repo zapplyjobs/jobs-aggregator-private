@@ -102,6 +102,23 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
+      - name: Seed starbucks cursor from R2 (AGG-PCSX-SLOWCADENCE-ADAPTER-1)
+        run: |
+          node -e "
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          async function main() {
+            const r2 = createR2Client({ prefix: 'data/' });
+            const result = await r2.downloadToFile('starbucks-cursor.json', '.github/data/starbucks-cursor.json');
+            if (result) { console.log('R2_OK'); } else { process.exit(1); }
+          }
+          main().catch(() => process.exit(1));
+          " && echo "Seeded starbucks cursor" || echo "No starbucks cursor yet (first run)"
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
       - name: Fetch custom supplemental lane
         run: node .github/scripts/fetch-supplemental-custom.js
         env:
@@ -120,7 +137,7 @@ jobs:
           meta = json.load(open('.github/data/supplemental-custom-metadata.json'))
           assert isinstance(jobs, list)
           assert meta.get('source') == 'custom'
-          assert meta.get('schema') == 'supplemental-lane-v1'
+          assert meta.get('schema') in ('supplemental-lane-v1', 'supplemental-lane-v2')  # v2 = AGG-LANE-SCHEMA-CONTRACT-1
           assert meta.get('lane_name') == 'custom'
           contract = meta.get('publish_contract') or {}
           assert contract.get('blocks_fast_publish') is False
@@ -128,7 +145,7 @@ jobs:
           assert contract.get('merge_mode') == 'separate_artifact'
           assert contract.get('visibility') == 'snapshot_only'
           declared = set(meta.get('sources', {}).keys())
-          assert declared <= {'google','microsoft','apple','bytedance','amazon','qualcomm'}, f"unexpected sources: {declared}"
+          assert declared <= {'google','microsoft','apple','bytedance','amazon','qualcomm','starbucks'}, f"unexpected sources: {declared}"
           print('jobs', len(jobs))
           print('sources', meta['sources'])
           PY
@@ -138,6 +155,29 @@ jobs:
         run: |
           cat .github/data/supplemental-custom-metadata.json | jq .
 
+
+      - name: Upload starbucks cursor to R2 (AGG-PCSX-SLOWCADENCE-ADAPTER-1)
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ -f .github/data/starbucks-cursor.json ]; then
+            node -e "
+            const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+            const fs = require('fs');
+            async function main() {
+              const r2 = createR2Client({ prefix: 'data/' });
+              const ok = await r2.uploadRaw('starbucks-cursor.json', fs.readFileSync('.github/data/starbucks-cursor.json', 'utf8'), 'application/json');
+              if (!ok) process.exit(1);
+              console.log('R2_OK: starbucks-cursor.json');
+            }
+            main().catch((e) => { console.error(e.message); process.exit(1); });
+            "
+          fi
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
       - name: "Dual-write to Supabase Storage (R2-elim)"
         if: always()  # INF-R2ELIM-CASCADE-MISS-1: must run even when fetch script fails on R2 publish (bucket deleted) — local files exist before R2 crash
