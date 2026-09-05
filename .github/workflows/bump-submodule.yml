@@ -109,6 +109,21 @@ jobs:
           fi
           echo "SHA existence verified: ${TARGET_SHA:0:12} on $SOURCE_REPO"
 
+      - name: Freshness guard — fail loud on stale pins (AGG-AUTOBUMP-STALE-RACE-1)
+        run: |
+          SOURCE_REPO="${{ steps.config.outputs.source_repo }}"
+          MAIN_SHA=$(gh api "repos/$SOURCE_REPO/commits/main" --jq '.sha')
+          if [[ "$MAIN_SHA" != "$TARGET_SHA" ]]; then
+            CMP=$(gh api "repos/$SOURCE_REPO/compare/$TARGET_SHA...$MAIN_SHA" --jq '.status')
+            if [[ "$CMP" == "ahead" || "$CMP" == "diverged" ]]; then
+              echo "::error::STALE PIN GUARD: TARGET_SHA ${TARGET_SHA:0:12} is behind/diverged from $SOURCE_REPO main (${MAIN_SHA:0:12}). A newer commit landed between dispatch and commit-time; pinning it would stale-pin the submodule (A274 race class). FAILING so the newer commit's own auto-bump pins the current SHA. Re-dispatch with the current main SHA only if pinning the older commit is intentional."
+              exit 1
+            fi
+            echo "Freshness note: TARGET_SHA is not behind main (status=$CMP) — proceeding."
+          else
+            echo "Freshness OK: TARGET_SHA is current main of $SOURCE_REPO."
+          fi
+
       - name: Disable dangerous workflows
         id: disable-workflows
         run: |
