@@ -131,6 +131,22 @@ jobs:
           gh api repos/zapplyjobs/jobs-data-2026/actions/workflows/239692001/disable --method PUT --silent && echo "Disabled: jobs-data/Enrich Jobs" || echo "WARN: Could not disable"
           # Consumer repos are pure display (Phase 4) — no workflows to disable
 
+      - name: Re-verify freshness at commit time (AGG-JOBSDATA-PIN-RACE-1)
+        run: |
+          # The early guard ran minutes ago (CDN wait, validation, disable steps).
+          # A child landing in that window makes TARGET_SHA stale RIGHT before we pin.
+          # Re-check here, seconds before the commit; failing loud lets the newer
+          # landing's own auto-bump pin the current SHA.
+          SOURCE_REPO="${{ steps.config.outputs.source_repo }}"
+          MAIN_SHA=$(gh api "repos/$SOURCE_REPO/commits/main" --jq '.sha')
+          if [[ "$MAIN_SHA" != "$TARGET_SHA" ]]; then
+            CMP=$(gh api "repos/$SOURCE_REPO/compare/$TARGET_SHA...$MAIN_SHA" --jq '.status')
+            if [[ "$CMP" == "ahead" || "$CMP" == "diverged" ]]; then
+              echo "::error::COMMIT-TIME STALE PIN: TARGET_SHA ${TARGET_SHA:0:12} is behind/diverged from $SOURCE_REPO main (${MAIN_SHA:0:12}) — main moved during this run. FAILING so the newer landing's own auto-bump pins the current SHA."
+              exit 1
+            fi
+          fi
+          echo "Commit-time freshness OK: TARGET_SHA ${TARGET_SHA:0:12} still matches $SOURCE_REPO main."
       - name: Bump target repos
         id: bump
         run: |
