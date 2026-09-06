@@ -5,8 +5,9 @@ name: Description Backfill (WD+SR)
 # SKIP_SR_DESC_BACKFILL=1 + writes wd-desc-queue.jsonl (pending WD jobs with _raw).
 # This workflow reads the WD queue (fetchWorkdayDescriptions) + reads all_jobs.json
 # for SR jobs (fetchSRDescriptions), fetches up to 1000 descriptions each, appends
-# to the sidecars, and uploads to R2. Runs every 10 min — clears backlogs faster
-# while removing ~160s from the main fetch hot path.
+# to the sidecars, and uploads to R2. Observed cadence ~every 3-5 min as of 2026-09-06
+# (GHA cron */10 + Worker dispatch) — clears backlogs faster while removing ~160s from the
+# main fetch hot path.
 
 on:
   schedule:

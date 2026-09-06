@@ -3,7 +3,7 @@ name: Fetch Oracle Supplemental
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *'  # AGG-ORACLE-DESC-1: self-dispatch. Previously relied on an external dispatcher that stopped 2026-07-12; matches historical cadence and mirrors fetch-custom-supplemental.yml.
+    - cron: '*/15 * * * *'  # GHA FALLBACK (AGG-ORACLE-DESC-1; external dispatcher stopped 2026-07-12). PRIMARY = CF Worker dispatch ~every 10-15 min (observed 2026-09-06).
 concurrency:
   group: fetch-oracle-supplemental
   cancel-in-progress: false

@@ -3,7 +3,7 @@ name: Fetch Custom Supplemental
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */2 * * *'  # AGG-SLOW-LANE-1: every 2 hours
+    - cron: '0 */2 * * *'  # GHA FALLBACK only (AGG-SLOW-LANE-1); PRIMARY = CF Worker dispatch ~every 10 min (observed 2026-09-06) per INF_CONTRACT cron governance
 
 concurrency:
   group: fetch-custom-supplemental

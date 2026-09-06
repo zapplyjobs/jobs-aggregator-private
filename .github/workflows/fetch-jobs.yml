@@ -3,8 +3,9 @@ name: Fetch All Jobs
 on:
   workflow_dispatch:
   # schedule REMOVED (INF-FETCHJOBS-DUAL-TRIGGER-1): the CF Worker job-board-cron-worker
-  # (*/15 + hasActiveWorkflowRun guard) is the SOLE trigger. GHA schedule caused a
-  # dual-trigger that doubled dispatches + piled the throttled queue (ghost-throttle P0).
+  # (observed dispatch every 10 min as of 2026-09-06, with hasActiveWorkflowRun guard) is the
+  # SOLE trigger. GHA schedule caused a dual-trigger that doubled dispatches + piled the
+  # throttled queue (ghost-throttle P0).
 
 # Prevent concurrent runs
 concurrency:
