@@ -68,7 +68,7 @@ jobs:
 
       - name: Seed description sidecars from R2
         run: |
-          for sidecar in google microsoft apple qualcomm; do
+          for sidecar in google microsoft apple qualcomm starbucks; do
             node -e "
             const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
             async function main() {
