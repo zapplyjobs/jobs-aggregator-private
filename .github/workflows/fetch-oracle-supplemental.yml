@@ -106,7 +106,7 @@ jobs:
           assert isinstance(jobs, list)
           assert isinstance(meta.get('jobs_fetched'), int)
           assert meta.get('source') == 'oracle'
-          assert meta.get('schema') == 'supplemental-lane-v1'
+          assert meta.get('schema') in ('supplemental-lane-v1', 'supplemental-lane-v2')  # v2 = AGG-LANE-SCHEMA-CONTRACT-1; AGG-ORACESUPP-VERIFYFAIL-1: the v2 migration updated the custom lane's verify but missed this one, so the producer (writing v2 since 09-04) failed its own verify before the R2 upload every run
           assert meta.get('lane_name') == 'oracle'
           contract = meta.get('publish_contract') or {}
           assert contract.get('blocks_fast_publish') is False
