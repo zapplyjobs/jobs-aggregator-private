@@ -574,19 +574,6 @@ jobs:
     # visa/skills. board-counts upload moved with it. Monitoring: check-03 (consumer-failed)
     # alerts if the post-enrich push misses + consumer repos go stale.
 
-    - name: Trigger jobs-data public snapshot refresh
-      if: success() && github.ref_name == 'main'
-      continue-on-error: true
-      run: |
-        curl -sf -X POST "https://api.github.com/repos/zapplyjobs/jobs-data-2026/actions/workflows/refresh-zjp-public-snapshot.yml/dispatches" \
-          -H "Authorization: Bearer ${GH_PAT}" \
-          -H "Accept: application/vnd.github+json" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          -d '{"ref":"main"}'
-        echo "✅ Triggered jobs-data public snapshot refresh"
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-        GH_TOKEN: ${{ secrets.GH_PAT }}
 
     # AGG-REDUNDANT-COLLECTMETRICS-DISPATCH-2: collect-metrics dispatch REMOVED here —
     # it fired while enrich/board-counts were still mid-flight and snapshotted intermediate
