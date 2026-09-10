@@ -127,6 +127,9 @@ jobs:
           console.log('✅ Downloaded spain-jobs.jsonl');
           await r2.downloadToFile('spain-internships.jsonl', '.github/data/spain-internships.jsonl');
           console.log('✅ Downloaded spain-internships.jsonl');
+          // Visa board uses its own feed file (feedKey), same pattern as Canada/Spain
+          await r2.downloadToFile('visa-jobs.jsonl', '.github/data/visa-jobs.jsonl');
+          console.log('✅ Downloaded visa-jobs.jsonl');
           // Canada LMIA visa markers (OUT-CAVISA-SURFACING-1) — id-keyed from ENR's lane
           try { await r2.downloadToFile('canada-jobs-enriched.json', '.github/data/canada-jobs-enriched.json'); console.log('✅ Downloaded canada-jobs-enriched.json'); }
           catch (e) { console.log('ℹ️ canada-jobs-enriched.json not on R2 yet — Canada visa column renders blank'); }
