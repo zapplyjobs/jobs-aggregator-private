@@ -66,19 +66,10 @@ jobs:
       - name: Create data directory
         run: mkdir -p .github/data
 
+      # AGG-SB-SIDECAR-CHUNK-1: list-driven seed (chunk-aware) — extracted per
+      # AGG-SEEDSTEP-EXTRACT-1; replaces the fixed single-name loop.
       - name: Seed description sidecars from R2
-        run: |
-          for sidecar in google microsoft apple qualcomm starbucks; do
-            node -e "
-            const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-            async function main() {
-              const r2 = createR2Client({ prefix: 'data/' });
-              const result = await r2.downloadToFile('descriptions-${sidecar}.jsonl', '.github/data/descriptions-${sidecar}.jsonl');
-              if (result) { console.log('R2_OK'); } else { process.exit(1); }
-            }
-            main().catch(() => process.exit(1));
-            " && echo "Seeded ${sidecar}" || echo "No ${sidecar} cache yet"
-          done
+        run: node .github/scripts/seed-custom-sidecars.js
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
