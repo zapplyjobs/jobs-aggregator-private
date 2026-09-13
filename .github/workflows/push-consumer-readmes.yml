@@ -119,8 +119,8 @@ jobs:
           console.log('✅ Downloaded enriched_jobs.json (fresh, post-enrichment)');
           // Feed files (feedKey) derived from the aggregator configs index at the PINNED
           // submodule commit (INF-PUBLISHER-FEEDLIST-1): a new board with a feedKey is
-          // downloaded automatically, closing the silent-skip class ("Feed not found
-          // locally", board skipped, run green). A missing EXISTING feed stays LOUD:
+          // downloaded automatically, closing the silent-skip class (Feed not found
+          // locally: board skipped, run green). A missing EXISTING feed stays LOUD:
           // all derived feeds are attempted, then the step fails listing every miss.
           const idx = JSON.parse(require('fs').readFileSync('./.github/scripts/aggregator/configs/_index.json', 'utf8'));
           const feeds = [...new Set(idx.map(b => b.feedKey).filter(k => k && k !== 'N/A'))];
