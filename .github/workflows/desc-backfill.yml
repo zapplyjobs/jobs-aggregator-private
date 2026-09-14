@@ -323,3 +323,38 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
+      # AGG-DESCBACKFILL-CANCELRACE-1 (2026-09-14): a CANCELLED run used to leave the
+      # marker at in_progress forever (cancellation skips the completion write), so the
+      # enrich gate burned its 7m+3m wait caps polling a zombie (C248 livelock). This
+      # step runs ONLY on cancellation and flips OUR OWN in_progress marker to failed
+      # (double guard: run_id match AND status still in_progress - never touches a
+      # successor's marker and never downgrades a completed run). The gate fails fast
+      # on status=failed; the next successful backfill write restores complete.
+      - name: "Flip marker to failed on cancellation (AGG-DESCBACKFILL-CANCELRACE-1)"
+        if: cancelled()
+        run: |
+          node <<'EOF'
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          async function main() {
+            const r2 = createR2Client({ prefix: 'data/' });
+            const current = await r2.downloadJson('desc-backfill-complete.json');
+            if (!current || current.status !== 'in_progress') {
+              console.log('Marker status ' + (current ? current.status : 'missing') + ' - nothing to clean up');
+              return;
+            }
+            if (String(current.run_id) !== String(process.env.GITHUB_RUN_ID)) {
+              console.log('Marker run_id ' + current.run_id + ' != ' + process.env.GITHUB_RUN_ID + ' - a newer run owns it; not touching');
+              return;
+            }
+            const marker = JSON.stringify({ status: 'failed', run_id: process.env.GITHUB_RUN_ID, started_at: current.started_at || null, note: 'run cancelled mid-flight (AGG-DESCBACKFILL-CANCELRACE-1)' });
+            const ok = await r2.uploadRaw('desc-backfill-complete.json', marker, 'application/json');
+            console.log(ok ? 'Marker flipped to failed (cancelled run, run_id guarded)' : 'R2 marker upload returned false (non-fatal)');
+          }
+          main().catch(err => { console.error('cleanup failed (non-fatal): ' + err.message); });
+          EOF
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
