@@ -1,0 +1,61 @@
+name: Post Digest (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      manual_text:
+        description: 'Digest text to post verbatim to #daily-digest (private repo: inputs are not public)'
+        type: string
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: post-digest
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to #daily-digest as team bot
+        env:
+          DISCORD_TEAM_TOKEN: ${{ secrets.DISCORD_TEAM_TOKEN }}
+          MANUAL_TEXT: ${{ github.event.inputs.manual_text }}
+        run: |
+          set -eu
+          # chunk to the 2000-char Discord message cap on line boundaries
+          python3 - "$MANUAL_TEXT" <<'PY'
+          import json, sys
+          text = sys.argv[1]
+          parts, cur = [], ''
+          for line in text.split('\n'):
+              if len(cur + line + '\n') > 1900 and cur:
+                  parts.append(cur.rstrip()); cur = ''
+              cur += line + '\n'
+          if cur.strip(): parts.append(cur.strip())
+          print(json.dumps(parts))
+          PY
+          CHUNKS=$(python3 - "$MANUAL_TEXT" <<'PY'
+          import json, sys
+          text = sys.argv[1]
+          parts, cur = [], ''
+          for line in text.split('\n'):
+              if len(cur + line + '\n') > 1900 and cur:
+                  parts.append(cur.rstrip()); cur = ''
+              cur += line + '\n'
+          if cur.strip(): parts.append(cur.strip())
+          print(json.dumps(parts))
+          PY
+          )
+          i=0
+          total=$(echo "$CHUNKS" | jq 'length')
+          for part in $(echo "$CHUNKS" | jq -c '.[]'); do
+            i=$((i+1))
+            curl -s -X POST "https://discord.com/api/v10/channels/1549172041545162798/messages" \
+              -H "Authorization: Bot $DISCORD_TEAM_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -n --arg c "$part" '{content: $c}')" > /dev/null
+            echo "posted part $i/$total"
+          done
+          echo "posted to #daily-digest"
