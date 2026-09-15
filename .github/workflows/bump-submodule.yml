@@ -174,12 +174,14 @@ jobs:
               echo "    gated: temp-branch create failed for $repo"
               return 1
             fi
-            echo "    gated: pushed $branch -> waiting for gate.yml"
-            local conclusion="" waited=0
-            while [ "$waited" -lt 600 ]; do
+            echo "    gated: pushed $branch -> waiting for required checks (gate + repo-guard)"
+            local conclusion="" guard_conc="" waited=0
+            while [ "$waited" -lt 900 ]; do
               conclusion=$(gh api "repos/$repo/actions/workflows/gate.yml/runs?branch=$branch&per_page=1" \
                            --jq '.workflow_runs[0].conclusion // empty' 2>/dev/null)
-              [ -n "$conclusion" ] && break
+              guard_conc=$(gh api "repos/$repo/commits/$new_commit/check-runs?per_page=100" \
+                           --jq '[.check_runs[] | select(.name == "guard")][0].conclusion // empty' 2>/dev/null)
+              if [ -n "$conclusion" ] && [ -n "$guard_conc" ]; then break; fi
               sleep 20; waited=$((waited + 20))
             done
             if [ "$conclusion" != "success" ]; then
@@ -187,6 +189,12 @@ jobs:
               gh api "repos/$repo/git/refs/heads/$branch" --method DELETE --silent 2>/dev/null || true
               return 1
             fi
+            if [ "$guard_conc" != "success" ]; then
+              echo "    gated: guard conclusion='${guard_conc:-missing}' (expected success); abandoning $repo"
+              gh api "repos/$repo/git/refs/heads/$branch" --method DELETE --silent 2>/dev/null || true
+              return 1
+            fi
+            echo "    gated: gate + repo-guard green on $branch"
             local update
             if update=$(printf '{"sha":"%s","force":false}' "$new_commit" \
                         | gh api "repos/$repo/git/refs/heads/main" --method PATCH --input - --jq '.object.sha' 2>/dev/null) \
