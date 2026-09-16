@@ -315,6 +315,38 @@ jobs:
             -H "Content-Type: application/json" \
             --data-binary @/tmp/desc-backfill-complete.json \
             || echo "⚠️ Storage marker backup failed (non-fatal — R2 canonical marker written; AGG-MARKER-STORAGE-RETRY-1)"
+          node <<'EOF'
+          // AGG-WORKFLOW-STAGETIMINGS-1: per-step durations (kv map, ms integers, stable
+          // labels = step names) from the Jobs API -> desc-backfill-stage-timings.json
+          // (R2, fail-open - instrumentation must never fail the run or the marker).
+          async function emitStageTimings() {
+            const headers = { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' };
+            let job = null;
+            try {
+              const r = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/actions/jobs/${process.env.JOB_ID}`, { headers });
+              if (r.ok) job = await r.json();
+            } catch {}
+            if (!job || !Array.isArray(job.steps)) {
+              try {
+                const r2 = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}/jobs`, { headers });
+                const j = r2.ok ? await r2.json() : null;
+                job = ((j && j.jobs) || []).find((x) => String(x.id) === String(process.env.JOB_ID)) || job;
+              } catch {}
+            }
+            if (!job || !Array.isArray(job.steps)) { console.log('stage timings: job steps unavailable (non-fatal)'); return; }
+            const stage_timings = {};
+            for (const s of job.steps) {
+              if (!s.started_at || !s.completed_at) continue;
+              stage_timings[s.name] = Math.max(0, Math.round(new Date(s.completed_at) - new Date(s.started_at)));
+            }
+            const payload = JSON.stringify({ schema: 'stage-timings-v1', lane_name: 'desc-backfill', run_id: process.env.GITHUB_RUN_ID, generated_at: new Date().toISOString(), stage_timings });
+            const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+            const r2 = createR2Client({ prefix: 'data/' });
+            const ok = await r2.uploadRaw('desc-backfill-stage-timings.json', payload, 'application/json');
+            console.log(ok ? 'stage timings: emitted' : 'stage timings: R2 upload returned false (non-fatal)');
+          }
+          emitStageTimings().catch((err) => console.log('stage timings: skipped (' + err.message + ') - non-fatal'));
+          EOF
           echo "Marker: ${STATUS} at ${COMPLETED_AT} (WD=${WD_LINES}, SR=${SR_LINES})"
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -323,6 +355,8 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          GITHUB_TOKEN: ${{ github.token }}
+          JOB_ID: ${{ github.job }}
 
       # AGG-DESCBACKFILL-CANCELRACE-1 (2026-09-14): a CANCELLED run used to leave the
       # marker at in_progress forever (cancellation skips the completion write), so the
