@@ -472,7 +472,8 @@ jobs:
 
     - name: "Mark sidecar generation in progress — upload phase only (AGG-FETCHJOBS-MARKER-WINDOW-1)"
       run: |
-        MARKER='{"status":"in_progress","run_id":"'"${GITHUB_RUN_ID}"'","started_at":"'"$(date -u +"%Y-%m-%dT%H:%M:%SZ")"'"}'
+        TS="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+        MARKER='{"status":"in_progress","run_id":"'"${GITHUB_RUN_ID}"'","started_at":"'"${TS}"'","updated_at":"'"${TS}"'"}'
         printf '%s' "$MARKER" > /tmp/fetch-jobs-sidecar-complete.json
         # AGG-MARKER-STORAGE-RETRY-1: R2 marker FIRST and fatal — R2 is canonical and the
         # ONLY reader path (ENR agg-snapshot-gate reads R2). Storage is a backup copy with
@@ -504,6 +505,41 @@ jobs:
         R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
+    - name: "Flip sidecar marker to failed on cancellation (AGG-DESCBACKFILL-CANCELRACE-1)"
+      if: cancelled()
+      run: |
+        # A CANCELLED run can be killed before the if:always() completion write lands,
+        # leaving the marker at in_progress forever (C248 zombie class - the gate burns
+        # its wait caps polling it). This runs ONLY on cancellation and flips OUR OWN
+        # in_progress marker to failed (double guard: run_id match AND status still
+        # in_progress - never touches a successor's marker, never downgrades a completed
+        # run). The gate fails fast on status=failed; the next run's marker restores it.
+        # Mirrors the production-proven desc-backfill.yml flip (landed 2026-09-14).
+        node <<'EOF'
+        const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+        async function main() {
+          const r2 = createR2Client({ prefix: 'data/' });
+          const current = await r2.downloadJson('fetch-jobs-sidecar-complete.json');
+          if (!current || current.status !== 'in_progress') {
+            console.log('Marker status ' + (current ? current.status : 'missing') + ' - nothing to clean up');
+            return;
+          }
+          if (String(current.run_id) !== String(process.env.GITHUB_RUN_ID)) {
+            console.log('Marker run_id ' + current.run_id + ' != ' + process.env.GITHUB_RUN_ID + ' - a newer run owns it; not touching');
+            return;
+          }
+          const marker = JSON.stringify({ status: 'failed', run_id: process.env.GITHUB_RUN_ID, started_at: current.started_at || null, note: 'run cancelled mid-flight (AGG-DESCBACKFILL-CANCELRACE-1)' });
+          const ok = await r2.uploadRaw('fetch-jobs-sidecar-complete.json', marker, 'application/json');
+          console.log(ok ? 'Marker flipped to failed (cancelled run, run_id guarded)' : 'R2 marker upload returned false (non-fatal)');
+        }
+        main().catch(err => { console.error('cleanup failed (non-fatal): ' + err.message); });
+        EOF
+      env:
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
     - name: "Upload pipeline data to Supabase Storage"
       id: upload_pipeline_data
       if: success()
@@ -524,9 +560,8 @@ jobs:
         if [ "${{ steps.upload_pipeline_data.outcome }}" != "success" ]; then STATUS=failed; fi
         ORACLE_LINES=$(wc -l < .github/data/descriptions-oracle.jsonl 2>/dev/null || echo 0)
         COMPLETED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        echo "{\"sidecars_written_at\":\"${COMPLETED_AT}\",\"oracle_entries\":${ORACLE_LINES},\"status\":\"${STATUS}\",\"run_id\":\"${GITHUB_RUN_ID}\"}" > /tmp/fetch-jobs-sidecar-complete.json
         # AGG-MARKER-STORAGE-RETRY-1: R2 first (fatal, only reader path) — Storage backup
-        # second (bounded retry, non-fatal). See in_progress marker step for full rationale.
+        echo "{\"sidecars_written_at\":\"${COMPLETED_AT}\",\"oracle_entries\":${ORACLE_LINES},\"status\":\"${STATUS}\",\"run_id\":\"${GITHUB_RUN_ID}\",\"updated_at\":\"${COMPLETED_AT}\"}" > /tmp/fetch-jobs-sidecar-complete.json
         node <<'EOF'
         const fs = require('fs');
         const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
