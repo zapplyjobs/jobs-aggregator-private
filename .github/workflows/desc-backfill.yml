@@ -330,7 +330,7 @@ jobs:
               try {
                 const r2 = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}/jobs`, { headers });
                 const j = r2.ok ? await r2.json() : null;
-                job = ((j && j.jobs) || []).find((x) => String(x.id) === String(process.env.JOB_ID)) || job;
+                job = ((j && j.jobs) || []).find((x) => String(x.id) === String(process.env.JOB_ID) || x.name === process.env.GITHUB_JOB) || job;
               } catch {}
             }
             if (!job || !Array.isArray(job.steps)) { console.log('stage timings: job steps unavailable (non-fatal)'); return; }
