@@ -1,0 +1,67 @@
+name: Post Landing Watch
+
+# AGG-POSTLANDING-WATCH-1 (A291): mechanizes the contract Pipeline Change
+# Verification Checklist first row. After ANY main landing, watch the FIRST
+# Fetch All Jobs run at that SHA; page Discord on failure so the landing owner
+# triages or reverts immediately (the 85-min be14f39 red window 2026-09-15 was
+# discovered only reactively). Trigger policy: push-triggered code-change work
+# (AGG-WORKFLOW-DISPATCH-AUDIT-1 acceptable pattern 3).
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: post-landing-watch
+  cancel-in-progress: true # rapid successive pins collapse to the newest landing
+
+permissions:
+  actions: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Watch the first Fetch All Jobs run at this SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          RUN_REPO: ${{ github.repository }}
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TEAM_TOKEN }}
+          CHANNEL_ID: ${{ secrets.DISCORD_PIPELINE_ALERT_CHANNEL_ID }}
+        run: |
+          set -uo pipefail
+          RUN_ID=""
+          # Wait up to 20 min for the Worker cadence to dispatch this SHA
+          # (hasActiveWorkflowRun may hold dispatch behind a still-running predecessor).
+          for i in $(seq 1 40); do
+            RUN_ID=$(gh api "repos/$RUN_REPO/actions/workflows/fetch-jobs.yml/runs?head_sha=$SHA&per_page=1" --jq '.workflow_runs[0].id // ""')
+            if [ -n "$RUN_ID" ]; then break; fi
+            sleep 30
+          done
+          if [ -z "$RUN_ID" ]; then
+            echo "No Fetch All Jobs dispatch observed for $SHA within 20 min (Worker hold or cadence gap) - non-fatal"
+            exit 0
+          fi
+          C=""
+          for i in $(seq 1 30); do
+            C=$(gh api "repos/$RUN_REPO/actions/runs/$RUN_ID" --jq '.status + " " + (.conclusion // "")')
+            echo "watch: $C"
+            case "$C" in
+              "completed "*) break ;;
+            esac
+            sleep 45
+          done
+          if echo "$C" | grep -q "completed success"; then
+            echo "Post-landing run $RUN_ID GREEN at $SHA"
+            exit 0
+          fi
+          RUN_URL="https://github.com/$RUN_REPO/actions/runs/$RUN_ID"
+          MSG="🚨 **AGG post-landing watch: Fetch All Jobs FAILED on freshly landed main**\n• SHA: ${SHA}\n• Run: ${RUN_URL}\nAction: landing owner triages or reverts before the pool degrades"
+          PAYLOAD=$(printf '{"content":"%s"}' "$MSG")
+          curl -sf -X POST "https://discord.com/api/v10/channels/${CHANNEL_ID}/messages" \
+            -H "Authorization: Bot ${DISCORD_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" || echo "Discord alert failed (non-fatal)"
+          echo "Post-landing run $RUN_ID FAILED at $SHA - alerted"
