@@ -296,30 +296,11 @@ jobs:
           SR_LINES=$(wc -l < .github/data/descriptions-smartrecruiters.jsonl 2>/dev/null || echo 0)
           COMPLETED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "{\"sidecars_written_at\":\"${COMPLETED_AT}\",\"wd_entries\":${WD_LINES},\"sr_entries\":${SR_LINES},\"status\":\"${STATUS}\",\"run_id\":\"${GITHUB_RUN_ID}\"}" > /tmp/desc-backfill-complete.json
-          # AGG-MARKER-STORAGE-RETRY-1: R2 first (fatal — ENR agg-snapshot-gate reads R2);
-          # Storage backup second, bounded retry, non-fatal.
           node <<'EOF'
-          const fs = require('fs');
-          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-          async function main() {
-            const marker = fs.readFileSync('/tmp/desc-backfill-complete.json');
-            const r2 = createR2Client({ prefix: 'data/' });
-            const ok = await r2.uploadRaw('desc-backfill-complete.json', marker, 'application/json');
-            if (!ok) throw new Error('R2 marker upload returned false');
-          }
-          main().catch(err => { console.error(err.message); process.exit(1); });
-          EOF
-          curl -sf --retry 3 --retry-delay 15 --retry-all-errors -X PUT \
-            "${SUPABASE_URL}/storage/v1/object/pipeline-data/desc-backfill-complete.json" \
-            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-            -H "Content-Type: application/json" \
-            --data-binary @/tmp/desc-backfill-complete.json \
-            || echo "⚠️ Storage marker backup failed (non-fatal — R2 canonical marker written; AGG-MARKER-STORAGE-RETRY-1)"
-          node <<'EOF'
-          // AGG-WORKFLOW-STAGETIMINGS-1: per-step durations (kv map, ms integers, stable
-          // labels = step names) from the Jobs API -> desc-backfill-stage-timings.json
-          // (R2, fail-open - instrumentation must never fail the run or the marker).
-          async function emitStageTimings() {
+          // AGG-WORKFLOW-STAGETIMINGS-1: per-step durations (kv map, ms integers, step
+          // names) from the Jobs API, folded INTO the completion marker (no separate
+          // artifact; additive fields only). Fail-open: never blocks the marker.
+          async function addStageTimings() {
             const headers = { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' };
             let job = null;
             try {
@@ -339,14 +320,33 @@ jobs:
               if (!s.started_at || !s.completed_at) continue;
               stage_timings[s.name] = Math.max(0, Math.round(new Date(s.completed_at) - new Date(s.started_at)));
             }
-            const payload = JSON.stringify({ schema: 'stage-timings-v1', lane_name: 'desc-backfill', run_id: process.env.GITHUB_RUN_ID, generated_at: new Date().toISOString(), stage_timings });
-            const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
-            const r2 = createR2Client({ prefix: 'data/' });
-            const ok = await r2.uploadRaw('desc-backfill-stage-timings.json', payload, 'application/json');
-            console.log(ok ? 'stage timings: emitted' : 'stage timings: R2 upload returned false (non-fatal)');
+            const fs = require('fs');
+            const marker = JSON.parse(fs.readFileSync('/tmp/desc-backfill-complete.json', 'utf8'));
+            marker.stage_timings = stage_timings;
+            fs.writeFileSync('/tmp/desc-backfill-complete.json', JSON.stringify(marker), 'utf8');
+            console.log('stage timings: folded into marker (' + Object.keys(stage_timings).length + ' steps)');
           }
-          emitStageTimings().catch((err) => console.log('stage timings: skipped (' + err.message + ') - non-fatal'));
+          addStageTimings().catch((err) => console.log('stage timings: skipped (' + err.message + ') - non-fatal'));
           EOF
+          # AGG-MARKER-STORAGE-RETRY-1: R2 first (fatal — ENR agg-snapshot-gate reads R2);
+          # Storage backup second, bounded retry, non-fatal.
+          node <<'EOF'
+          const fs = require('fs');
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          async function main() {
+            const marker = fs.readFileSync('/tmp/desc-backfill-complete.json');
+            const r2 = createR2Client({ prefix: 'data/' });
+            const ok = await r2.uploadRaw('desc-backfill-complete.json', marker, 'application/json');
+            if (!ok) throw new Error('R2 marker upload returned false');
+          }
+          main().catch(err => { console.error(err.message); process.exit(1); });
+          EOF
+          curl -sf --retry 3 --retry-delay 15 --retry-all-errors -X PUT \
+            "${SUPABASE_URL}/storage/v1/object/pipeline-data/desc-backfill-complete.json" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/desc-backfill-complete.json \
+            || echo "⚠️ Storage marker backup failed (non-fatal — R2 canonical marker written; AGG-MARKER-STORAGE-RETRY-1)"
           echo "Marker: ${STATUS} at ${COMPLETED_AT} (WD=${WD_LINES}, SR=${SR_LINES})"
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
