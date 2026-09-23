@@ -16,9 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 1
+          fetch-depth: 2
           submodules: recursive
           token: ${{ secrets.GH_PAT }}
+      - name: Check aggregator pin ancestry (AGG-PIN-ANCESTOR-GUARD-1)
+        run: bash .github/scripts/check-pin-ancestor.sh
+
       - name: Install transcrypt
         run: |
           curl -sSL https://raw.githubusercontent.com/elasticdog/transcrypt/5effa13/transcrypt -o /tmp/transcrypt
