@@ -15,7 +15,7 @@ concurrency:
 jobs:
   fetch-all:
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # INF-CANCELCASCADE-DIAG-1 recovery headroom (temporary): first post-fix run full-re-derives once before the A1 gate starts skipping; revert to 20 with the DRIFTDBG cleanup
+    timeout-minutes: 20
     permissions:
       contents: write
 
