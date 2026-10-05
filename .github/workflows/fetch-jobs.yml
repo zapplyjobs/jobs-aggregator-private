@@ -647,6 +647,15 @@ jobs:
         echo "📋 Fetch Output (last 50 lines):"
         tail -50 .github/logs/fetch.log || echo "Log file not found"
 
+    - name: Upload fetch log on failure or cancellation (INF-1007 B1)
+      if: failure() || cancelled()
+      uses: actions/upload-artifact@v4
+      with:
+        name: fetch-log-postmortem
+        path: .github/logs/fetch.log
+        retention-days: 14
+        if-no-files-found: ignore
+
     - name: Verify output files
       if: always()
       run: |
