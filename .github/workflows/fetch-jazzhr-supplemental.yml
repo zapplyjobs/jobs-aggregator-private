@@ -1,0 +1,94 @@
+name: Fetch JazzHR Supplemental
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 * * * *'  # hourly GHA self-trigger (Workflow Trigger Policy option 1). JazzHR supply is slow-moving SMB/industrial volume; seen-set diff + 250/run detail budget converges in ~2-3 days from cold. Worker dual-trigger rider to INF (AGG-FAMWORK-WORKERRIDER-1 pattern).
+concurrency:
+  group: fetch-jazzhr-supplemental
+  cancel-in-progress: false
+
+jobs:
+  fetch-jazzhr-supplemental:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      NODE_OPTIONS: --max-old-space-size=4096
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 1
+          submodules: recursive
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Install transcrypt
+        run: |
+          curl -sSL https://raw.githubusercontent.com/elasticdog/transcrypt/5effa13/transcrypt -o /tmp/transcrypt
+          chmod +x /tmp/transcrypt
+          sudo mv /tmp/transcrypt /usr/local/bin/transcrypt
+
+      - name: Unlock encrypted files
+        run: |
+          echo "Y" | transcrypt --cipher aes-256-cbc --password "$TRANSCRYPT_PASSWORD" --force
+          git checkout -- .
+          git submodule foreach --recursive '
+            echo "Y" | transcrypt --cipher aes-256-cbc --password "'"$TRANSCRYPT_PASSWORD"'" --force 2>/dev/null || true
+            rm -f "$(git rev-parse --git-dir)/index" 2>/dev/null || true
+            git checkout HEAD -- . 2>/dev/null || true
+          ' || true
+        env:
+          TRANSCRYPT_PASSWORD: ${{ secrets.TRANSCRYPT_PASSWORD }}
+
+      - name: Fix submodule index
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --force --recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create data directory
+        run: mkdir -p .github/data
+
+      - name: Seed JazzHR lane state from R2
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          node -e "
+          const { createR2Client } = require('./.github/scripts/aggregator/lib/storage/r2-client');
+          async function downloadMaybe(r2, key, file) {
+            const result = await r2.downloadToFile(key, file);
+            console.log((result ? 'R2_OK' : 'R2_MISS') + ' ' + key);
+          }
+          (async () => {
+            const r2 = createR2Client({ prefix: 'data/' });
+            await downloadMaybe(r2, 'jazzhr-lane-state.json', '.github/data/jazzhr-lane-state.json');
+            await downloadMaybe(r2, 'supplemental-jazzhr-jobs.json', '.github/data/supplemental-jazzhr-jobs.json');
+            await downloadMaybe(r2, 'supplemental-jazzhr-metadata.json', '.github/data/supplemental-jazzhr-metadata.json');
+          })().catch(e => { console.error('seed failed', e.message); process.exit(1); });
+          "
+
+      - name: Fetch JazzHR jobs
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: node .github/scripts/fetch-supplemental-jazzhr.js
