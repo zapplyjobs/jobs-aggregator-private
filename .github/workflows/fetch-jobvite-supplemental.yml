@@ -19,6 +19,11 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       NODE_OPTIONS: --max-old-space-size=4096
+      # A303 (AGG-JOBVITE-DETAILFAIL-FIX-1 item c): this lane reads ITS OWN env
+      # names now (the producer historically read PHENOM_DETAIL_BUDGET, silently
+      # coupling the two lanes' budgets). Floor 8 x 29 tenants ~= the 250 budget.
+      JOBVITE_DETAIL_BUDGET: '250'
+      JOBVITE_DETAIL_FLOOR: '8'
 
     steps:
       - name: Checkout repository
