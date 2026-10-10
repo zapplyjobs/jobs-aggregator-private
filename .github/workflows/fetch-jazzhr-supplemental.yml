@@ -19,6 +19,12 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       NODE_OPTIONS: --max-old-space-size=4096
+      # AGG-JAZZHR-DETAILJSONLD-REJECT-1: sub-threshold detail pacing (rate-shell
+      # class measured 2026-10-10); 70s x 10 fits the 15-min timeout. Producer
+      # derives budget from pace when JAZZHR_DETAIL_BUDGET is unset - set both
+      # together when retuning.
+      JAZZHR_DETAIL_PACING_MS: '70000'
+      JAZZHR_DETAIL_BUDGET: '10'
 
     steps:
       - name: Checkout repository
